@@ -1,0 +1,3 @@
+import { actor, db } from '../../../../../lib/store';
+export const dynamic='force-dynamic';
+export async function GET(req:Request){try{if(!await actor(req))return Response.json({error:'관리자 인증이 필요합니다.'},{status:401});const id=new URL(req.url).searchParams.get('asset_id')||'';const row=await db().prepare('SELECT mime_type,bytes,expires_at FROM growth_review_assets WHERE asset_id=?').bind(id).first<any>();if(!row||Date.parse(row.expires_at)<=Date.now())return Response.json({error:'확인 이미지를 찾을 수 없습니다.'},{status:404});return new Response(row.bytes,{headers:{'Content-Type':row.mime_type,'Cache-Control':'private,no-store','X-Content-Type-Options':'nosniff'}});}catch{return Response.json({error:'확인 이미지를 읽지 못했습니다.'},{status:503});}}

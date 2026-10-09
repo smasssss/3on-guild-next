@@ -1,0 +1,2 @@
+import { response } from '../../../../lib/store';
+export async function GET(req:Request){return response(req,{schema:'3on-growth-package-v1',observed_date:'2026-10-10',slot:'day',expected_member_count:2,source_hashes:['0'.repeat(64)],rows:[{raw_name:'예시확정',normalized_candidate:'예시확정',rank:'R3',level:28,power:50000000,uncertain:false,source_position:{file:'01.jpg',row:1}},{raw_name:'애매한이름',normalized_candidate:'애매한이름',rank:'R2',level:25,power:30000000,uncertain:true,uncertainty_reason:'닉네임 글자 확인 필요',source_position:{file:'01.jpg',row:2}}]});}

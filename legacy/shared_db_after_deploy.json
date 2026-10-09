@@ -1,0 +1,239 @@
+{
+  "schema": "3on-shared-backup-v1",
+  "exportedAt": "2026-10-08T18:50:42.474Z",
+  "documents": [
+    {
+      "kind": "carriage",
+      "revision": 10,
+      "data": {
+        "pointer": 0,
+        "records": [
+          {
+            "id": "muxwwro6pnzdy",
+            "date": "2026-10-07",
+            "weekKey": "2026-10-05",
+            "type": "base",
+            "leader": "두리",
+            "leaderCanonical": "내가두려운가",
+            "vip": "문어치즈",
+            "vipCanonical": "문어치즈",
+            "leaderSnapshot": {
+              "rank": "R3",
+              "level": 28,
+              "power": 63978581,
+              "date": "2026-10-06"
+            },
+            "vipSnapshot": {
+              "rank": "R4",
+              "level": 27,
+              "power": 34546463,
+              "date": "2026-10-06"
+            },
+            "memo": "",
+            "createdAt": 1791365740566
+          },
+          {
+            "id": "muzi6o3aqz13h",
+            "date": "2026-10-08",
+            "weekKey": "2026-10-05",
+            "type": "base",
+            "leader": "야생야옹아",
+            "leaderCanonical": "야생야옹아",
+            "vip": "Nameless-",
+            "vipCanonical": "Nameless-",
+            "leaderSnapshot": {
+              "rank": "R3",
+              "level": 29,
+              "power": 52814553,
+              "date": "2026-10-07"
+            },
+            "vipSnapshot": {
+              "rank": "R2",
+              "level": 26,
+              "power": 31877622,
+              "date": "2026-10-07"
+            },
+            "memo": "",
+            "createdAt": 1791461940598
+          }
+        ],
+        "vipCarry": {}
+      },
+      "updatedAt": "2026-10-08T12:19:01.248Z"
+    },
+    {
+      "kind": "power",
+      "revision": 1,
+      "data": {
+        "version": 1,
+        "weeks": [
+          {
+            "date": "2026-10-08",
+            "source": "사용자 제공 협곡대전 1소대 자료",
+            "members": [
+              {
+                "id": "guild:아일리",
+                "nickname": "아일리˚",
+                "displayName": "아일리˚",
+                "power": 18868882,
+                "rank": 1
+              },
+              {
+                "id": "guild:내가두려운가",
+                "nickname": "꧁ᬊ두리ᬊ꧂",
+                "displayName": "꧁ᬊ두리ᬊ꧂",
+                "power": 17032994,
+                "rank": 2
+              },
+              {
+                "id": "guild:으나으나1",
+                "nickname": "으나으나",
+                "displayName": "으나으나",
+                "power": 15416439,
+                "rank": 3
+              },
+              {
+                "id": "guild:닥종닥테닥",
+                "nickname": "닥중닥테닥",
+                "displayName": "닥중닥테닥",
+                "power": 15217425,
+                "rank": 4
+              },
+              {
+                "id": "guild:BelialKing",
+                "nickname": "BelialKing",
+                "displayName": "BelialKing",
+                "power": 15110235,
+                "rank": 5
+              },
+              {
+                "id": "guild:공 주",
+                "nickname": "공 주",
+                "displayName": "공 주",
+                "power": 14803956,
+                "rank": 6
+              },
+              {
+                "id": "guild:핵불잡",
+                "nickname": "핵불잙",
+                "displayName": "핵불잙",
+                "power": 14601455,
+                "rank": 7
+              },
+              {
+                "id": "guild:반달gh",
+                "nickname": "반달gh",
+                "displayName": "반달gh",
+                "power": 14575395,
+                "rank": 8
+              },
+              {
+                "id": "guild:백구김구",
+                "nickname": "백구김구",
+                "displayName": "백구김구",
+                "power": 13295865,
+                "rank": 9
+              },
+              {
+                "id": "guild:포도",
+                "nickname": "포도",
+                "displayName": "포도",
+                "power": 13160635,
+                "rank": 10
+              },
+              {
+                "id": "guild:얼음많이",
+                "nickname": "얼음많이",
+                "displayName": "얼음많이",
+                "power": 12621391,
+                "rank": 11
+              },
+              {
+                "id": "guild:링",
+                "nickname": "ㅤ링ㅤ",
+                "displayName": "ㅤ링ㅤ",
+                "power": 12377109,
+                "rank": 12
+              },
+              {
+                "id": "guild:문어치즈",
+                "nickname": "문어치즈",
+                "displayName": "문어치즈",
+                "power": 12169023,
+                "rank": 13
+              },
+              {
+                "id": "guild:이도동",
+                "nickname": "이도동",
+                "displayName": "이도동",
+                "power": 11800000,
+                "rank": 14
+              },
+              {
+                "id": "guild:눈도깜짝안한다",
+                "nickname": "눈도깜짝안한다",
+                "displayName": "눈도깜짝안한다",
+                "power": 11728079,
+                "rank": 15
+              },
+              {
+                "id": "guild:준이민이파파",
+                "nickname": "준이민이파파",
+                "displayName": "준이민이파파",
+                "power": 11262229,
+                "rank": 16
+              },
+              {
+                "id": "guild:워워",
+                "nickname": "워워",
+                "displayName": "워워",
+                "power": 11200000,
+                "rank": 17
+              },
+              {
+                "id": "guild:Cs2Таня",
+                "nickname": "TanyaCs",
+                "displayName": "TanyaCs",
+                "power": 10924504,
+                "rank": 18
+              },
+              {
+                "id": "guild:크림쿡",
+                "nickname": "크림쿜",
+                "displayName": "크림쿜",
+                "power": 10776534,
+                "rank": 19
+              },
+              {
+                "id": "guild:볼트트",
+                "nickname": "볼트트",
+                "displayName": "볼트트",
+                "power": 9426192,
+                "rank": 20
+              }
+            ]
+          }
+        ]
+      },
+      "updatedAt": "2026-10-07T07:54:14.509Z"
+    },
+    {
+      "kind": "memos",
+      "revision": 7,
+      "data": {
+        "version": 1,
+        "members": {
+          "guild:아일리": {
+            "text": "🥕",
+            "updatedAt": "2026-10-07T10:01:42.775Z"
+          },
+          "guild:내가두려운가": {
+            "text": "",
+            "updatedAt": "2026-10-07T09:40:59.032Z"
+          }
+        }
+      },
+      "updatedAt": "2026-10-07T10:01:43.814Z"
+    }
+  ]
+}

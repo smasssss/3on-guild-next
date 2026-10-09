@@ -1,0 +1,31 @@
+{
+  "status": "PASS",
+  "environment": "isolated managed Staging Site/D1",
+  "site_project_id": "appgprj_6ac90bf8dc7c8191846ff5631ba93f5b",
+  "tested_source_commit": "fa8e570dccf7de89de32af06091dcdf9a4ef6e0a",
+  "deployment_id": "appgdep_6ac917bc4b2881918e31f9db605f7bd1",
+  "checks_passed": 34,
+  "baseline_probe": {
+    "growth_revision": 1,
+    "identity_revision": 1,
+    "observed_date": "2026-10-08",
+    "current_members": 87,
+    "archived_members": 13,
+    "history": 4027,
+    "documents": {
+      "carriage": 14,
+      "power": 1,
+      "memos": 7
+    }
+  },
+  "covered": [
+    "login/wrong-password/logout/unauthorized-write",
+    "package upload and semantic/package/source duplicate handling",
+    "review queue, existing connection, direct new member, hold",
+    "publish CAS/idempotency/response-loss retry",
+    "correction, supersede, withdrawal and publication restore",
+    "two-device stale draft conflict and atomic publication preservation",
+    "partial/schema validation",
+    "carriage/power/memos revision preservation"
+  ]
+}

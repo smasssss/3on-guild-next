@@ -1,0 +1,40 @@
+{
+  "status": "PASS",
+  "api_revision": 1,
+  "identity_revision": 1,
+  "counts": {
+    "current": 87,
+    "archived": 13,
+    "total": 100,
+    "history": 4027,
+    "missing": 53,
+    "duplicate_groups": 71,
+    "duplicate_entries": 142,
+    "hyune_profile": 51
+  },
+  "rank_distribution": {
+    "R1": 17,
+    "R2": 30,
+    "R3": 33,
+    "R4": 6,
+    "R5": 1
+  },
+  "legacy_payload_sha256": "7d5ecac8a1f1a9556955bdf0b71ad5e74f4f856fa5b5e811bb072b0b0a111465",
+  "migrated_payload_sha256": "7d5ecac8a1f1a9556955bdf0b71ad5e74f4f856fa5b5e811bb072b0b0a111465",
+  "derived_metrics_sha256": "7f657c39afb2d4325c26089038da5e2137e53d78e69f2153d86bd6c9831ce65a",
+  "checks": {
+    "exact_legacy_payload": true,
+    "current_count": true,
+    "archived_count": true,
+    "history_count": true,
+    "missing_count": true,
+    "nickname_changes": true,
+    "profile_history": true,
+    "duplicate_groups": true,
+    "derived_current_prev_cumulative_average_recent7_weekly_graph_sort": true,
+    "identity_duri": true,
+    "identity_fire": true,
+    "identity_cream": true,
+    "identity_yong_distinct": true
+  }
+}

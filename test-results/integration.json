@@ -1,0 +1,175 @@
+{
+  "base": "http://127.0.0.1:8801",
+  "results": [
+    {
+      "name": "legacy current count",
+      "status": "PASS",
+      "detail": "87"
+    },
+    {
+      "name": "legacy growth revision",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "legacy observed date",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "rank distribution",
+      "status": "PASS",
+      "detail": "{'R1': 17, 'R2': 30, 'R3': 33, 'R4': 6, 'R5': 1}"
+    },
+    {
+      "name": "state remains three documents",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "seed document revisions",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "legacy envelope current/archived",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "legacy history count",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "missing preserved",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "nickname changes preserved",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "HyunE profile history",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "wrong password rejected",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "login/session",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "unauthorized growth write rejected",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "full package ready",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "duplicate package idempotent",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "atomic publish revision",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "publish response-loss retry",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "published current revision",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "correction supersedes atomically",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "correction withdrawal restores target",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "review queue created",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "connect/new/direct review",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "identity revision on new member",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "new member published with carry-forward",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "withdraw idempotency",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "withdraw restores previous publication",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "review mutation idempotency",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "stale review leaves publication unchanged",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "partial package blocking warning",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "schema/source/partial validation",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "logout",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "logged-out token rejected",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "growth operations preserve operation documents",
+      "status": "PASS",
+      "detail": ""
+    }
+  ]
+}
