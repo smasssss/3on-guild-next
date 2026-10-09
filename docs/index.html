@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>3ON 성장기록 Staging</title>
+  <style>
+    :root{--bg:#08111b;--panel:#122132;--line:#304963;--text:#f7f9fc;--muted:#9fb2c6;--blue:#78c7ff;--green:#59dda4;--yellow:#ffd06f}
+    *{box-sizing:border-box}html{background:var(--bg)}body{margin:0;background:linear-gradient(180deg,#0d1b2b,#08111b 320px);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Noto Sans KR","Malgun Gothic",sans-serif}
+    main{max-width:980px;margin:auto;padding:18px 12px 80px}header{padding:12px 4px 16px}.brand{display:flex;align-items:center;gap:9px;font-size:12px}.mark{display:grid;place-items:center;width:42px;height:30px;border-radius:8px;background:#cf453c;border:1px solid #ff8b82;font-weight:900}.brand span{font-weight:800;color:#cfe9ff}h1{font-size:26px;margin:10px 0 5px}header p{color:var(--muted);margin:0}.banner,.sync,.kpis>div,.member{background:var(--panel);border:1px solid var(--line);border-radius:13px}.banner{padding:13px;margin:10px 0;border-left:4px solid var(--yellow)}.banner b{display:block}.banner small{color:var(--muted)}.sync{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:12px;margin:10px 0}.sync span{font-size:12px;color:var(--muted)}.sync.stale{border-color:#8b6f28}.kpis{display:grid;grid-template-columns:1fr 1fr 2fr;gap:8px}.kpis>div{padding:12px}.kpis span,.member span,.member small{display:block;color:var(--muted);font-size:11px}.kpis b{display:block;margin-top:5px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}.member{padding:11px;min-width:0}.member h2{font-size:16px;margin:5px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.member small{margin-top:6px}.admin{display:inline-flex;align-items:center;min-height:44px;margin-top:14px;padding:9px 14px;border-radius:10px;background:#e9f4ff;color:#102036;font-weight:900;text-decoration:none}.error{color:#ffb4ba}.empty{text-align:center;color:var(--muted);padding:44px 10px}
+    @media(max-width:640px){main{padding:10px 10px 72px}.kpis{grid-template-columns:1fr 1fr}.kpis>div:last-child{grid-column:1/-1}.grid{grid-template-columns:1fr 1fr}}
+    @media(max-width:340px){.grid,.kpis{grid-template-columns:1fr}.kpis>div:last-child{grid-column:auto}h1{font-size:22px}}
+  </style>
+</head>
+<body>
+<main>
+  <header><div class="brand"><b class="mark">3ON</b><span>차세대 성장기록</span></div><h1>성장기록 Staging</h1><p>Production과 분리된 2차 검증 화면</p></header>
+  <section class="banner"><b>Staging 전용</b><small>여기서 보이는 자료와 변경은 기존 운영 웹·DB에 영향을 주지 않습니다.</small></section>
+  <section id="sync" class="sync"><b id="status">불러오는 중…</b><span id="time"></span></section>
+  <section class="kpis"><div><span>관측일</span><b id="date">-</b></div><div><span>현재 인원</span><b id="count">-</b></div><div><span>공개 revision</span><b id="revision">-</b></div></section>
+  <section id="members" class="grid"><p class="empty">성장자료를 불러오고 있습니다.</p></section>
+  <a class="admin" href="https://threeon-next-staging.alswlgns2.chatgpt.site" rel="noopener">관리자 업로드·검토 화면</a>
+</main>
+<script>
+  const API='https://threeon-next-staging.alswlgns2.chatgpt.site/api/growth/current';
+  const CACHE='3on_growth_staging_public_cache_v1';
+  const el=id=>document.getElementById(id);
+  const num=v=>Number(v||0).toLocaleString('ko-KR');
+  function render(payload,stale=false){
+    const data=payload.data||payload;
+    const members=data.members||[];
+    el('date').textContent=data.date||payload.observed_date||'-';
+    el('count').textContent=num(members.length)+'명';
+    el('revision').textContent=String(payload.revision??'-');
+    el('status').textContent=stale?'마지막 승인 cache 표시 중':'Staging API 동기화 완료';
+    el('sync').classList.toggle('stale',stale);
+    el('time').textContent=(stale?'마지막 동기화: ':'동기화: ')+(new Date(payload.cached_at||Date.now())).toLocaleString('ko-KR');
+    el('members').innerHTML=members.length?members.map(m=>`<article class="member"><span>${m.rank||'등급 미상'} · Lv.${m.level??'?'}</span><h2>${escapeHtml(m.displayName||m.name||'이름 미상')}</h2><b>${num(m.power)}</b><small>canonical: ${escapeHtml(m.name||'-')}</small></article>`).join(''):'<p class="empty">현재 길드원이 없습니다.</p>';
+  }
+  function escapeHtml(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  async function load(){
+    try{const r=await fetch(API,{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);const p=await r.json();p.cached_at=Date.now();localStorage.setItem(CACHE,JSON.stringify(p));render(p,false);}
+    catch(err){const cached=localStorage.getItem(CACHE);if(cached){render(JSON.parse(cached),true);}else{el('status').textContent='Staging API 연결 실패';el('status').className='error';el('members').innerHTML='<p class="empty">승인된 cache가 없습니다. 잠시 후 다시 시도해 주세요.</p>';}}
+  }
+  load();
+</script>
+</body>
+</html>
