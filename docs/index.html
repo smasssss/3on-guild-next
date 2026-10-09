@@ -36,7 +36,7 @@
     el('status').textContent=stale?'마지막 승인 cache 표시 중':'Staging API 동기화 완료';
     el('sync').classList.toggle('stale',stale);
     el('time').textContent=(stale?'마지막 동기화: ':'동기화: ')+(new Date(payload.cached_at||Date.now())).toLocaleString('ko-KR');
-    el('members').innerHTML=members.length?members.map(m=>`<article class="member"><span>${m.rank||'등급 미상'} · Lv.${m.level??'?'}</span><h2>${escapeHtml(m.displayName||m.name||'이름 미상')}</h2><b>${num(m.power)}</b><small>canonical: ${escapeHtml(m.name||'-')}</small></article>`).join(''):'<p class="empty">현재 길드원이 없습니다.</p>';
+    el('members').innerHTML=members.length?members.map(m=>`<article class="member"><span>${m.rank||'등급 미상'} · Lv.${m.level??'?'}</span><h2>${escapeHtml(m.display_name||m.displayName||m.name||'이름 미상')}</h2><b>${num(m.power)}</b><small>canonical: ${escapeHtml(m.canonical||m.legacy_canonical||m.name||'-')}</small></article>`).join(''):'<p class="empty">현재 길드원이 없습니다.</p>';
   }
   function escapeHtml(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
   async function load(){
