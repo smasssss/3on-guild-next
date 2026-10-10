@@ -1,7 +1,7 @@
 import { db, hash } from './store';
 
-export const GROWTH_SCHEMA='3on-growth-v1';
-export const GROWTH_API='3on-growth-api-v1';
+export const GROWTH_SCHEMA='3on-growth-v1.1';
+export const GROWTH_API='3on-growth-api-v1.1';
 export const PACKAGE_SCHEMA='3on-growth-package-v1';
 export const MAX_PACKAGE_BYTES=1_500_000;
 export const MAX_CROP_BYTES=65_536;
