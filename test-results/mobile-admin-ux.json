@@ -1,0 +1,150 @@
+{
+  "base": "http://127.0.0.1:8791",
+  "results": [
+    {
+      "name": "four primary admin menus",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "review uses overlay",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "previous next navigation",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "decision confirmation",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "draft undo and changes",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "two step publish",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "draft vs withdrawal wording",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "staging regression separated",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "mobile breakpoints",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "fixed mobile action bar",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "horizontal overflow guarded",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "baseline current members",
+      "status": "PASS",
+      "detail": "87"
+    },
+    {
+      "name": "review draft created",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "server batch summary",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "connect recorded as draft change",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "server side undo",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "reapply after undo",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "new member change",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "new member cancellation",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "direct number edit",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "undo restores previous edit",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "hold separated from required",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "hold returns to review",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "all required decisions complete",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "change list consolidated",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "atomic publish and retry",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "published changes retained for result",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "published withdrawal restores prior batch",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "operational documents unchanged",
+      "status": "PASS",
+      "detail": "{'carriage': 14, 'power': 1, 'memos': 7}"
+    }
+  ]
+}
