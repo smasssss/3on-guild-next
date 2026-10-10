@@ -54,4 +54,4 @@ next-env.d.ts
 /3ON_PHASE*_CHAT_HANDOFF*.zip
 /3ON_PHASE*_PACKAGE_CONTENTS.md
 /3ON_PHASE*_STAGING*.md
-/3on-next-*-deploy.tar.gz
+/3on-next-*.tar.gz

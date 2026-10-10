@@ -65,6 +65,7 @@ def run() -> None:
     check("root opens production mirror", "legacy.html" in root_page and "location.replace" in root_page)
     check("five production tabs", all(name in legacy for name in ["성장추적", "협곡대전 1소대", "마차관리", "운영이력", "관리설정"]))
     check("staging environment marker", "STAGING · Production과 분리된 검증 환경" in legacy)
+    check("legacy mirror accepts current growth schema", "r.schema!=='3on-growth-v1.1'" in legacy)
     check("growth update entry", "growthUpdateEntry" in legacy and "./growth-admin" in legacy)
     check("simplified result first flow", all(text in admin_page for text in ["AI 처리 결과", "전체 결과 보기", "이번 변경만 보기", "판독 실패"]))
     check("no general hold action", "action:'hold'" not in admin_page and ">보류<" not in admin_page)

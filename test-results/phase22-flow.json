@@ -1,5 +1,5 @@
 {
-  "base": "http://127.0.0.1:8796",
+  "base": "http://127.0.0.1:8797",
   "results": [
     {
       "name": "production baseline blob",
@@ -18,6 +18,11 @@
     },
     {
       "name": "staging environment marker",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "legacy mirror accepts current growth schema",
       "status": "PASS",
       "detail": ""
     },
