@@ -1,7 +1,7 @@
 {
-  "status": "FAIL",
+  "status": "PASS",
   "checks": {
-    "critical_function_source_preserved": false,
+    "critical_function_source_preserved": true,
     "three_documents": true,
     "document_revisions": true,
     "record_ids_and_snapshots": true,
@@ -47,7 +47,7 @@
     "canyonValidDate": true,
     "canyonValidate": true,
     "canyonLoad": true,
-    "canyonMemo": false,
+    "canyonMemo": true,
     "canyonWrite": true,
     "renderCanyon": true,
     "bindCanyon": true,
