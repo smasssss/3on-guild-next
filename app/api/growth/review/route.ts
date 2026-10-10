@@ -3,12 +3,13 @@ import { sha, validMutation } from '../../../../lib/growth';
 export const dynamic='force-dynamic';
 export function OPTIONS(req:Request){return response(req,{},204);}
 
-const completedStates=new Set(['resolved','new','unobserved']);
+const completedStates=new Set(['resolved','new']);
 const stateFields=['resolution_status','resolved_member_id','proposed_member_id','proposed_display_name','confirm_alias','power','level','rank','membership_state','uncertainty_reason'] as const;
 function snapshot(row:any){return Object.fromEntries(stateFields.map(key=>[key,row[key]??null]));}
 function parseState(raw:string){const value=JSON.parse(raw);for(const key of stateFields)if(!(key in value))value[key]=null;return value;}
 function restoreSql(state:any,rowId:string,batchId:string,guard:string){return db().prepare(`UPDATE growth_batch_rows SET resolution_status=?,resolved_member_id=?,proposed_member_id=?,proposed_display_name=?,confirm_alias=?,power=?,level=?,rank=?,membership_state=?,uncertainty_reason=?,review_version=review_version+1 WHERE row_id=? AND batch_id=? AND EXISTS(SELECT 1 FROM growth_tx_guards WHERE guard_id=?)`).bind(state.resolution_status,state.resolved_member_id,state.proposed_member_id,state.proposed_display_name,Number(state.confirm_alias||0),state.power,state.level,state.rank,state.membership_state,state.uncertainty_reason,rowId,batchId,guard);}
-function stateRefresh(batchId:string,guard:string){return db().prepare(`UPDATE growth_batches SET state=CASE WHEN NOT EXISTS(SELECT 1 FROM growth_batch_rows WHERE batch_id=? AND resolution_status NOT IN ('resolved','new','unobserved')) AND json_array_length(json_extract(validation_json,'$.blocking'))=0 THEN 'ready' ELSE 'needs_review' END WHERE batch_id=? AND EXISTS(SELECT 1 FROM growth_tx_guards WHERE guard_id=?)`).bind(batchId,batchId,guard);}
+function stateRefresh(batchId:string,guard:string){return db().prepare(`UPDATE growth_batches SET state=CASE WHEN NOT EXISTS(SELECT 1 FROM growth_batch_rows WHERE batch_id=? AND resolution_status NOT IN ('resolved','new')) AND json_array_length(json_extract(validation_json,'$.blocking'))=0 THEN 'ready' ELSE 'needs_review' END WHERE batch_id=? AND EXISTS(SELECT 1 FROM growth_tx_guards WHERE guard_id=?)`).bind(batchId,batchId,guard);}
+function compactName(value:any){return String(value||'').normalize('NFKC').toLocaleLowerCase('ko-KR').replace(/[\s\p{P}\p{S}]/gu,'');}
 
 async function batchView(batchId:string){
   const batch=await db().prepare('SELECT * FROM growth_batches WHERE batch_id=?').bind(batchId).first<any>();if(!batch)return null;
@@ -16,13 +17,34 @@ async function batchView(batchId:string){
     db().prepare(`SELECT r.*,m.legacy_canonical AS member_canonical,m.display_name AS member_display_name FROM growth_batch_rows r LEFT JOIN growth_members m ON m.member_id=COALESCE(r.resolved_member_id,r.candidate_member_id) WHERE r.batch_id=? ORDER BY r.row_index`).bind(batchId).all<any>(),
     db().prepare("SELECT event_id,mutation,row_id,action,before_json,after_json,draft_revision,actor,created_at FROM growth_review_events WHERE batch_id=? AND status='active' ORDER BY created_at,event_id").bind(batchId).all<any>(),
   ]);
-  const rows=rowResult.results.map(r=>({...r,source_position:JSON.parse(r.source_position_json||'null'),asset_url:r.crop_asset_id?'/api/growth/review/asset?asset_id='+encodeURIComponent(r.crop_asset_id):null}));
+  const rows=rowResult.results.map(r=>{
+    const raw=compactName(r.raw_name),candidate=compactName(r.candidate_name),display=compactName(r.member_display_name),canonical=compactName(r.member_canonical);
+    const nicknameGuess=r.resolution_status==='resolved'&&r.review_version===0&&!!raw&&raw!==display&&raw!==canonical&&candidate!==display&&candidate!==canonical;
+    return {...r,nickname_change_guess:nicknameGuess,source_position:JSON.parse(r.source_position_json||'null'),asset_url:r.crop_asset_id?'/api/growth/review/asset?asset_id='+encodeURIComponent(r.crop_asset_id):null};
+  });
   const latest=new Map<string,any>();
   for(const event of eventResult.results)latest.set(event.row_id,{...event,before:JSON.parse(event.before_json),after:JSON.parse(event.after_json)});
   const changes=rows.filter(r=>latest.has(r.row_id)).map(r=>({row:r,decision:latest.get(r.row_id)}));
   const remaining=rows.filter(r=>!completedStates.has(r.resolution_status));
   const byAction=(...actions:string[])=>changes.filter(x=>actions.includes(x.decision.action)).length;
-  const summary={total:rows.length,automatic:rows.filter(r=>r.review_version===0&&r.resolution_status==='resolved').length,user_confirmed:changes.length,processed:rows.length-remaining.length,review_required:remaining.filter(r=>r.resolution_status!=='held').length,held:remaining.filter(r=>r.resolution_status==='held').length,unobserved:rows.filter(r=>r.resolution_status==='unobserved').length,new_members:byAction('new','direct_new'),connections:byAction('connect'),direct_edits:byAction('direct_connect'),changed_members:changes.length};
+  const summary={
+    total:rows.length,
+    automatic:rows.filter(r=>r.review_version===0&&completedStates.has(r.resolution_status)).length,
+    auto_connections:rows.filter(r=>r.review_version===0&&r.resolution_status==='resolved').length,
+    auto_new:rows.filter(r=>r.review_version===0&&r.resolution_status==='new').length,
+    nickname_changes:rows.filter(r=>r.nickname_change_guess||r.confirm_alias===1).length,
+    user_confirmed:changes.length,
+    user_edits:byAction('direct_connect','direct_new'),
+    processed:rows.length-remaining.length,
+    review_required:remaining.length,
+    failures:remaining.length,
+    held:rows.filter(r=>r.resolution_status==='held').length,
+    unobserved:rows.filter(r=>r.resolution_status==='unobserved').length,
+    new_members:rows.filter(r=>r.resolution_status==='new').length,
+    connections:rows.filter(r=>r.resolution_status==='resolved').length,
+    direct_edits:byAction('direct_connect'),
+    changed_members:rows.filter(r=>r.resolution_status==='new'||r.nickname_change_guess||r.review_version>0||!completedStates.has(r.resolution_status)).length,
+  };
   return {batch:{...batch,validation:JSON.parse(batch.validation_json),source_hashes:JSON.parse(batch.source_hashes_json)},summary,rows,changes};
 }
 
@@ -62,7 +84,9 @@ export async function POST(req:Request){try{
       let power=body.power??row.power,level=body.level??row.level,rank=body.rank??row.rank;
       if(body.action==='connect'||body.action==='direct_connect'){
         if(typeof body.member_id!=='string'||!await db().prepare('SELECT 1 ok FROM growth_members WHERE member_id=?').bind(body.member_id).first())return response(req,{error:'연결할 기존 길드원을 확인해 주세요.'},400);
-        status='resolved';memberId=body.member_id;alias=body.confirm_alias===true?1:0;
+        status='resolved';memberId=body.member_id;
+        if(body.display_name!==undefined){display=String(body.display_name||'').trim();if(!display||display.length>100)return response(req,{error:'닉네임을 확인해 주세요.'},400);}
+        alias=body.nickname_mode==='rename'&&!!display?1:0;
       }else if(body.action==='new'||body.action==='direct_new'){
         display=String(body.display_name||'').trim();if(!display||display.length>100)return response(req,{error:'신규 길드원 닉네임을 확인해 주세요.'},400);
         proposedId='new_'+(await sha(body.batch_id+'\0'+body.row_id+'\0'+display)).slice(0,32);status='new';

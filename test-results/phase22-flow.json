@@ -1,0 +1,130 @@
+{
+  "base": "http://127.0.0.1:8796",
+  "results": [
+    {
+      "name": "production baseline blob",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "root opens production mirror",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "five production tabs",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "staging environment marker",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "growth update entry",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "simplified result first flow",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "no general hold action",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "no general unobserved action",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "direct fields and advanced identity",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "exact OCR auto connects",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "history based auto connects",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "automatic new member",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "unreadable row is explicit failure",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "failure blocks publish",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "direct nickname level power rank edit",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "OCR correction is not alias",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "advanced identity relink",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "advanced relink reset",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "confirmed nickname change separated from OCR",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "final atomic publish",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "new members published",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "confirmed nickname updates display",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "operations documents unchanged",
+      "status": "PASS",
+      "detail": "{'carriage': 14, 'power': 1, 'memos': 7}"
+    },
+    {
+      "name": "test publication withdrawn",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "withdraw restores nickname display",
+      "status": "PASS",
+      "detail": ""
+    }
+  ]
+}

@@ -17,16 +17,23 @@ export async function POST(req:Request){try{
     (SELECT value FROM growth_meta WHERE key='growth_revision')=? AND
     (SELECT value FROM growth_meta WHERE key='identity_revision')=? AND
     EXISTS(SELECT 1 FROM growth_batches WHERE batch_id=? AND state='ready' AND draft_revision=? AND base_growth_revision=? AND identity_revision=?) AND
-    NOT EXISTS(SELECT 1 FROM growth_batch_rows WHERE batch_id=? AND resolution_status NOT IN ('resolved','new','unobserved')) AND
+    NOT EXISTS(SELECT 1 FROM growth_batch_rows WHERE batch_id=? AND resolution_status NOT IN ('resolved','new')) AND
     NOT EXISTS(SELECT 1 FROM growth_batch_rows WHERE batch_id=? AND COALESCE(resolved_member_id,proposed_member_id) IS NOT NULL GROUP BY COALESCE(resolved_member_id,proposed_member_id) HAVING COUNT(*)>1)
     THEN 1 ELSE NULL END,?`).bind(guard,String(current.growthRevision),String(current.identityRevision),b.batch_id,b.draft_revision,current.growthRevision,current.identityRevision,b.batch_id,b.batch_id,now));
   statements.push(db().prepare(`INSERT INTO growth_members(member_id,legacy_canonical,display_name,source,created_at)
-    SELECT proposed_member_id,NULL,proposed_display_name,'review-new',? FROM growth_batch_rows WHERE batch_id=? AND resolution_status='new' AND EXISTS(SELECT 1 FROM growth_tx_guards WHERE guard_id=?)`).bind(now,b.batch_id,guard));
+    SELECT proposed_member_id,NULL,proposed_display_name,CASE WHEN review_version=0 THEN 'package-auto-new' ELSE 'review-new' END,? FROM growth_batch_rows WHERE batch_id=? AND resolution_status='new' AND EXISTS(SELECT 1 FROM growth_tx_guards WHERE guard_id=?)`).bind(now,b.batch_id,guard));
   statements.push(db().prepare(`INSERT INTO growth_identity_decisions(decision_id,identity_revision,raw_value,decision_kind,member_id,display_name,source,batch_id,status,created_at)
-    SELECT 'idec_new_'||row_id,?,proposed_display_name,'new',proposed_member_id,proposed_display_name,'user-review',batch_id,'confirmed',? FROM growth_batch_rows WHERE batch_id=? AND resolution_status='new' AND EXISTS(SELECT 1 FROM growth_tx_guards WHERE guard_id=?)`).bind(identityNext,now,b.batch_id,guard));
+    SELECT 'idec_new_'||row_id,?,proposed_display_name,'new',proposed_member_id,proposed_display_name,CASE WHEN review_version=0 THEN 'package-auto' ELSE 'user-edit' END,batch_id,'confirmed',? FROM growth_batch_rows WHERE batch_id=? AND resolution_status='new' AND EXISTS(SELECT 1 FROM growth_tx_guards WHERE guard_id=?)`).bind(identityNext,now,b.batch_id,guard));
+  statements.push(db().prepare(`INSERT OR IGNORE INTO growth_identity_decisions(decision_id,identity_revision,raw_value,decision_kind,member_id,display_name,source,batch_id,status,created_at)
+    SELECT 'idec_alias_prev_'||r.row_id,?,m.display_name,'alias',r.resolved_member_id,r.proposed_display_name,'user-nickname-change',r.batch_id,'confirmed',?
+    FROM growth_batch_rows r JOIN growth_members m ON m.member_id=r.resolved_member_id
+    WHERE r.batch_id=? AND r.confirm_alias=1 AND r.resolution_status='resolved' AND r.proposed_display_name IS NOT NULL AND r.proposed_display_name<>m.display_name AND EXISTS(SELECT 1 FROM growth_tx_guards WHERE guard_id=?)`).bind(identityNext,now,b.batch_id,guard));
   statements.push(db().prepare(`INSERT INTO growth_identity_decisions(decision_id,identity_revision,raw_value,decision_kind,member_id,display_name,source,batch_id,status,created_at)
-    SELECT 'idec_alias_'||row_id,?,raw_name,'alias',resolved_member_id,(SELECT display_name FROM growth_members WHERE member_id=resolved_member_id),'user-review',batch_id,'confirmed',? FROM growth_batch_rows r
-    WHERE batch_id=? AND confirm_alias=1 AND resolution_status='resolved' AND NOT EXISTS(SELECT 1 FROM growth_identity_decisions d WHERE d.raw_value=r.raw_name AND d.member_id=r.resolved_member_id AND d.status='confirmed') AND EXISTS(SELECT 1 FROM growth_tx_guards WHERE guard_id=?)`).bind(identityNext,now,b.batch_id,guard));
+    SELECT 'idec_name_'||r.row_id,?,m.display_name,'nickname',r.resolved_member_id,r.proposed_display_name,'user-nickname-change',r.batch_id,'confirmed',?
+    FROM growth_batch_rows r JOIN growth_members m ON m.member_id=r.resolved_member_id
+    WHERE r.batch_id=? AND r.confirm_alias=1 AND r.resolution_status='resolved' AND r.proposed_display_name IS NOT NULL AND r.proposed_display_name<>m.display_name AND EXISTS(SELECT 1 FROM growth_tx_guards WHERE guard_id=?)`).bind(identityNext,now,b.batch_id,guard));
+  statements.push(db().prepare(`UPDATE growth_members SET display_name=(SELECT r.proposed_display_name FROM growth_batch_rows r WHERE r.batch_id=? AND r.resolved_member_id=growth_members.member_id AND r.confirm_alias=1 AND r.resolution_status='resolved' LIMIT 1)
+    WHERE member_id IN (SELECT resolved_member_id FROM growth_batch_rows WHERE batch_id=? AND confirm_alias=1 AND resolution_status='resolved' AND proposed_display_name IS NOT NULL) AND EXISTS(SELECT 1 FROM growth_tx_guards WHERE guard_id=?)`).bind(b.batch_id,b.batch_id,guard));
   statements.push(db().prepare(`INSERT INTO growth_observations(observation_id,member_id,batch_id,observed_date,slot,power,level,rank,label,source_type,legacy_index,legacy_source_fingerprint,original_order,supersedes_observation_id,status,created_at)
     SELECT 'obs_'||r.row_id,COALESCE(r.resolved_member_id,r.proposed_member_id),r.batch_id,b.observed_date,b.slot,r.power,r.level,r.rank,
       CAST(CAST(substr(b.observed_date,6,2) AS INTEGER) AS TEXT)||'/'||CAST(CAST(substr(b.observed_date,9,2) AS INTEGER) AS TEXT),

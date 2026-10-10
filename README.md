@@ -11,8 +11,8 @@
 | API/Site | `https://threeon-next-staging.alswlgns2.chatgpt.site` |
 | Site project | `appgprj_6ac90bf8dc7c8191846ff5631ba93f5b` |
 | DB binding | Staging Site의 독립 `DB` |
-| Growth schema | `3on-growth-v1` |
-| Growth API | `3on-growth-api-v1` |
+| Growth schema | `3on-growth-v1.1` |
+| Growth API | `3on-growth-api-v1.2` |
 | Update package | `3on-growth-package-v1` |
 
 관리자 secret, session, D1, cache/storage key에는 Staging 전용 namespace를 사용한다. 소스에 Production write endpoint나 credential을 넣지 않는다.
@@ -25,7 +25,8 @@
 - `drizzle/0002_growth_v1.sql`: growth schema와 결정적 legacy import
 - `drizzle/0003_mobile_admin_ux.sql`: review decision 감사·Undo·변경 내역 지원
 - `drizzle/0004_review_event_backfill.sql`: 기존 Staging Draft 결정의 행별 감사기록 보정
-- `public/legacy.html`: 기존 운영 UI를 보존한 Staging 호환 화면
+- `public/legacy.html`: Production 운영센터 5개 탭을 재사용한 Staging 기본 화면
+- `app/growth-admin`: 자동 판정 결과를 먼저 보여주는 성장자료 업데이트 화면
 - `scripts/generate-legacy-migration.py`: 동일 legacy 입력에서 동일 ID/SQL 생성
 - `tests/`: shadow, API/동시성, 운영 회귀, 5년 규모 시험
 
@@ -33,17 +34,11 @@
 
 ## Growth package 업로드
 
-관리자는 AI가 만든 JSON 파일 하나를 화면에서 선택한다. 서버가 schema, 날짜, 타입, 인원수, source/package/semantic hash, 닉네임 충돌, 중복 관측, 수치 범위, identity revision과 비정상 변화를 검사한다. AI raw reading은 confirmed alias로 자동 승격하지 않는다.
+관리자는 AI가 만든 JSON 파일 하나를 화면에서 선택한다. 서버가 schema, 날짜, 타입, 인원수, source/package/semantic hash, 닉네임 충돌, 중복 관측, 수치 범위, identity revision과 비정상 변화를 검사한다. 기존 member는 닉네임·level·power·rank·이력을 종합해 자동 연결하고 연결 후보가 없는 항목은 자동 신규로 분류한다. AI raw reading은 confirmed alias로 자동 승격하지 않는다.
 
-불확실한 행은 review queue에서 다음 중 하나로 처리한다.
+일반 운영 화면은 AI 처리 결과와 변경 member를 먼저 보여준다. 사용자는 이상한 항목만 닉네임, level, power, rank를 직접 수정하며, 잘못 연결된 경우에만 고급 연결 대상 변경을 연다. 판독 실패는 숨기거나 보류하지 않고 최종 반영 전에 반드시 해결한다.
 
-- 기존 member 연결
-- 신규 member 등록
-- 수치와 이름 직접 입력
-- 이번 관측에서 미확인
-- 보류
-
-모든 필수 행이 확정되기 전에는 일부만 공개하지 않는다. 동일 package와 동일 mutation 재시도는 기존 결과를 반환한다.
+모든 필수 행이 확정되기 전에는 일부만 공개하지 않는다. 동일 package와 동일 mutation 재시도는 기존 결과를 반환하며, publish는 현재 공개 batch를 supersede해 철회 시 바로 이전 공개본으로 돌아갈 수 있다.
 
 ## Legacy migration
 
@@ -89,6 +84,8 @@ STAGING_BASE=http://127.0.0.1:8790 python tests/integration_staging.py
 python tests/operations_regression.py
 python tests/scale_5y.py
 ```
+
+2.2 변경 영향 범위는 새 격리 D1에서 `tests/phase22_flow.py`와 `tests/operations_regression.py`로 확인한다. 이미 검증된 전체 migration/shadow/5년 scale 코드는 2.2에서 변경하지 않았다.
 
 쓰기 시험은 로컬 또는 별도 Staging D1에서만 수행한다. Production DB에는 시험 자료를 쓰지 않는다.
 
