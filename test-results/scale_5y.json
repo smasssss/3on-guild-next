@@ -6,27 +6,27 @@
   "observations": 182500,
   "db_bytes": 37818368,
   "index_bytes": 21897216,
-  "insert_all_ms": 635.91,
+  "insert_all_ms": 707.346,
   "queries": {
     "current_members": {
       "rows": 100,
-      "latency_ms": 0.561
+      "latency_ms": 0.917
     },
     "recent_7_days": {
       "rows": 700,
-      "latency_ms": 10.117
+      "latency_ms": 10.235
     },
     "period_31_days": {
       "rows": 3100,
-      "latency_ms": 2.02
+      "latency_ms": 2.038
     },
     "member_history_500": {
       "rows": 500,
-      "latency_ms": 0.78
+      "latency_ms": 0.904
     },
     "publish_reference_transaction": {
       "writes": 4,
-      "latency_ms": 0.151
+      "latency_ms": 0.23
     }
   },
   "api_current_response_bytes": 4501,
