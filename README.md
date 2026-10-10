@@ -23,6 +23,8 @@
 - `app/api/growth/*`: growth 조회, package upload, review, publish, correction, withdrawal
 - `lib/growth.ts`: package schema 검증, hash, current/history 공급 계층
 - `drizzle/0002_growth_v1.sql`: growth schema와 결정적 legacy import
+- `drizzle/0003_mobile_admin_ux.sql`: review decision 감사·Undo·변경 내역 지원
+- `drizzle/0004_review_event_backfill.sql`: 기존 Staging Draft 결정의 행별 감사기록 보정
 - `public/legacy.html`: 기존 운영 UI를 보존한 Staging 호환 화면
 - `scripts/generate-legacy-migration.py`: 동일 legacy 입력에서 동일 ID/SQL 생성
 - `tests/`: shadow, API/동시성, 운영 회귀, 5년 규모 시험
@@ -74,7 +76,7 @@ npm run lint
 로컬 D1에는 migration을 순서대로 적용한다.
 
 ```sh
-for f in drizzle/0000_safe_machine_man.sql drizzle/0001_warm_smiling_tiger.sql drizzle/0002_growth_v1.sql; do
+for f in drizzle/0000_safe_machine_man.sql drizzle/0001_warm_smiling_tiger.sql drizzle/0002_growth_v1.sql drizzle/0003_mobile_admin_ux.sql drizzle/0004_review_event_backfill.sql; do
   npx wrangler d1 execute DB --local --persist-to .wrangler/state --config dist/server/wrangler.json --file "$f"
 done
 ```
