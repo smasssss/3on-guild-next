@@ -1,0 +1,90 @@
+{
+  "base": "http://127.0.0.1:8790",
+  "results": [
+    {
+      "name": "lineage-first ready",
+      "status": "PASS",
+      "detail": "{'batch_id': 'gb_5f98c3c6730da4764679139738a83107', 'state': 'ready', 'draft_revision': 1, 'base_growth_revision': 1, 'identity_revision': 1, 'validation': {'warnings': [], 'blocking': [], 'accepted': False, 'unresolved': 0, 'row_count': 2, 'expected_count': 2}}"
+    },
+    {
+      "name": "existing first consecutive prev",
+      "status": "PASS",
+      "detail": "55067936"
+    },
+    {
+      "name": "existing history retained",
+      "status": "PASS",
+      "detail": "52"
+    },
+    {
+      "name": "new member first record",
+      "status": "PASS",
+      "detail": "None"
+    },
+    {
+      "name": "lineage-second ready",
+      "status": "PASS",
+      "detail": "{'batch_id': 'gb_4ed3a0e64f44d486adbde146824e56ee', 'state': 'ready', 'draft_revision': 1, 'base_growth_revision': 2, 'identity_revision': 2, 'validation': {'warnings': [], 'blocking': [], 'accepted': False, 'unresolved': 0, 'row_count': 2, 'expected_count': 2}}"
+    },
+    {
+      "name": "existing second consecutive prev",
+      "status": "PASS",
+      "detail": "55068036"
+    },
+    {
+      "name": "existing second history retained",
+      "status": "PASS",
+      "detail": "53"
+    },
+    {
+      "name": "new member second record",
+      "status": "PASS",
+      "detail": "987654321"
+    },
+    {
+      "name": "lineage-correction ready",
+      "status": "PASS",
+      "detail": "{'batch_id': 'gb_07ddb932e3df7d7bc348c53a75185432', 'state': 'ready', 'draft_revision': 1, 'base_growth_revision': 3, 'identity_revision': 2, 'validation': {'warnings': [], 'blocking': [], 'accepted': False, 'unresolved': 0, 'row_count': 2, 'expected_count': 2}}"
+    },
+    {
+      "name": "correction replaces invalid package observation",
+      "status": "PASS",
+      "detail": "power=55068186 prev=55068036"
+    },
+    {
+      "name": "correction does not duplicate history",
+      "status": "PASS",
+      "detail": "53"
+    },
+    {
+      "name": "new correction keeps prior publication",
+      "status": "PASS",
+      "detail": "power=987654381 prev=987654321"
+    },
+    {
+      "name": "withdraw restores prior publication",
+      "status": "PASS",
+      "detail": "{'duplicate': False, 'schema': '3on-growth-withdraw-v1', 'batch_id': 'gb_07ddb932e3df7d7bc348c53a75185432', 'growth_revision': 5, 'identity_revision': 2, 'restored_batch_id': 'gb_4ed3a0e64f44d486adbde146824e56ee'}"
+    },
+    {
+      "name": "withdraw excludes child observation",
+      "status": "PASS",
+      "detail": "[{'label': '10/8', 'date': '2026-10-08', 'slot': 'day', 'power': 55067936}, {'label': '10/9', 'date': '2026-10-09', 'slot': 'lineage', 'power': 55068036}, {'label': '10/10', 'date': '2026-10-10', 'slot': 'lineage', 'power': 55068136}]"
+    },
+    {
+      "name": "withdraw preserves new member lineage",
+      "status": "PASS",
+      "detail": "power=987654371 prev=987654321"
+    },
+    {
+      "name": "operation documents unchanged",
+      "status": "PASS",
+      "detail": "before={'carriage': 14, 'power': 1, 'memos': 7} after={'carriage': 14, 'power': 1, 'memos': 7}"
+    },
+    {
+      "name": "publish identifiers available",
+      "status": "PASS",
+      "detail": ""
+    }
+  ]
+}
