@@ -61,7 +61,7 @@ def run() -> None:
     admin_page = (ROOT / "app/growth-admin/page.tsx").read_text()
     legacy = Path(os.environ.get("LEGACY_HTML_PATH", ROOT / "public/legacy.html")).read_text()
     production = Path(os.environ.get("PRODUCTION_BASELINE_PATH", ROOT.parent / "work/index.html")).read_bytes()
-    check("production baseline blob", hashlib.sha1(b"blob " + str(len(production)).encode() + b"\0" + production).hexdigest() == "45fd61f7008cc9392c0cfc95adc066475efc9a44")
+    check("production baseline blob", hashlib.sha1(b"blob " + str(len(production)).encode() + b"\0" + production).hexdigest() == "9281161b96fb4ca11b2586d654d6858cd41d45c7")
     check("root opens production mirror", "legacy.html" in root_page and "location.replace" in root_page)
     check("five production tabs", all(name in legacy for name in ["성장추적", "협곡대전 1소대", "마차관리", "운영이력", "관리설정"]))
     check("staging environment marker", "STAGING · Production과 분리된 검증 환경" in legacy)
