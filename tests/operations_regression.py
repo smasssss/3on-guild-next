@@ -5,12 +5,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-STAGING = (ROOT / "public/legacy.html").read_text()
+STAGING = Path(os.environ.get("LEGACY_HTML_PATH", ROOT / "public/legacy.html")).read_text()
 
 PRODUCTION_FUNCTION_SHA256 = {
     "nextBase": "055a7ec588598a9af4222d4a873fa79bf7422512c2ae137214b5d620db0612da", "nextBaseAfter": "d11699629ec8aaaa73a0b944249b7f9dce9ba28653372948eee40bc4ead91452",
@@ -105,7 +106,7 @@ def main() -> None:
         "canyon_seed": len(power["weeks"]) == 1 and power["weeks"][0]["date"] == "2026-10-08" and len(power["weeks"][0]["members"]) == 20,
         "memo_keys_preserved": set(memos["members"]) == {"guild:아일리", "guild:내가두려운가"},
         "storage_namespaced": "3on_carriage_proto_v1_staging" in STAGING and "3on_admin_session_v2_staging" in STAGING,
-        "staging_backend_only": "https://threeon-next-staging.alswlgns2.chatgpt.site" in STAGING and ("https://threeon-shared" + "-data.alswlgns2.chatgpt.site") not in STAGING,
+        "cloudflare_same_origin": "const SHARED_DB_URL=''" in STAGING and "chatgpt.site" not in STAGING and "github.io" not in STAGING,
     }
     result = {
         "status": "PASS" if all(checks.values()) else "FAIL",

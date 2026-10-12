@@ -22,7 +22,7 @@
     "canyon_seed": true,
     "memo_keys_preserved": true,
     "storage_namespaced": true,
-    "staging_backend_only": true
+    "cloudflare_same_origin": true
   },
   "critical_functions": {
     "nextBase": true,

@@ -14,7 +14,7 @@ from pathlib import Path
 
 BASE = os.environ.get("STAGING_BASE", "http://127.0.0.1:8790").rstrip("/")
 PASSWORD = os.environ.get("STAGING_ADMIN_PASSWORD", "")
-ORIGIN = "https://smasssss.github.io"
+ORIGIN = BASE
 ROOT = Path(__file__).resolve().parents[1]
 RESULTS: list[dict[str, str]] = []
 

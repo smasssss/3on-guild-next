@@ -14,7 +14,7 @@ from pathlib import Path
 
 
 BASE = os.environ.get("STAGING_BASE", "http://127.0.0.1:8790").rstrip("/")
-ORIGIN = "https://smasssss.github.io"
+ORIGIN = BASE
 ADMIN_PASSWORD = os.environ.get("STAGING_ADMIN_PASSWORD", "")
 SERVICE_TOKEN = ""
 ROOT = Path(__file__).resolve().parents[1]

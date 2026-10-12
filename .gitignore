@@ -42,6 +42,7 @@ next-env.d.ts
 *.tsbuildinfo
 /dist/
 /.wrangler/
+/wrangler.cloudflare.generated.json
 # Checkout-local execution profile and tool state; never publish them.
 /.sites-runtime/
 /.agents/

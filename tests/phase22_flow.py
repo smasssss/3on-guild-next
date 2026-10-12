@@ -13,7 +13,7 @@ from pathlib import Path
 
 BASE = os.environ.get("STAGING_BASE", "http://127.0.0.1:8794").rstrip("/")
 PASSWORD = os.environ.get("STAGING_ADMIN_PASSWORD", "")
-ORIGIN = "https://smasssss.github.io"
+ORIGIN = BASE
 ROOT = Path(__file__).resolve().parents[1]
 RESULTS: list[dict[str, str]] = []
 
@@ -59,8 +59,8 @@ def run() -> None:
 
     root_page = (ROOT / "app/page.tsx").read_text()
     admin_page = (ROOT / "app/growth-admin/page.tsx").read_text()
-    legacy = (ROOT / "public/legacy.html").read_text()
-    production = (ROOT.parent / "work/index.html").read_bytes()
+    legacy = Path(os.environ.get("LEGACY_HTML_PATH", ROOT / "public/legacy.html")).read_text()
+    production = Path(os.environ.get("PRODUCTION_BASELINE_PATH", ROOT.parent / "work/index.html")).read_bytes()
     check("production baseline blob", hashlib.sha1(b"blob " + str(len(production)).encode() + b"\0" + production).hexdigest() == "45fd61f7008cc9392c0cfc95adc066475efc9a44")
     check("root opens production mirror", "legacy.html" in root_page and "location.replace" in root_page)
     check("five production tabs", all(name in legacy for name in ["성장추적", "협곡대전 1소대", "마차관리", "운영이력", "관리설정"]))

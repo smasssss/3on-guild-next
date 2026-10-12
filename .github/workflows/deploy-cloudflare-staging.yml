@@ -1,0 +1,122 @@
+name: Deploy Cloudflare Staging
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      ADMIN_PASSWORD: ${{ secrets.CLOUDFLARE_STAGING_ADMIN_PASSWORD }}
+      WORKER_NAME: 3on-guild-staging
+      DATABASE_NAME: 3on-guild-staging-db
+      CONFIG_FILE: wrangler.cloudflare.generated.json
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Check out current fallback UI for mirror guard
+        uses: actions/checkout@v6
+        with:
+          repository: smasssss/3on-guild
+          path: _production_baseline
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check required secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$ADMIN_PASSWORD"
+
+      - name: Install and verify source
+        run: |
+          npm ci --include=dev --include=optional --no-audit --no-fund
+          npm run lint
+          npm run build
+          node scripts/cloudflare-artifact.mjs
+
+      - name: Find or create isolated Staging D1
+        id: d1
+        shell: bash
+        run: |
+          set -euo pipefail
+          database_id="$(npx wrangler d1 list --json | jq -r --arg name "$DATABASE_NAME" '.[] | select(.name == $name) | .uuid' | head -n1)"
+          if [[ -z "$database_id" ]]; then
+            response="$(curl --fail-with-body --silent --show-error \
+              -X POST \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/d1/database" \
+              --data "$(jq -cn --arg name "$DATABASE_NAME" '{name:$name}')")"
+            database_id="$(jq -er '.result.uuid' <<<"$response")"
+          fi
+          echo "database_id=$database_id" >> "$GITHUB_OUTPUT"
+
+      - name: Apply Staging schema and seed
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/cloudflare-config.mjs "$CONFIG_FILE" "$WORKER_NAME" "$DATABASE_NAME" "${{ steps.d1.outputs.database_id }}"
+          npx wrangler d1 migrations apply DB --remote --config "$CONFIG_FILE"
+
+      - name: Deploy same-origin Worker and assets
+        id: deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$ADMIN_PASSWORD" | node scripts/cloudflare-admin-hash.mjs > /tmp/admin-hash.json
+          jq -cn --rawfile value /tmp/admin-hash.json '{ADMIN_PASSWORD_HASH:$value}' > /tmp/worker-secrets.json
+          npx wrangler deploy --config "$CONFIG_FILE" --secrets-file /tmp/worker-secrets.json --strict 2>&1 | tee /tmp/deploy.log
+          staging_url="$(grep -Eo 'https://[[:alnum:].-]+\.workers\.dev' /tmp/deploy.log | tail -n1)"
+          test -n "$staging_url"
+          echo "url=$staging_url" >> "$GITHUB_OUTPUT"
+
+      - name: Read-only Staging smoke
+        shell: bash
+        env:
+          STAGING_URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error "$STAGING_URL/legacy.html" >/dev/null
+          curl --fail --silent --show-error "$STAGING_URL/api/state" | jq -e '.schema == "3on-shared-v1" and (.documents | length) == 3' >/dev/null
+          curl --fail --silent --show-error "$STAGING_URL/api/growth/legacy" | jq -e '.schema == "3on-growth-v1.1" and .data' >/dev/null
+
+      - name: Focused Staging regression
+        shell: bash
+        env:
+          STAGING_BASE: ${{ steps.deploy.outputs.url }}
+          STAGING_ADMIN_PASSWORD: ${{ secrets.CLOUDFLARE_STAGING_ADMIN_PASSWORD }}
+          PRODUCTION_BASELINE_PATH: ${{ github.workspace }}/_production_baseline/index.html
+          LEGACY_HTML_PATH: ${{ github.workspace }}/dist/client/legacy.html
+        run: |
+          set -euo pipefail
+          python tests/phase22_flow.py
+          python tests/legacy_lineage_regression.py
+          python tests/operations_regression.py
+
+      - name: Deployment summary
+        shell: bash
+        run: |
+          {
+            echo "## Cloudflare Staging"
+            echo ""
+            echo "- URL: ${{ steps.deploy.outputs.url }}"
+            echo "- Worker: $WORKER_NAME"
+            echo "- D1: $DATABASE_NAME"
+            echo "- Commit: $GITHUB_SHA"
+          } >> "$GITHUB_STEP_SUMMARY"

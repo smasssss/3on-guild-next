@@ -1,21 +1,20 @@
-# 3ON 운영센터 차세대 Staging
+# 3ON 운영센터 Cloudflare Staging
 
-이 저장소는 3ON 운영센터 차세대 구조의 **Staging 전용** 구현이다. 현재 운영 중인 Production 저장소 `smasssss/3on-guild`, Pages, Shared DB와 분리되어 있다. 이 저장소나 Staging DB를 Production 위에 덮어쓰지 않는다.
+이 저장소는 3ON 운영센터의 **Cloudflare Staging 전용** 구현이다. 검증된 2.2.1 기능을 한 Cloudflare Worker의 웹/API와 독립 D1으로 제공한다. 현재 운영 중인 Production 저장소 `smasssss/3on-guild`, Pages, Shared DB와 분리되어 있으며 Staging DB를 Production 원본으로 사용하지 않는다.
 
 ## 환경 구분
 
 | 항목 | Staging |
 |---|---|
-| GitHub frontend | `smasssss/3on-guild-next` |
-| frontend | `https://smasssss.github.io/3on-guild-next/` |
-| API/Site | `https://threeon-next-staging.alswlgns2.chatgpt.site` |
-| Site project | `appgprj_6ac90bf8dc7c8191846ff5631ba93f5b` |
-| DB binding | Staging Site의 독립 `DB` |
+| Source | `smasssss/3on-guild-next` |
+| Hosting | Cloudflare Worker + Static Assets |
+| Web/API | 같은 `3on-guild-staging.workers.dev` origin |
+| DB binding | `3on-guild-staging-db`의 독립 `DB` |
 | Growth schema | `3on-growth-v1.1` |
 | Growth API | `3on-growth-api-v1.2` |
 | Update package | `3on-growth-package-v1` |
 
-관리자 secret, session, D1, cache/storage key에는 Staging 전용 namespace를 사용한다. 소스에 Production write endpoint나 credential을 넣지 않는다.
+관리자 secret, session, D1, cache/storage key에는 Staging 전용 namespace를 사용한다. `ADMIN_PASSWORD_HASH`는 Cloudflare secret으로만 배포하며 소스에 Production write endpoint나 credential을 넣지 않는다.
 
 ## 구조
 
