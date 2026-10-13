@@ -1,0 +1,66 @@
+name: Repair Production Growth
+
+on:
+  push:
+    branches: [fix/production-growth-20261013]
+    paths:
+      - '.github/workflows/repair-cloudflare-production.yml'
+      - 'app/**'
+      - 'lib/**'
+      - 'public/legacy.html'
+      - 'scripts/repair-production-growth.py'
+      - 'tests/production_growth_regression.cjs'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-production-growth-repair
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      REPAIR_EVIDENCE: repair-evidence
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - name: Check existing deployment authorization
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          test -n "$CLOUDFLARE_API_TOKEN"
+      - name: Preserve current growth and operational documents
+        run: python scripts/repair-production-growth.py inspect
+      - name: Install dependencies
+        run: npm ci --include=dev --include=optional --no-audit --no-fund
+      - name: Verify publish, cancel, reupload and identity handling
+        run: |
+          node tests/production_growth_regression.cjs
+          npx tsc --noEmit
+      - name: Build Production fixes
+        run: |
+          npm run build
+          node scripts/cloudflare-artifact.mjs
+      - name: Deploy to the existing Production Worker and D1 binding
+        run: npx wrangler deploy --config wrangler.production-repair.json --strict
+      - name: Reconnect duplicate October 9 observations without deleting history
+        run: python scripts/repair-production-growth.py repair
+      - name: Verify live date, 87 members, histories and untouched documents
+        run: python scripts/repair-production-growth.py verify
+      - name: Preserve repair evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-growth-repair-${{ github.run_id }}
+          path: repair-evidence/
+          retention-days: 14
+          if-no-files-found: warn

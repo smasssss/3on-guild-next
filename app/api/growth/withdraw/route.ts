@@ -5,8 +5,18 @@ export async function POST(req:Request){try{
   if(!validOrigin(req))return response(req,{error:'허용되지 않은 주소입니다.'},403);const user=await actor(req);if(!user)return response(req,{error:'관리자 인증이 필요합니다.'},401);
   const b=await req.json() as any;if(typeof b.batch_id!=='string'||!Number.isSafeInteger(b.growth_revision)||!Number.isSafeInteger(b.identity_revision)||!validMutation(b.mutation))return response(req,{error:'철회 요청 형식을 확인해 주세요.'},400);
   const duplicate=await db().prepare("SELECT result_json FROM growth_mutations WHERE mutation=? AND operation='withdraw'").bind(b.mutation).first<{result_json:string}>();if(duplicate)return response(req,{duplicate:true,...JSON.parse(duplicate.result_json)});
+  const draft=await db().prepare("SELECT state,draft_revision FROM growth_batches WHERE batch_id=? AND state IN ('draft','needs_review','ready')").bind(b.batch_id).first<any>();
+  if(draft){
+    if(!Number.isSafeInteger(b.draft_revision)||draft.draft_revision!==b.draft_revision)return response(req,{error:'다른 기기에서 자료가 변경됐습니다. 다시 확인해 주세요.'},409);
+    const now=new Date().toISOString(),guard='cancel_'+b.mutation,result={schema:'3on-growth-withdraw-v1',batch_id:b.batch_id,draft_cancelled:true};
+    await db().batch([
+      db().prepare("INSERT INTO growth_tx_guards(guard_id,ok,created_at) SELECT ?,CASE WHEN EXISTS(SELECT 1 FROM growth_batches WHERE batch_id=? AND state IN ('draft','needs_review','ready') AND draft_revision=?) THEN 1 ELSE NULL END,?").bind(guard,b.batch_id,b.draft_revision,now),
+      db().prepare("UPDATE growth_batches SET state='withdrawn',draft_revision=draft_revision+1,updated_at=? WHERE batch_id=? AND EXISTS(SELECT 1 FROM growth_tx_guards WHERE guard_id=?)").bind(now,b.batch_id,guard),
+      db().prepare("INSERT INTO growth_mutations(mutation,operation,result_json,created_at) VALUES(?,'withdraw',?,?)").bind(b.mutation,JSON.stringify(result),now),
+    ]);return response(req,{duplicate:false,...result});
+  }
   const target=await db().prepare("SELECT supersedes_batch_id FROM growth_batches WHERE batch_id=? AND state='published' AND published_revision>1").bind(b.batch_id).first<{supersedes_batch_id:string|null}>();
-  if(!target)return response(req,{error:'철회할 수 있는 공개 성장 묶음이 아닙니다.'},409);
+  if(!target||!target.supersedes_batch_id)return response(req,{error:'취소할 수 있는 최신 공개 성장자료가 아닙니다.'},409);
   const current=await meta();
   if(current.growthRevision!==b.growth_revision||current.identityRevision!==b.identity_revision)return response(req,{error:'다른 기기에서 성장 또는 동일인 자료가 변경됐습니다.',current},409);
   const identityChanges=await db().prepare("SELECT COUNT(*) n FROM growth_identity_decisions WHERE batch_id=? AND status='confirmed'").bind(b.batch_id).first<{n:number}>();

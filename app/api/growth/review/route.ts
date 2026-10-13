@@ -1,5 +1,5 @@
 import { actor, db, response, validOrigin } from '../../../../lib/store';
-import { sha, validMutation } from '../../../../lib/growth';
+import { currentMembers, sha, validMutation } from '../../../../lib/growth';
 export const dynamic='force-dynamic';
 export function OPTIONS(req:Request){return response(req,{},204);}
 
@@ -89,6 +89,7 @@ export async function POST(req:Request){try{
         alias=body.nickname_mode==='rename'&&!!display?1:0;
       }else if(body.action==='new'||body.action==='direct_new'){
         display=String(body.display_name||'').trim();if(!display||display.length>100)return response(req,{error:'신규 길드원 닉네임을 확인해 주세요.'},400);
+        const active=await currentMembers();if(active.members.some((member:any)=>member.display_name===display||member.canonical===display))return response(req,{error:'같은 이름의 기존 길드원이 있습니다. 고급 수정에서 기존 길드원을 연결해 주세요.'},409);
         proposedId='new_'+(await sha(body.batch_id+'\0'+body.row_id+'\0'+display)).slice(0,32);status='new';
       }else if(body.action==='unobserved'){
         if(typeof body.member_id!=='string'||!await db().prepare('SELECT 1 ok FROM growth_members WHERE member_id=?').bind(body.member_id).first())return response(req,{error:'미확인으로 유지할 길드원을 확인해 주세요.'},400);
