@@ -1,0 +1,34 @@
+name: Confirm October 11 departures
+on:
+  push:
+    branches: [fix/production-growth-20261013]
+    paths:
+      - '.github/workflows/confirm-oct11-departures.yml'
+      - 'scripts/confirm-oct11-departures.py'
+permissions:
+  contents: read
+concurrency:
+  group: cloudflare-production-growth-repair
+  cancel-in-progress: false
+jobs:
+  confirm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - name: Verify guarded membership correction locally
+        run: REPAIR_EVIDENCE=departure-test-evidence python scripts/confirm-oct11-departures.py --self-test
+      - name: Apply only user-confirmed departures and verify live results
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          REPAIR_EVIDENCE: departure-evidence
+        run: python scripts/confirm-oct11-departures.py
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: confirmed-oct11-departures-${{ github.run_id }}
+          path: departure-evidence/
+          retention-days: 14
+          if-no-files-found: warn
