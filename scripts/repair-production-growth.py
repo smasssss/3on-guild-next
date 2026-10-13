@@ -3,7 +3,7 @@
 Uses existing GitHub Actions Cloudflare credentials through environment only.
 Never exports authentication tables or prints secret values. No schema changes.
 """
-import argparse,hashlib,json,os,sqlite3,urllib.request
+import argparse,hashlib,json,os,sqlite3,subprocess,urllib.request
 from pathlib import Path
 
 WORKER='3on-guild-production'
@@ -17,7 +17,8 @@ def digest(value):
  return hashlib.sha256(json.dumps(value,ensure_ascii=False,sort_keys=True,separators=(',',':')).encode()).hexdigest()
 def quote(x):return "'"+str(x).replace("'","''")+"'"
 def public(path):
- with urllib.request.urlopen(ORIGIN+path,timeout=60) as r:return json.load(r)
+ result=subprocess.run(['curl','--fail','--silent','--show-error','--max-time','60',ORIGIN+path],check=True,capture_output=True,text=True)
+ return json.loads(result.stdout)
 
 class Remote:
  def __init__(self):
