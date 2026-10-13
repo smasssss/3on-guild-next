@@ -30,7 +30,9 @@ export async function GET(req:Request){try{
     item.name=info.legacy_canonical||item.name||memberId;item.displayName=info.display_name;
     const all=observations.get(memberId)||[];const newer=all.filter(o=>o.source_type!=='legacy');
     for(const o of newer)item.history.push({label:o.label||o.observed_date,date:o.observed_date,slot:o.slot,power:o.power});
-    if(all.length){const last=all[all.length-1],prev=all.length>1?all[all.length-2]:null;item.power=last.power;item.prevPower=prev?.power??null;const rank=[...all].reverse().find(o=>o.rank)?.rank;const level=[...all].reverse().find(o=>o.level)?.level;if(rank)item.rank=rank;if(level)item.level=level;}
+    if(all.length){const last=all[all.length-1],prev=all.length>1?all[all.length-2]:null;item.power=last.power;item.prevPower=prev?.power??null;const rank=[...all].reverse().find(o=>o.rank)?.rank;const level=[...all].reverse().find(o=>o.level)?.level;if(rank)item.rank=rank;if(level)item.level=level;
+      if(newer.length){item.prevLevel=prev?.level??(prev?.source_type==='legacy'?env?.data.level:null)??null;item.prevRank=prev?.rank??(prev?.source_type==='legacy'?env?.data.rank:null)??null;item.isNew=!env&&all.length===1;}
+    }
     return item;
   };
   const activeStates=new Set(['current','observed','unobserved','new']);const current:any[]=[];const currentIds=new Set<string>();

@@ -125,6 +125,8 @@ def verify(db):
   assert current['observed_date']==legacy['data']['date']=='2026-10-09'
   assert len(current['members'])==legacy['data']['guildCount']==87
   assert len(legacy['data']['archivedMembers'])==13
+  assert sum(m['prevLevel'] is not None and m['level']>m['prevLevel'] for m in legacy['data']['members'])==6
+  assert sum(m['prevRank'] is not None and m['rank']!=m['prevRank'] for m in legacy['data']['members'])==1
   for name,(power,level,rank) in NAMES.items():
    members=[m for m in current['members'] if m['display_name']==name];assert len(members)==1 and members[0]['canonical']==name and members[0]['power']==power
    m=next(m for m in legacy['data']['members'] if m['name']==name);assert len(m['history'])>1 and m['history'][-1]['date']=='2026-10-09' and m['history'][-1]['power']==power

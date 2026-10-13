@@ -30,6 +30,7 @@ async function run(){
  await call(publish,{batch_id:batch.batch_id,growth_revision:meta.growthRevision,identity_revision:meta.identityRevision,draft_revision:1,mutation:mutation()});
  let current=await growth.currentMembers();assert.equal(current.members.length,87);assert.equal(current.observed_date,'2026-10-09');
  let payload=await call(legacy);assert.equal(payload.data.guildCount,87);assert.equal(payload.data.date,'2026-10-09');
+ for(const member of payload.data.members){const baseline=seed.members.find(m=>m.name===member.name);assert(baseline);assert.equal(member.prevLevel,baseline.level,member.name);assert.equal(member.prevRank,baseline.rank,member.name);}
  const history=payload.data.members.find(m=>m.name==='lucky~').history;assert.equal(history.at(-1).power,51263986);assert(history.length>1);
  let cancelled=await call(withdraw,{batch_id:batch.batch_id,growth_revision:current.revision,identity_revision:current.identity_revision,mutation:mutation()});
  current=await growth.currentMembers();assert.equal(current.members.length,87);assert.equal(current.observed_date,'2026-10-08');
@@ -41,7 +42,7 @@ async function run(){
  current=await growth.currentMembers();await call(publish,{batch_id:batch.batch_id,growth_revision:current.revision,identity_revision:current.identity_revision,draft_revision:1,mutation:mutation()});
  payload=await call(legacy);assert.equal(payload.data.guildCount,87);assert.equal(payload.data.members.find(m=>m.name==='lucky~').history.length,history.length);
  const ui=fs.readFileSync(path.join(root,'public/legacy.html'),'utf8');const frame=Buffer.from(ui.match(/id="growthPayload">([\s\S]*?)<\/script>/)[1],'base64').toString();
- assert(frame.includes("sessionStorage.getItem('3on_growth_iframe_data')"));assert(!frame.includes('3on_growth_iframe_data_staging'));
+ assert(frame.includes("sessionStorage.getItem('3on_growth_iframe_data')"));assert(!frame.includes('3on_growth_iframe_data_staging'));assert(frame.includes('displayDate(previousDate)'));
  const react=fs.readFileSync(path.join(root,'app/growth-admin/page.tsx'),'utf8');assert(react.includes('/api/growth/withdraw'));assert(react.includes('반영 취소'));assert(react.includes('자료 취소'));assert(react.includes("['needs_review','ready'].includes(review.batch.state)"));
  console.log(JSON.stringify({status:'PASS',checks:['87 existing members auto-connect','lucky punctuation remains distinct','duplicate new member blocked','publish preserves complete legacy histories','published withdrawal restores 8 October','withdrawal preserves stored observations','same JSON can be reuploaded after withdrawal','draft cancellation does not change public revision','same JSON can be reuploaded after draft cancellation','repeated publication does not duplicate active history','Production iframe storage key matches outer document','cancel controls and read-only published editor'],baselineObservations:baselineCount,batch_id:batch.batch_id,dbPath}));
 }
