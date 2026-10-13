@@ -49,7 +49,6 @@ jobs:
       - name: Build Production fixes
         run: |
           npm run build
-          node scripts/cloudflare-artifact.mjs
       - name: Deploy to the existing Production Worker and D1 binding
         run: npx wrangler deploy --config wrangler.production-repair.json --strict
       - name: Reconnect duplicate October 9 observations without deleting history
