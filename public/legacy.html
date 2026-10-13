@@ -350,6 +350,7 @@ const validTabs=['growth','canyon','carriage','history','settings'];
 function activateTab(tab,push=false){
   if(!validTabs.includes(tab))tab='growth';
   if(push && typeof clearExitWarning==='function')clearExitWarning();
+  if(tab==='canyon'&&currentTab!=='canyon'&&canyonStores.power){canyonDateManuallySelected=false;renderCanyon();}
   currentTab=tab;
   document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('active',x.dataset.tab===tab));
   document.querySelectorAll('.page').forEach(x=>x.classList.toggle('active',x.id===tab));
@@ -684,7 +685,7 @@ function bindPageDialogs(){
 // Independent datasets: release updates never seed or overwrite administrator memos.
 const CANYON_POWER_SEED={"version":1,"weeks":[{"date":"2026-10-08","source":"사용자 제공 협곡대전 1소대 자료","members":[{"id":"guild:아일리","nickname":"아일리˚","displayName":"아일리˚","power":18868882,"rank":1},{"id":"guild:내가두려운가","nickname":"꧁ᬊ두리ᬊ꧂","displayName":"꧁ᬊ두리ᬊ꧂","power":17032994,"rank":2},{"id":"guild:으나으나1","nickname":"으나으나","displayName":"으나으나","power":15416439,"rank":3},{"id":"guild:닥종닥테닥","nickname":"닥중닥테닥","displayName":"닥중닥테닥","power":15217425,"rank":4},{"id":"guild:BelialKing","nickname":"BelialKing","displayName":"BelialKing","power":15110235,"rank":5},{"id":"guild:공 주","nickname":"공 주","displayName":"공 주","power":14803956,"rank":6},{"id":"guild:핵불잡","nickname":"핵불잙","displayName":"핵불잙","power":14601455,"rank":7},{"id":"guild:반달gh","nickname":"반달gh","displayName":"반달gh","power":14575395,"rank":8},{"id":"guild:백구김구","nickname":"백구김구","displayName":"백구김구","power":13295865,"rank":9},{"id":"guild:포도","nickname":"포도","displayName":"포도","power":13160635,"rank":10},{"id":"guild:얼음많이","nickname":"얼음많이","displayName":"얼음많이","power":12621391,"rank":11},{"id":"guild:링","nickname":"ㅤ링ㅤ","displayName":"ㅤ링ㅤ","power":12377109,"rank":12},{"id":"guild:문어치즈","nickname":"문어치즈","displayName":"문어치즈","power":12169023,"rank":13},{"id":"guild:이도동","nickname":"이도동","displayName":"이도동","power":11800000,"rank":14},{"id":"guild:눈도깜짝안한다","nickname":"눈도깜짝안한다","displayName":"눈도깜짝안한다","power":11728079,"rank":15},{"id":"guild:준이민이파파","nickname":"준이민이파파","displayName":"준이민이파파","power":11262229,"rank":16},{"id":"guild:워워","nickname":"워워","displayName":"워워","power":11200000,"rank":17},{"id":"guild:Cs2Таня","nickname":"TanyaCs","displayName":"TanyaCs","power":10924504,"rank":18},{"id":"guild:크림쿡","nickname":"크림쿜","displayName":"크림쿜","power":10776534,"rank":19},{"id":"guild:볼트트","nickname":"볼트트","displayName":"볼트트","power":9426192,"rank":20}]}]};
 const CANYON_KEYS={power:'3on_canyon_power',memos:'3on_canyon_memos'};
-let canyonSelectedDate='',canyonMemoMember=null,canyonDataMode='week',canyonPendingAction=null;
+let canyonSelectedDate='',canyonDateManuallySelected=false,canyonMemoMember=null,canyonDataMode='week',canyonPendingAction=null;
 const canyonStores={};
 function canyonIdentity(nickname){
   const nick=String(nickname).trim();
@@ -744,7 +745,7 @@ function canyonDelta(date,id){
 }
 function renderCanyon(){
   const weeks=canyonStores.power.data.weeks,select=document.getElementById('canyonWeek');
-  if(!weeks.some(w=>w.date===canyonSelectedDate))canyonSelectedDate=weeks[0]?.date||'';
+  if(!canyonDateManuallySelected||!weeks.some(w=>w.date===canyonSelectedDate))canyonSelectedDate=weeks[0]?.date||'';
   select.innerHTML=weeks.length?weeks.map(w=>`<option value="${w.date}">${w.date} · ${w.members.length}명</option>`).join(''):'<option value="">등록된 협곡대전 자료 없음</option>';
   select.value=canyonSelectedDate;select.disabled=!weeks.length;
   const errors=Object.values(canyonStores).map(s=>s.error).filter(Boolean),warning=document.getElementById('canyonWarning');warning.hidden=!errors.length;warning.textContent=errors.join('\n');
@@ -804,7 +805,7 @@ async function canyonRestoreLocal(kind){
 }
 function bindCanyon(){
   canyonStores.power=canyonLoad('power');canyonStores.memos=canyonLoad('memos');
-  document.getElementById('canyonWeek').onchange=e=>{canyonSelectedDate=e.target.value;renderCanyon();};
+  document.getElementById('canyonWeek').onchange=e=>{canyonSelectedDate=e.target.value;canyonDateManuallySelected=true;renderCanyon();};
   document.getElementById('canyonRows').onclick=e=>{const b=e.target.closest('[data-canyon-memo]');if(!b)return;const member=canyonStores.power.data.weeks.find(w=>w.date===canyonSelectedDate)?.members[Number(b.dataset.canyonMemo)];if(member)canyonRequireAdmin(()=>canyonOpenMemo(member));};
   document.getElementById('canyonMemoCancel').onclick=()=>canyonCloseModal('canyonMemoModal');
   document.getElementById('canyonMemoSave').onclick=async()=>{
@@ -831,7 +832,7 @@ function bindCanyon(){
         if(!await askConfirm(replace?'전체 복구: 현재 '+(kind==='power'?'협곡 명단 자료':'협곡 메모')+'를 이 백업으로 교체할까요? 백업에 없는 해당 자료는 현재 화면에서 제외됩니다. 변경 전 원본은 자동 백업합니다.':'백업을 병합할까요? 기존 날짜의 명단은 보존하고 메모는 더 최근 수정본을 적용합니다. 변경 전 자료는 자동 백업합니다.'))return;
         if(replace&&!await askConfirm('정말 해당 자료 전체를 백업 상태로 복구하시겠습니까? 마차/VIP와 다른 종류의 협곡 자료는 유지됩니다.'))return;
       }
-      if(!adminOK())return;await canyonWrite(kind,next);canyonSelectedDate=date;canyonCloseModal('canyonDataModal');renderCanyon();showNotice('협곡대전 자료를 저장했습니다.');
+      if(!adminOK())return;await canyonWrite(kind,next);canyonSelectedDate=date;canyonDateManuallySelected=!!date;canyonCloseModal('canyonDataModal');renderCanyon();showNotice('협곡대전 자료를 저장했습니다.');
     }catch(e){showNotice('저장하지 못했습니다. '+e.message);}
   };
   document.getElementById('canyonExportPower').onclick=()=>canyonExport('power');document.getElementById('canyonExportMemos').onclick=()=>canyonExport('memos');
