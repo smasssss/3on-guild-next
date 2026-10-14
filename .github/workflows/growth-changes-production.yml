@@ -1,0 +1,54 @@
+name: Fix growth change-history display
+on:
+  push:
+    branches: [fix/growth-change-history-20261014]
+    paths:
+      - '.github/workflows/growth-changes-production.yml'
+      - 'public/legacy.html'
+      - 'tests/growth_changes_regression.cjs'
+      - 'lib/growth-changes.ts'
+      - 'app/api/growth/legacy/route.ts'
+      - 'scripts/verify-growth-changes-release.py'
+permissions:
+  contents: read
+concurrency:
+  group: cloudflare-production-growth-repair
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      REPAIR_EVIDENCE: growth-changes-release-evidence
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - name: Verify current Production and preserve data comparison
+        run: python scripts/verify-growth-changes-release.py inspect
+      - name: Install existing dependencies
+        run: npm ci --include=dev --include=optional --no-audit --no-fund
+      - name: Verify change-history projection and existing growth routes
+        run: |
+          node tests/growth_changes_regression.cjs
+          node tests/canyon_latest_regression.cjs
+          node tests/production_growth_regression.cjs
+          npx tsc --noEmit
+      - name: Build existing application
+        run: npm run build
+      - name: Deploy to existing Production binding
+        run: npx wrangler deploy --config wrangler.production-repair.json --strict
+      - name: Verify published source and unchanged saved data
+        run: python scripts/verify-growth-changes-release.py verify
+      - name: Preserve release verification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: growth-changes-release-${{ github.run_id }}
+          path: growth-changes-release-evidence/
+          retention-days: 14
+          if-no-files-found: warn
