@@ -26,6 +26,9 @@ export function growthChanges(input:{metadata:any;members:any[];archived:any[];e
   const departures=new Map<string,any>();
   for(const mutation of mutations){
     const result=JSON.parse(mutation.result_json);if(!batchMap.has(result.batch_id))continue;
+    for(const r of result.returned||[]){if(r.after!=='observed')continue;
+      history.push({kind:'rejoin',member_id:r.member_id,name:info.get(r.member_id)?.name||r.member_id,displayName:r.display_name,date:result.observed_date});
+    }
     for(const d of result.departed||[]){if(d.after!=='missing')continue;
       const event={kind:'departure',member_id:d.member_id,name:info.get(d.member_id)?.name||d.member_id,displayName:d.display_name,date:result.observed_date};
       history.push(event);departures.set(d.member_id,event);

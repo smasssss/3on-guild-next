@@ -26,6 +26,11 @@ async function get(){const res=await legacy.GET(new Request('https://test.invali
 async function run(){
  const before=JSON.stringify(sqlite.prepare('SELECT * FROM growth_observations ORDER BY observation_id').all());
  let data=await get();assert.equal(data.changeHistory.filter(e=>e.kind==='departure').length,5);
+ assert(!data.changeHistory.some(e=>e.kind==='rejoin'),'A screenshot alone cannot confirm a returning identity');
+ const returning=id('공 주');
+ exec("UPDATE growth_membership_snapshots SET membership_state='observed' WHERE batch_id='fixture-13' AND member_id=?",returning);
+ exec("INSERT INTO growth_mutations VALUES('confirmed-return','membership_correction',?,'2026-10-13')",JSON.stringify({batch_id:'fixture-13',observed_date:'2026-10-13',returned:[{member_id:returning,display_name:'공 주',before:'missing',after:'observed'}]}));
+ data=await get();assert.equal(data.changeHistory.filter(e=>e.kind==='rejoin'&&e.member_id===returning).length,1);
  assert(data.missing.filter(m=>m.confirmedDeparture).every(m=>m.status.includes('탈퇴 확인')));
  assert(data.changeHistory.some(e=>e.kind==='nickname'&&e.date==='2026-10-11'&&e.from==='제시맘'&&e.to==='홍시'));
  assert(data.changeHistory.some(e=>e.kind==='nickname'&&e.date==='2026-10-12'&&e.from==='홍시'&&e.to==='제시맘'));
@@ -40,6 +45,8 @@ async function run(){
  const sandbox={DATA:data,$:el,esc:x=>String(x).replaceAll('<','&lt;').replaceAll('>','&gt;'),todayDelta:()=>null,levelChange:()=>0,card:()=>''};vm.createContext(sandbox);vm.runInContext(code+';renderChanges()',sandbox);
  assert(el('#changeHistory').innerHTML.includes('2026-10-13'));
  assert(el('#changeHistory').innerHTML.includes('용퍕이'));
+ assert(el('#changeHistory').innerHTML.includes('재가입 확인'));
+ assert(el('#changeHistory').innerHTML.includes('공 주'));
  assert(el('#changeSummary').innerHTML.includes('탈퇴 확인'));
  assert(el('#changeHistory').innerHTML.indexOf('2026-10-13')<el('#changeHistory').innerHTML.indexOf('2026-10-11'));
  // Withdrawing the newest publication must hide its departure and rank events.
