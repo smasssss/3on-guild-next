@@ -21,11 +21,14 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - name: Inspect account Cron capacity without changing any schedule
+        run: python scripts/growth-automation-release.py inventory staging
       - name: Install existing dependencies
         run: npm ci --include=dev --include=optional --no-audit --no-fund
       - name: Test automation and existing growth and canyon behavior
         run: |
           npx tsc --noEmit
+          node tests/growth_auto_ui_regression.cjs
           node tests/growth_automation_regression.cjs
           node tests/growth_changes_regression.cjs
           node tests/production_growth_regression.cjs

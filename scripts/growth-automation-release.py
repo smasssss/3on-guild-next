@@ -67,6 +67,12 @@ def inspect(db):
  assert restored.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
  (E/'restore-rehearsal.json').write_text(json.dumps({'status':'PASS','tables':len(data),'rows':sum(map(len,data.values())),'credentials_excluded':True}))
  print(json.dumps({'status':'BACKUP_AND_RESTORE_PASS','target':TARGET,'business_tables':len(data),'binding_types':[b['type'] for b in db.settings['bindings']],'growth_meta':before['growth_meta'],'schedules':schedules,'time_travel_available':'bookmark' in bookmark}))
+def inventory(db):
+ scripts=db.api('GET','/workers/scripts')['result'];rows=[]
+ for worker in scripts:
+  name=worker['id'];value=db.api('GET','/workers/scripts/'+name+'/schedules')['result'];schedules=value.get('schedules',[]) if isinstance(value,dict) else value
+  if schedules:rows.append({'worker':name,'crons':[x['cron'] for x in schedules]})
+ print(json.dumps({'status':'READ_ONLY_CRON_INVENTORY','total':sum(len(x['crons']) for x in rows),'scheduled_workers':rows}))
 def prepare(db):
  before=json.loads((E/'before.json').read_text());assert baseline(db)==before,'Production changed after backup; inspect again'
  db.execute(Path('drizzle/0005_growth_automation.sql').read_text())
@@ -93,4 +99,4 @@ def verify(db):
  (E/'after.json').write_text(json.dumps({'baseline':after,'automation':state,'schedules':schedules,'current':nowpublic['current']},ensure_ascii=False,indent=2))
  print(json.dumps({'status':'DEPLOYMENT_VERIFIED','target':TARGET,'members':len(nowpublic['current']['members']),'revision':nowpublic['current']['revision'],'schedules':sorted(actual),'existing_data_and_credentials_preserved':True}))
 if __name__=='__main__':
- db=Remote();{'inspect':inspect,'prepare':prepare,'verify':verify}[sys.argv[1]](db)
+ db=Remote();{'inspect':inspect,'prepare':prepare,'verify':verify,'inventory':inventory}[sys.argv[1]](db)
