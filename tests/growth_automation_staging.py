@@ -1,61 +1,20 @@
-"""Exercise the deployed Staging Worker with reused responses; never LastAsylum."""
-import os,json,sys,importlib.util,urllib.request,urllib.error,datetime
+"""Real Staging D1 test; use authorized management API, never blocked website login."""
+import os,json,importlib.util,subprocess,tempfile
 from pathlib import Path
 spec=importlib.util.spec_from_file_location('release',Path('scripts/growth-automation-release.py'));r=importlib.util.module_from_spec(spec);spec.loader.exec_module(r)
-assert r.TARGET=='staging';db=r.Remote();before=r.tables(db);base='https://3on-guild-staging.295server.workers.dev';token=''
-def call(path,body=None,auth=True,expected=200):
- headers={'Content-Type':'application/json','Origin':base}
- if auth and token:headers['Authorization']='Bearer '+token
- req=urllib.request.Request(base+path,data=None if body is None else json.dumps(body).encode(),headers=headers)
- try:
-  with urllib.request.urlopen(req,timeout=60) as res:status=res.status;out=json.load(res)
- except urllib.error.HTTPError as e:
-  status=e.code;raw=e.read().decode(errors='replace')
-  try:out=json.loads(raw)
-  except ValueError:out={'non_json_error':raw[:300].replace(os.environ.get('STAGING_ADMIN_PASSWORD','not-a-secret'), '[redacted]')}
-
- assert status==expected,(path,status,out);return out
-def ms(s):return int(datetime.datetime.fromisoformat(s.replace('Z','+00:00')).timestamp()*1000)
-checks=[]
+assert r.TARGET=='staging';db=r.Remote();before=r.tables(db);auth_before=r.baseline(db)['credentials_hash']
 try:
- password=os.environ.get('STAGING_ADMIN_PASSWORD','');assert password,'Existing Staging admin secret unavailable'
- token=call('/api/session',{'password':password},False)['token']
- assert call('/api/session')['admin'];call('/api/growth/automation?admin=1',auth=False,expected=401)
- checks.append('existing administrator authentication and unauthenticated write protection')
- synthetic=json.loads(Path('tests/fixtures/lastasylum-50373046.json').read_text())
- current=call('/api/growth/current')['members'];assert len(current)==89
- links=[{'game_id':row['id'],'member_id':member['member_id'],'source_name':row['name'],'evidence':'Staging synthetic fixture only'} for row,member in zip(synthetic['roster'],current)]
- call('/api/growth/automation',{'action':'bootstrap','mappings':links})
- for row,member in zip(synthetic['roster'],current):row['power']=member['power'];row['castle']=max(25,member['level'])
- def runtime_fixture():return json.loads(json.dumps(synthetic))
- data=runtime_fixture()
- data['asOf']=ms('2026-10-18T14:00:00Z')//1000;data['roster']=data['roster'][:88];data['members']=88
- a=call('/api/growth/automation',{'action':'fixture','data':data,'called_at':ms('2026-10-18T14:01:00Z')})
- n=len(db.query('SELECT * FROM growth_hourly_observations'));assert n==88
- a=call('/api/growth/automation',{'action':'fixture','data':data,'called_at':ms('2026-10-18T14:02:00Z')});assert a['result']['status']=='duplicate';assert len(db.query('SELECT * FROM growth_hourly_observations'))==n
- checks.append('real D1 duplicate raw JSON creates no additional observations')
- data=runtime_fixture();data['asOf']=ms('2026-10-18T14:50:00Z')//1000
- data['roster'][0]['name']='STAGING_닉변시험';data['roster'][0]['rank']=3
- call('/api/growth/automation',{'action':'fixture','data':data,'called_at':ms('2026-10-18T14:51:00Z')})
- last_power=data['roster'][0]['power'];game_id=data['roster'][0]['id']
- state=call('/api/growth/automation?admin=1');assert state['last_good']['member_count']==89;assert state['external_calls']==0
- assert any(e['kind']=='nickname' for e in state['events']);assert any(e['kind']=='rank' for e in state['events'])
- assert len(db.query('SELECT * FROM growth_observations'))==len(before['growth_observations'])
- checks.append('88 to 89 roster, ID-preserving nickname/rank events, hourly/daily separation')
- data['asOf']=ms('2026-10-18T15:00:00Z')//1000;data['roster'][0]['power']+=1234
- call('/api/growth/automation',{'action':'fixture','data':data,'called_at':ms('2026-10-18T15:00:01Z')})
- result=call('/api/growth/automation',{'action':'close','date':'2026-10-18','now':ms('2026-10-18T15:10:00Z')})
- assert result['result']['members']==89
- selected=db.query('SELECT * FROM growth_daily_sources WHERE game_id='+r.quote(game_id))[0];assert selected['power']==last_power;assert selected['source_as_of']<ms('2026-10-18T15:00:00Z')
- count=len(db.query('SELECT * FROM growth_observations'));again=call('/api/growth/automation',{'action':'close','date':'2026-10-18','now':ms('2026-10-18T15:11:00Z')});assert again['result']['duplicate'];assert len(db.query('SELECT * FROM growth_observations'))==count
- assert call('/api/growth/current')['observed_date']=='2026-10-18';legacy=call('/api/growth/legacy');assert legacy['data']['date']=='2026-10-18'
- assert next(m for m in legacy['data']['members'] if m['member_id']==selected['member_id'])['history'][-1]['power']==last_power
- checks.append('deployed Worker midnight exclusion, close idempotence and existing growth API/history')
- assert call('/api/growth/automation')['external_calls']==0
- call('/api/growth/automation',{'action':'collect'});assert call('/api/growth/automation')['external_calls']==0
- checks.append('closing and Staging collection make zero external calls')
- # Preserve evidence without credentials or tokens.
- (r.E/'staging-fixture-state.json').write_text(json.dumps(state,ensure_ascii=False,indent=2));(r.E/'staging-fixture-legacy.json').write_text(json.dumps(legacy,ensure_ascii=False))
+ data=json.loads(Path('tests/fixtures/lastasylum-50373046.json').read_text());current=r.public('/api/growth/current')['members'];assert len(current)==89
+ links=[{'game_id':row['id'],'member_id':member['member_id'],'source_name':row['name']} for row,member in zip(data['roster'],current)]
+ for row,member in zip(data['roster'],current):row['power']=member['power'];row['castle']=max(25,member['level'])
+ with tempfile.TemporaryDirectory() as temp:
+  fixture=Path(temp)/'fixture.json';fixture.write_text(json.dumps({'worker':'3on-guild-staging','links':links,'data':data},ensure_ascii=False))
+  subprocess.run(['node','tests/growth_automation_remote.cjs'],check=True,env={**os.environ,'STAGING_D1_ID':db.database,'STAGING_RUNTIME_FIXTURE':str(fixture)})
+ result=json.loads((r.E/'staging-tests.json').read_text());legacy=r.public('/api/growth/legacy');current=r.public('/api/growth/current')
+ assert current['observed_date']==legacy['data']['date']=='2026-10-18'
+ assert next(m for m in legacy['data']['members'] if m['member_id']==result['first_member_id'])['history'][-1]['power']==result['expected_power']
+ (r.E/'staging-fixture-legacy.json').write_text(json.dumps(legacy,ensure_ascii=False))
+ result['checks'].append('deployed Worker current/legacy APIs expose the real D1 close and original member history')
 finally:
  # Restore only fixture-created rows and changed growth fields to the pretest snapshot.
  # Never touch carriage/VIP/canyon/documents or any credentials.
@@ -74,7 +33,7 @@ finally:
   for row in before[name]:
    if any(current[row[key]][c]!=row[c] for c in columns):updates.append('UPDATE '+name+' SET '+','.join(c+'='+('NULL' if row[c] is None else r.quote(row[c])) for c in columns)+' WHERE '+key+'='+r.quote(row[key])+';')
   if updates:db.execute('\n'.join(updates))
- if token:call('/api/session',{'action':'logout'})
-after=r.tables(db);assert r.digest(before)==r.digest(after),'Staging fixture cleanup did not restore existing data'
-checks.append('all pretest Staging business data restored exactly; carriage and VIP preserved')
-(r.E/'staging-tests.json').write_text(json.dumps({'status':'PASS','checks':checks,'external_calls':0,'real_d1':True},ensure_ascii=False,indent=2));print(json.dumps({'status':'PASS','checks':checks,'external_calls':0}))
+after=r.tables(db);assert r.digest(before)==r.digest(after),'Staging test cleanup changed existing business data'
+assert r.baseline(db)['credentials_hash']==auth_before,'Existing administrator credentials changed'
+result['checks'].append('exact Staging business data and authentication restoration; carriage/VIP preserved')
+(r.E/'staging-tests.json').write_text(json.dumps(result,ensure_ascii=False,indent=2));print(json.dumps({'status':'PASS','checks':result['checks'],'external_calls':0}))
