@@ -2,10 +2,13 @@ name: Verify first real hourly Cloudflare collection once
 on:
   push:
     branches: [release/growth-automation-20261017]
-    paths: ['.github/workflows/growth-automation-first-hour-verification.yml']
+    paths: ['.github/workflows/growth-automation-first-hour-verification.yml', 'scripts/wait-first-growth-cron.py']
 permissions:
   contents: read
   actions: read
+concurrency:
+  group: 3on-first-hour-read-only-verification
+  cancel-in-progress: true
 jobs:
   verify:
     runs-on: ubuntu-latest

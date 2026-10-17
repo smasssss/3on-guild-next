@@ -6,7 +6,7 @@ r=importlib.util.module_from_spec(spec);spec.loader.exec_module(r)
 assert r.TARGET=='production';db=r.Remote()
 for minute in range(70):
  runs=db.query("SELECT status FROM growth_auto_runs WHERE trigger_kind='cron' ORDER BY called_at DESC LIMIT 1")
- if runs:
+ if runs and runs[0]['status'] not in ('calling','received'):
   print('Observed first real scheduled collection:',runs[0]['status'],flush=True)
   assert runs[0]['status'] in ('accepted','partial','duplicate'),'Scheduled collection failed; retain existing confirmed data and review the administrator error log'
   break
