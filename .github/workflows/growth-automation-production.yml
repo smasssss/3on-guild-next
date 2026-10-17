@@ -16,7 +16,7 @@ jobs:
     env:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      VALIDATED_SOURCE_SHA: c24d2138f36cd8a9f77d7e23f06f52ac6103b5e2
+      VALIDATED_SOURCE_SHA: c784871ea891c2810b401d57f0f713d9b8c35a7a
     steps:
       - name: Require successful exact-source Staging validation
         env:
@@ -33,7 +33,7 @@ jobs:
           PY
       - uses: actions/checkout@v6
         with:
-          ref: c24d2138f36cd8a9f77d7e23f06f52ac6103b5e2
+          ref: c784871ea891c2810b401d57f0f713d9b8c35a7a
       - uses: actions/setup-node@v6
         with:
           node-version: 24
