@@ -76,16 +76,19 @@ export function parsePackage(raw:string):GrowthPackage{
 export async function currentMembers(){
   const latest=await db().prepare("SELECT batch_id,observed_date,published_revision FROM growth_batches WHERE state='published' ORDER BY observed_date DESC,published_revision DESC LIMIT 1").first<{batch_id:string;observed_date:string;published_revision:number}>();
   if(!latest)throw Error('growth publication unavailable');
-  const rows=await db().prepare(`SELECT s.member_id,s.membership_state,s.row_order,m.legacy_canonical,m.display_name,e.payload,
+  const rows=await db().prepare(`WITH RECURSIVE lineage(batch_id) AS (
+    SELECT ? UNION ALL SELECT b.supersedes_batch_id FROM growth_batches b JOIN lineage l USING(batch_id)
+    JOIN growth_batches parent ON parent.batch_id=b.supersedes_batch_id WHERE parent.state IN ('published','superseded'))
+    SELECT s.member_id,s.membership_state,s.row_order,m.legacy_canonical,m.display_name,e.payload,
     o.observation_id,o.observed_date,o.slot,o.power,o.level,o.rank,o.original_order
     FROM growth_membership_snapshots s
     JOIN growth_members m ON m.member_id=s.member_id
     LEFT JOIN growth_legacy_envelopes e ON e.member_id=m.member_id
     LEFT JOIN growth_observations o ON o.observation_id=(
-      SELECT x.observation_id FROM growth_observations x JOIN growth_batches b ON b.batch_id=x.batch_id
-      WHERE x.member_id=s.member_id AND x.status='active' AND b.state='published' AND x.observed_date<=?
+      SELECT x.observation_id FROM growth_observations x JOIN lineage b ON b.batch_id=x.batch_id
+      WHERE x.member_id=s.member_id AND x.status='active' AND x.observed_date<=?
       ORDER BY x.observed_date DESC,x.original_order DESC LIMIT 1)
-    WHERE s.batch_id=? ORDER BY s.row_order`).bind(latest.observed_date,latest.batch_id).all<any>();
+    WHERE s.batch_id=? ORDER BY s.row_order`).bind(latest.batch_id,latest.observed_date,latest.batch_id).all<any>();
   const members=rows.results.filter(r=>!['archived','missing'].includes(r.membership_state)).map(r=>{
     const legacy=r.payload?JSON.parse(r.payload):{};
     return {member_id:r.member_id,canonical:r.legacy_canonical,display_name:r.display_name,rank:r.rank??legacy.rank??null,level:r.level??legacy.level??null,power:r.power??legacy.power??null,observed_date:r.observed_date??null,slot:r.slot??null,membership_state:r.membership_state};
@@ -97,9 +100,14 @@ export async function currentMembers(){
 export async function memberHistory(memberId:string,limit=200,before?:string|null){
   if(!/^[a-z0-9_-]{8,100}$/i.test(memberId))throw Error('MEMBER_ID');
   limit=Math.max(1,Math.min(500,Math.trunc(limit)));
-  const sql=`SELECT o.observation_id,o.observed_date,o.slot,o.power,o.level,o.rank,o.label,o.source_type,o.original_order
-    FROM growth_observations o JOIN growth_batches b ON b.batch_id=o.batch_id
-    WHERE o.member_id=? AND o.status='active' AND b.state='published' ${before?'AND o.observed_date<?':''}
+  const sql=`WITH RECURSIVE lineage(batch_id,depth) AS (
+    SELECT batch_id,0 FROM (SELECT batch_id FROM growth_batches WHERE state='published' ORDER BY observed_date DESC,published_revision DESC LIMIT 1)
+    UNION ALL SELECT parent.batch_id,l.depth+1 FROM growth_batches b JOIN lineage l USING(batch_id)
+    JOIN growth_batches parent ON parent.batch_id=b.supersedes_batch_id WHERE parent.state IN ('published','superseded'))
+    SELECT o.observation_id,o.observed_date,o.slot,o.power,o.level,o.rank,o.label,o.source_type,o.original_order
+    FROM growth_observations o JOIN lineage b ON b.batch_id=o.batch_id
+    WHERE o.member_id=? AND o.status='active' AND (o.source_type='legacy' OR b.depth=(
+      SELECT MIN(l.depth) FROM growth_observations x JOIN lineage l USING(batch_id) WHERE x.member_id=o.member_id AND x.observed_date=o.observed_date AND x.slot=o.slot AND x.status='active')) ${before?'AND o.observed_date<?':''}
     ORDER BY o.observed_date DESC,o.original_order DESC LIMIT ?`;
   const statement=before?db().prepare(sql).bind(memberId,before,limit):db().prepare(sql).bind(memberId,limit);
   return (await statement.all()).results;

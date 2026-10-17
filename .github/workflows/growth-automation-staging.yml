@@ -1,0 +1,55 @@
+name: Verify growth automation on existing Staging
+on:
+  push:
+    branches: [feat/growth-automation-20261017]
+permissions:
+  contents: read
+concurrency:
+  group: cloudflare-staging
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      STAGING_ADMIN_PASSWORD: ${{ secrets.CLOUDFLARE_STAGING_ADMIN_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install existing dependencies
+        run: npm ci --include=dev --include=optional --no-audit --no-fund
+      - name: Test automation and existing growth and canyon behavior
+        run: |
+          npx tsc --noEmit
+          node tests/growth_automation_regression.cjs
+          node tests/growth_changes_regression.cjs
+          node tests/production_growth_regression.cjs
+          node tests/canyon_latest_regression.cjs
+      - name: Back up existing Staging business data and rehearse restore
+        run: python scripts/growth-automation-release.py inspect staging
+      - name: Add isolated automation tables and reviewed game IDs
+        run: python scripts/growth-automation-release.py prepare staging
+      - name: Build existing application
+        run: npm run build
+      - name: Deploy Staging without external collection schedules
+        run: npx wrangler deploy --config wrangler.automation.generated.json --strict
+      - name: Verify saved data and disabled Staging Cron
+        run: python scripts/growth-automation-release.py verify staging
+      - name: Test real Staging D1 and existing administrator authentication
+        run: python tests/growth_automation_staging.py
+      - name: Encrypt business backup and verification evidence
+        if: always()
+        run: node scripts/encrypt-automation-evidence.mjs
+      - name: Save encrypted backups and verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: growth-automation-staging-${{ github.run_id }}
+          path: automation-encrypted/
+          retention-days: 30
+          if-no-files-found: warn

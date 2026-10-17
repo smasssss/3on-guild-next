@@ -1,6 +1,7 @@
 'use client';
 
 import {useCallback,useEffect,useMemo,useState} from 'react';
+import AutomationPanel from './AutomationPanel';
 
 const SESSION_KEY='3on_admin_session_v2';
 const mutation=()=>crypto.randomUUID();
@@ -80,7 +81,8 @@ export default function GrowthAdmin(){
     <header className="adminHeader"><a href="../legacy#settings">← 운영센터</a><div><span>3ON 관리설정</span><h1>성장자료 업데이트</h1></div>{admin&&<button className="secondary" onClick={logout}>로그아웃</button>}</header>
     {notice&&<div className="simpleNotice" role="status">{notice}</div>}
     {!admin?<form className="simpleCard loginCard" onSubmit={login}><h2>관리자 확인</h2><p>관리자 비밀번호를 입력하세요.</p><input type="password" value={password} onChange={event=>setPassword(event.target.value)} autoComplete="current-password"/><button disabled={busy}>{busy?'확인 중…':'인증'}</button></form>:<>
-      <section className="simpleCard uploadCard"><div><h2>성장자료 입력</h2><p>AI가 만든 업데이트 파일을 선택하면 기존 member 연결과 신규 등록을 자동 처리합니다.</p></div><label className="fileButton">{busy?'처리 중…':'파일 선택'}<input type="file" accept=".json,application/json" disabled={busy} onChange={upload}/></label></section>
+      <AutomationPanel call={call}/>
+      <section className="simpleCard uploadCard"><div><h2>성장자료 수동 입력</h2><p>자동 수집 장애 시에도 기존 JSON 파일을 검토하고 반영할 수 있습니다.</p></div><label className="fileButton">{busy?'처리 중…':'파일 선택'}<input type="file" accept=".json,application/json" disabled={busy} onChange={upload}/></label></section>
       {batches.length>0&&<label className="batchPicker">확인할 자료<select value={batchId} onChange={event=>loadReview(event.target.value)}>{batches.map(item=><option key={item.batch_id} value={item.batch_id}>{item.observed_date} · {item.slot}{item.slot.includes('test')?' · TEST':''} · {item.state}</option>)}</select></label>}
       {review&&<>
         <section className="resultHead simpleCard"><div className="resultTitle"><div><span>{review.batch.observed_date} 성장자료 {review.batch.slot.includes('test')&&<b className="testBadge">TEST</b>}</span><h2>AI 처리 결과</h2></div><span className="draftBadge">{review.batch.state==='published'?'Published':'Draft'}</span></div><div className="resultCounts"><div><b>{summary.total||0}</b><span>전체</span></div><div><b>{summary.auto_connections||0}</b><span>기존 자동연결</span></div><div><b>{summary.new_members||0}</b><span>신규</span></div><div><b>{summary.nickname_changes||0}</b><span>닉변 추정</span></div><div className={summary.failures?'warnCount':''}><b>{summary.failures||0}</b><span>판독 실패</span></div></div><p>현재 공개자료: {current?.observed_date||'—'} · revision {current?.revision??'—'}</p><div className="viewButtons"><button className={!changedOnly?'active':''} onClick={()=>setChangedOnly(false)}>전체 결과 보기</button><button className={changedOnly?'active':''} onClick={()=>setChangedOnly(true)}>이번 변경만 보기 · {summary.changed_members||0}</button></div></section>
