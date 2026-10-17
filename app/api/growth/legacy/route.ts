@@ -21,8 +21,9 @@ export async function GET(req:Request){try{
       JOIN growth_batches child ON child.batch_id=lineage.batch_id
       JOIN growth_batches parent ON parent.batch_id=child.supersedes_batch_id
       WHERE parent.state IN ('published','superseded')
-    ) SELECT o.*,lineage.lineage_depth FROM growth_observations o
+    ) SELECT o.*,lineage.lineage_depth,d.source_as_of auto_source_as_of,d.received_at auto_received_at,d.stale auto_stale,d.previous_power auto_previous_power FROM growth_observations o
       JOIN valid_lineage lineage ON lineage.batch_id=o.batch_id
+      LEFT JOIN growth_daily_sources d ON d.member_id=o.member_id AND d.date=o.observed_date AND o.source_type='automatic'
       WHERE o.status='active' ORDER BY o.observed_date,o.original_order`).bind(latest.batch_id).all<any>(),
     db().prepare('SELECT member_id,membership_state,row_order FROM growth_membership_snapshots WHERE batch_id=? ORDER BY row_order').bind(latest.batch_id).all<any>(),
     db().prepare('SELECT key,payload FROM growth_legacy_metadata').all<any>(),
@@ -39,9 +40,10 @@ export async function GET(req:Request){try{
     const info:any=memberInfo.get(memberId),env:any=envelopes.get(memberId);const item=env?structuredClone(env.data):{name:info.legacy_canonical||memberId,displayName:info.display_name,history:[],isNew:true};
     item.name=info.legacy_canonical||item.name||memberId;item.displayName=info.display_name;item.member_id=memberId;
     const all=observations.get(memberId)||[];const newer=all.filter(o=>o.source_type!=='legacy');
-    for(const o of newer)item.history.push({label:o.label||o.observed_date,date:o.observed_date,slot:o.slot,power:o.power});
+    for(const o of newer)item.history.push({label:o.label||o.observed_date,date:o.observed_date,slot:o.slot,power:o.power,...(o.source_type==='automatic'?{source_as_of:o.auto_source_as_of,received_at:o.auto_received_at,stale:!!o.auto_stale,source_type:'automatic',individual_timestamp:false}:{})});
     if(all.length){const last=all[all.length-1],prev=all.length>1?all[all.length-2]:null;item.power=last.power;item.prevPower=prev?.power??null;const rank=[...all].reverse().find(o=>o.rank)?.rank;const level=[...all].reverse().find(o=>o.level)?.level;if(rank)item.rank=rank;if(level)item.level=level;
       if(newer.length){item.prevLevel=prev?.level??(prev?.source_type==='legacy'?env?.data.level:null)??null;item.prevRank=prev?.rank??(prev?.source_type==='legacy'?env?.data.rank:null)??null;item.isNew=!env&&all.length===1;}
+      if(last.source_type==='automatic'){item.prevPower=last.auto_previous_power??null;item.source_as_of=last.auto_source_as_of;item.observation_delayed=!!last.auto_stale;item.previous_power_basis='previous_daily_close';}
     }
     return item;
   };
@@ -50,6 +52,14 @@ export async function GET(req:Request){try{
   const archived:any[]=[];for(const memberId of new Set([...envelopes.keys(),...observations.keys()]))if(!currentIds.has(memberId))archived.push(makeMember(memberId));
   const metadata=Object.fromEntries(metadataResult.results.map((r:any)=>[r.key,JSON.parse(r.payload)]));
   const changes=growthChanges({metadata,members:current,archived,envelopes,observations:effective,batches:batchResult.results,rows:rowResult.results,mutations:mutationResult.results,snapshots:snapshotResult.results});
+  const automaticNames=await db().prepare("SELECT * FROM growth_auto_events WHERE kind='nickname' AND status='recorded' ORDER BY source_as_of").all<any>();
+  for(const event of automaticNames.results){
+    const date=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(event.source_as_of);if(date>latest.observed_date)continue;
+    const m:any=memberInfo.get(event.member_id),from=JSON.parse(event.before_json||'{}').name,to=JSON.parse(event.after_json||'{}').name;
+    if(!m||!from||!to)continue;const row={kind:'nickname',member_id:event.member_id,name:m.legacy_canonical||event.member_id,displayName:m.display_name,date,from,to,source_as_of:event.source_as_of};
+    if(!changes.changeHistory.some((x:any)=>x.kind==='nickname'&&x.member_id===row.member_id&&x.date===date&&x.from===from&&x.to===to)){changes.changeHistory.push(row);changes.nicknameChanges.push(row);}
+  }
+  changes.changeHistory.sort((a:any,b:any)=>b.date.localeCompare(a.date));
   const data={...metadata,...changes,date:latest.observed_date,guildCount:current.length,members:current,archivedMembers:archived};
   const revision=await meta();return response(req,{schema:GROWTH_SCHEMA,api:GROWTH_API,revision:revision.growthRevision,identity_revision:revision.identityRevision,data});
 }catch{return response(req,{error:'호환 성장자료를 만들지 못했습니다.'},503);}}

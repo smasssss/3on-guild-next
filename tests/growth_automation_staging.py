@@ -24,7 +24,7 @@ finally:
   for row in before[name]:
    cols=list(row);vals=['NULL' if row[c] is None else str(row[c]) if isinstance(row[c],(int,float)) else r.quote(row[c]) for c in cols]
    db.execute('INSERT INTO '+name+'('+','.join(cols)+') VALUES('+','.join(vals)+');')
- for name,key in [('growth_observations','observation_id'),('growth_batch_rows','row_id'),('growth_membership_snapshots','batch_id'),('growth_publications','publication_id'),('growth_mutations','mutation'),('growth_tx_guards','guard_id'),('growth_identity_decisions','decision_id'),('growth_batches','batch_id')]:
+ for name,key in [('growth_observations','observation_id'),('growth_batch_rows','row_id'),('growth_batch_sources','batch_id'),('growth_membership_snapshots','batch_id'),('growth_publications','publication_id'),('growth_mutations','mutation'),('growth_tx_guards','guard_id'),('growth_identity_decisions','decision_id'),('growth_batches','batch_id')]:
   old={row[key] for row in before[name]};current=db.query('SELECT DISTINCT '+key+' FROM '+name)
   extra=[row[key] for row in current if row[key] not in old]
   if extra:db.execute('DELETE FROM '+name+' WHERE '+key+' IN('+','.join(map(r.quote,extra))+');')

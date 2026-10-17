@@ -49,3 +49,9 @@ CREATE TABLE IF NOT EXISTS growth_daily_sources (
  accepted_at INTEGER NOT NULL, power INTEGER NOT NULL, previous_power INTEGER,
  delta INTEGER, stale INTEGER NOT NULL, PRIMARY KEY(date,member_id)
 );
+CREATE TABLE IF NOT EXISTS growth_auto_executions (
+ execution_id TEXT PRIMARY KEY, cron TEXT NOT NULL, scheduled_at INTEGER NOT NULL,
+ started_at INTEGER NOT NULL, completed_at INTEGER, status TEXT NOT NULL,
+ result_json TEXT, error TEXT
+);
+CREATE INDEX IF NOT EXISTS growth_auto_executions_time ON growth_auto_executions(scheduled_at DESC);

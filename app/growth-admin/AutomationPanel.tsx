@@ -12,6 +12,8 @@ export default function AutomationPanel({call}:{call:(url:string,options?:Reques
   <p>{data?.mode==='fixture'?'Staging · 저장된 테스트 응답만 사용':data?.control?.enabled?'자동 수집 켜짐':'자동 수집 일시 정지'} · 검토 {data?.pending_count??0}건</p>
   <p>최근 호출: {time(data?.last_run?.called_at)} ({data?.last_run?.status||'대기'})<br/>원본 기준: {time(data?.last_good?.source_as_of)} · 마지막 정상 저장: {time(data?.last_good?.accepted_at)}<br/>일일 마감: {data?.last_close?.date||'첫 마감 대기'} · 외부 호출 {data?.external_calls??0}회</p>
   {data?.last_run?.error&&<p role="alert">수집 오류: {data.last_run.error}</p>}
+  <p>최근 실제 Cron 실행: {time(data?.last_execution?.started_at)} · {data?.last_execution?.status||'첫 실행 대기'}</p>
+  {data?.last_execution?.error&&<p role="alert">Cron 실행 오류: {data.last_execution.error}</p>}
   {message&&<p role="status">{message}</p>}
   {data?.mappings?.length===0&&<label className="fileButton">검증된 게임 ID 연결표 등록 · 수집 시작<input type="file" accept=".json" disabled={busy} onChange={async e=>{const file=e.target.files?.[0];if(!file)return;try{await action({action:'bootstrap',mappings:JSON.parse(await file.text())})}catch(err:any){setMessage(err.message)}e.target.value=''}}/></label>}
   <div className="viewButtons"><button disabled={busy} onClick={load}>상태 새로고침</button><button disabled={busy||data?.mode!=='production'} onClick={()=>action({action:'collect'})}>지금 수집 · 호출 간격 준수</button><button disabled={busy} onClick={()=>action({action:'close'})}>전날 마감 재실행 · API 호출 없음</button><button disabled={busy} onClick={()=>action({action:'enabled',enabled:!data?.control?.enabled})}>{data?.control?.enabled?'수집 일시 정지':'수집 재개'}</button></div>

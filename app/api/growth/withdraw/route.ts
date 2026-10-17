@@ -4,6 +4,7 @@ export const dynamic='force-dynamic';
 export async function POST(req:Request){try{
   if(!validOrigin(req))return response(req,{error:'허용되지 않은 주소입니다.'},403);const user=await actor(req);if(!user)return response(req,{error:'관리자 인증이 필요합니다.'},401);
   const b=await req.json() as any;if(typeof b.batch_id!=='string'||!Number.isSafeInteger(b.growth_revision)||!Number.isSafeInteger(b.identity_revision)||!validMutation(b.mutation))return response(req,{error:'철회 요청 형식을 확인해 주세요.'},400);
+  if(b.batch_id.startsWith('auto_close_'))return response(req,{error:'자동 일일 확정자료는 보존됩니다. 정정이 필요하면 원본을 검토하고 수동 정정 자료를 등록하세요.'},409);
   const duplicate=await db().prepare("SELECT result_json FROM growth_mutations WHERE mutation=? AND operation='withdraw'").bind(b.mutation).first<{result_json:string}>();if(duplicate)return response(req,{duplicate:true,...JSON.parse(duplicate.result_json)});
   const draft=await db().prepare("SELECT state,draft_revision FROM growth_batches WHERE batch_id=? AND state IN ('draft','needs_review','ready')").bind(b.batch_id).first<any>();
   if(draft){

@@ -41,7 +41,16 @@ async function run(){
  const actualNow=Date.now;Date.now=()=>Date.parse('2026-10-17T15:10:00Z');
  await auto.scheduledAutomation({cron:auto.CLOSE_CRON,scheduledTime:Date.parse('2026-10-17T15:10:00Z')},{DB:db,GROWTH_AUTO_MODE:'production'});Date.now=actualNow;assert.equal(fetches,1,'close never fetches');
  assert.equal(digest(),preserved,'carriage VIP canyon memos preserved');assert.equal(count('growth_observations'),oldObs+89);
- const status=await auto.automaticStatus(db,true);assert(status.members.length===89);assert.equal(status.ai_calls,0);
+ // The second close has a real previous-day baseline; new IDs stay distinct.
+ const next=snap('2026-10-18T14:00:00Z');next.roster[0].power=b.roster[0].power-100;
+ next.roster.push({...next.roster[1],id:'900000000998',name:'별도신규테스트'});next.members=90;
+ next.roster.push({...next.roster[2],id:'900000000999',name:next.roster[2].name});next.members=91;
+ await auto.fixture(db,JSON.stringify(next),Date.parse('2026-10-18T14:01:00Z'));
+ assert.equal(sql.prepare('SELECT status FROM growth_external_ids WHERE game_id=?').get('900000000999').status,'review','same nickname cannot merge IDs');
+ await auto.closeDay(db,'2026-10-18',Date.parse('2026-10-18T15:10:00Z'));
+ assert.equal(sql.prepare('SELECT delta FROM growth_daily_sources WHERE date=? AND game_id=?').get('2026-10-18',b.roster[0].id).delta,-100,'negative daily growth stays unadjusted');
+ assert.equal(sql.prepare('SELECT delta FROM growth_daily_sources WHERE date=? AND game_id=?').get('2026-10-18','900000000998').delta,null,'new member has no invented previous-day power');
+ const status=await auto.automaticStatus(db,true);assert(status.members.length===91);assert.equal(status.ai_calls,0);
  const code=fs.readFileSync(path.join(root,'lib/growth-automation.ts'),'utf8');assert(!/api\.openai|anthropic|gemini|CONNECTORS/.test(code));
  console.log(JSON.stringify({status:'PASS',checks:['Asia/Seoul midnight','88→89 complete roster','same JSON deduplication','hourly/daily separation','ID-preserving nickname','rank event','missing member candidate only','malformed incomplete response quarantined','abnormal power excluded','postmidnight excluded','atomic D1 failure rollback and retry','daily idempotence','Staging zero external calls','hourly failure no immediate retry','closing zero fetches','operational documents and old histories preserved','no AI calls'],daily:result}));
 }

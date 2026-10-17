@@ -86,7 +86,7 @@ export async function ingestStored(db:D1Database,runId:string,acceptedAt=Date.no
     const row={snapshot_id:snapshotId,game_id:r.id,member_id:m.member_id||null,source_as_of:sourceTime,received_at:run.received_at,accepted_at:acceptedAt,source_name:r.name,power:r.power,level:r.castle,rank:'R'+r.rank,activity:r.activity??null,kills:r.kills??null,joined_at:r.joined??null,status:reason?'review':'valid',reason};rows.push(row);
     if(reason)event('observation_review',m,'pending',prev.get(r.id)||null,row,reason);
     if(!reason&&m.source_name!==r.name){renames.push({...m,source_name:r.name});event('nickname',m,'recorded',{name:m.display_name||m.source_name},{name:r.name});}
-    const p=prev.get(r.id);if(!reason&&p?.rank!==undefined&&p.rank!==row.rank)event('rank',m,'recorded',{rank:p.rank},{rank:row.rank});
+    const p=prev.get(r.id)||approved.get(m.member_id);if(!reason&&p?.rank!==undefined&&p.rank!==row.rank)event('rank',m,'recorded',{rank:p.rank},{rank:row.rank});
   }
   const present=new Set(source.roster.map(r=>r.id));
   for(const m of mappings)if(m.status==='confirmed'&&!m.departed_at&&!present.has(m.game_id))event('departure_candidate',m,'pending',null,null,'명단 미관측 · 탈퇴 미확정');
@@ -159,14 +159,19 @@ export async function closeDay(db:D1Database,date:string,now=Date.now()){
   const growthNext=revisions.growth_revision+1,batchId='auto_close_'+date,guard='close_'+date,iso=new Date(now).toISOString();
   const rows=selected.map((r,index)=>({...r,member_id:r.mapped_member_id,row_index:index,row_id:batchId+'_'+r.game_id,stale:cutoff-r.source_as_of>2*HOUR?1:0}));
   const priorPower=await all(db,`WITH RECURSIVE lineage(batch_id) AS(SELECT ? UNION ALL SELECT b.supersedes_batch_id FROM growth_batches b JOIN lineage l ON l.batch_id=b.batch_id WHERE b.supersedes_batch_id IS NOT NULL) SELECT o.* FROM growth_observations o JOIN lineage USING(batch_id) WHERE o.status='active' ORDER BY observed_date,original_order`,latest.batch_id);
-  const powers=new Map<string,number>();for(const p of priorPower)powers.set(p.member_id,p.power);
+  const membershipInfo=await all(db,'SELECT e.member_id,e.departed_at,m.display_name FROM growth_external_ids e JOIN growth_members m USING(member_id)');
+  const memberInfo=new Map(membershipInfo.map(m=>[m.member_id,m]));
+  const departed=previous.filter(p=>['current','observed','unobserved','new'].includes(p.membership_state)&&memberInfo.get(p.member_id)?.departed_at&&memberInfo.get(p.member_id).departed_at<cutoff).map(p=>({member_id:p.member_id,display_name:memberInfo.get(p.member_id).display_name,before:p.membership_state,after:'missing'}));
+  const returned=previous.filter(p=>['missing','archived'].includes(p.membership_state)&&ids.has(p.member_id)).map(p=>({member_id:p.member_id,display_name:memberInfo.get(p.member_id)?.display_name||p.member_id,before:p.membership_state,after:'observed'}));
+  const previousDate=kstDate(cutoff-2*DAY);
+  const powers=new Map<string,number>();for(const p of priorPower)if(p.observed_date===previousDate)powers.set(p.member_id,p.power);
   const daily=rows.map(r=>({...r,previous_power:powers.get(r.member_id)??null,delta:powers.has(r.member_id)?r.power-powers.get(r.member_id)!:null}));
   const stale=rows.filter(r=>r.stale).length;
-  const details={timezone:'Asia/Seoul',cutoff_at:cutoff,selection:'source_as_of,received_at,accepted_at strictly before cutoff',source:'lastasylum-alliance-asOf',individual_timestamp:false,stale_count:stale,unobserved:previous.filter(p=>['current','observed','unobserved','new'].includes(p.membership_state)&&!ids.has(p.member_id)).length};
+  const details={timezone:'Asia/Seoul',cutoff_at:cutoff,previous_date:previousDate,selection:'source_as_of,received_at,accepted_at strictly before cutoff',source:'lastasylum-alliance-asOf',individual_timestamp:false,stale_count:stale,unobserved:previous.filter(p=>['current','observed','unobserved','new'].includes(p.membership_state)&&!ids.has(p.member_id)&&!departed.some(d=>d.member_id===p.member_id)).length};
   const hash=await digest(json({date,rows:daily.map(r=>[r.member_id,r.snapshot_id,r.power])}));
   const statements=[
     stmt(db,`INSERT INTO growth_tx_guards VALUES(?,CASE WHEN NOT EXISTS(SELECT 1 FROM growth_daily_closes WHERE date=?) AND (SELECT value FROM growth_meta WHERE key='growth_revision')=? AND (SELECT value FROM growth_meta WHERE key='identity_revision')=? AND EXISTS(SELECT 1 FROM growth_batches WHERE batch_id=? AND state='published') THEN 1 ELSE NULL END,?)`,guard,date,String(revisions.growth_revision),String(revisions.identity_revision),latest.batch_id,iso),
-    stmt(db,`INSERT INTO growth_batches(batch_id,package_hash,semantic_hash,operation_id,observed_date,slot,expected_count,source_hashes_json,state,identity_revision,base_growth_revision,draft_revision,validation_json,supersedes_batch_id,created_at,updated_at,published_revision) VALUES(?,?,?,?,?,'auto_close',?,?,'published',?,?,1,?,?,?,?,?)`,batchId,hash,hash,guard,date,rows.length,json([...new Set(rows.map(r=>r.snapshot_id))]),revisions.identity_revision,revisions.growth_revision,json(details),latest.batch_id,iso,iso,growthNext),
+    stmt(db,`INSERT INTO growth_batches(batch_id,package_hash,semantic_hash,operation_id,observed_date,slot,expected_count,source_hashes_json,state,identity_revision,base_growth_revision,draft_revision,validation_json,supersedes_batch_id,created_at,updated_at,published_revision) VALUES(?,?,?,?,?,'auto_close',?,?,'published',?,?,1,?,?,?,?,?)`,batchId,hash,hash,guard,date,rows.length,json([...new Set(rows.map(r=>r.snapshot_id.slice(5)))]),revisions.identity_revision,revisions.growth_revision,json(details),latest.batch_id,iso,iso,growthNext),
     stmt(db,`INSERT INTO growth_batch_rows(row_id,batch_id,row_index,raw_name,resolution_status,resolved_member_id,power,level,rank,source_position_json,membership_state) SELECT json_extract(value,'$.row_id'),?,json_extract(value,'$.row_index'),json_extract(value,'$.source_name'),'resolved',json_extract(value,'$.member_id'),json_extract(value,'$.power'),json_extract(value,'$.level'),json_extract(value,'$.rank'),value,'observed' FROM json_each(?)`,batchId,json(daily)),
     stmt(db,`INSERT INTO growth_observations(observation_id,member_id,batch_id,observed_date,slot,power,level,rank,label,source_type,original_order,status,created_at) SELECT 'obs_'||json_extract(value,'$.row_id'),json_extract(value,'$.member_id'),?,?,'auto_close',json_extract(value,'$.power'),json_extract(value,'$.level'),json_extract(value,'$.rank'),?,'automatic',?+json_extract(value,'$.row_index'),'active',? FROM json_each(?)`,batchId,date,Number(date.slice(5,7))+'/'+Number(date.slice(8)),growthNext*1000,iso,json(daily)),
     stmt(db,`INSERT INTO growth_membership_snapshots SELECT ?,member_id,CASE WHEN EXISTS(SELECT 1 FROM growth_external_ids e WHERE e.member_id=growth_membership_snapshots.member_id AND e.departed_at<?) THEN 'missing' WHEN membership_state IN ('current','observed','unobserved','new') THEN 'unobserved' ELSE membership_state END,row_order+500 FROM growth_membership_snapshots WHERE batch_id=? AND member_id NOT IN(SELECT json_extract(value,'$.member_id') FROM json_each(?))`,batchId,cutoff,latest.batch_id,json(daily)),
@@ -179,10 +184,12 @@ export async function closeDay(db:D1Database,date:string,now=Date.now()){
     stmt(db,'INSERT INTO growth_daily_closes VALUES(?,?,?,?,?,?,?,?)',date,cutoff,batchId,stale||details.unobserved?'delayed':'closed',rows.length,stale,now,json(details)),
     stmt(db,'INSERT INTO growth_mutations VALUES(?,?,?,?)',guard,'automatic_close',json({date,batch_id:batchId,growth_revision:growthNext,...details}),iso),
   ];
+  statements.push(stmt(db,`INSERT INTO growth_batch_sources(batch_id,source_hash) SELECT DISTINCT ?,substr(json_extract(value,'$.snapshot_id'),6) FROM json_each(?)`,batchId,json(daily)));
+  if(departed.length||returned.length)statements.push(stmt(db,'INSERT INTO growth_mutations VALUES(?,?,?,?)',guard+'_membership','membership_correction',json({batch_id:batchId,observed_date:date,departed,returned,source:'confirmed-game-id-membership'}),iso));
   await db.batch(statements);return {status:stale||details.unobserved?'delayed':'closed',date,batch_id:batchId,members:rows.length,stale};
 }
 
-export async function scheduledAutomation(controller:{cron:string;scheduledTime:number},env:AutoEnv){
+async function scheduledWork(controller:{cron:string;scheduledTime:number},env:AutoEnv){
   if(env.GROWTH_AUTO_MODE!=='production'||!env.DB)return;
   const db=env.DB;
   // Closing has no reference to collect/fetch. Failed days remain retryable.
@@ -203,6 +210,14 @@ export async function scheduledAutomation(controller:{cron:string;scheduledTime:
   return collect(env,'cron');
 }
 
+export async function scheduledAutomation(controller:{cron:string;scheduledTime:number},env:AutoEnv){
+  if(env.GROWTH_AUTO_MODE!=='production'||!env.DB)return;
+  const id=controller.cron+'_'+controller.scheduledTime,db=env.DB;
+  await stmt(db,"INSERT OR IGNORE INTO growth_auto_executions(execution_id,cron,scheduled_at,started_at,status) VALUES(?,?,?,?,'running')",id,controller.cron,controller.scheduledTime,Date.now()).run();
+  try{const result=await scheduledWork(controller,env);await stmt(db,"UPDATE growth_auto_executions SET completed_at=?,status='success',result_json=?,error=NULL WHERE execution_id=?",Date.now(),json(result??null),id).run();return result;}
+  catch(e){await stmt(db,"UPDATE growth_auto_executions SET completed_at=?,status='failed',error=? WHERE execution_id=?",Date.now(),(e as Error).message.slice(0,300),id).run();throw e;}
+}
+
 export async function automaticStatus(db:D1Database,admin=false){
   const [control,lastRun,lastGood,close,pending]=await Promise.all([
     first(db,'SELECT enabled,start_date,last_call_at FROM growth_auto_control WHERE id=1'),
@@ -220,10 +235,15 @@ export async function automaticStatus(db:D1Database,admin=false){
   // The first day uses the existing approved daily observation as its baseline.
   const baseline=await approvedLatest(db);
   const powers=new Map<string,any>();for(const r of baseline)powers.set(r.member_id,r);
-  for(const m of members)if(m.closed_power==null&&powers.has(m.member_id)){const p=powers.get(m.member_id);m.closed_power=p.power;m.closed_date=p.observed_date;m.delta=m.power==null?null:m.power-p.power;}
+  for(const m of members)if(powers.has(m.member_id)){
+    const p=powers.get(m.member_id);
+    if(m.closed_power==null){m.closed_power=p.power;m.closed_date=p.observed_date;m.delta=m.power==null?null:m.power-p.power;}
+    if(m.power==null){m.power=p.power;m.level=p.level;m.rank=p.rank;m.delta=0;m.last_valid_kind='previous_confirmed_record';m.observed_date=p.observed_date;}
+  }
   const counts=await first(db,"SELECT COUNT(*) calls FROM growth_auto_runs WHERE trigger_kind<>'fixture'");
   const changes=await all(db,`SELECT e.kind,e.game_id,e.member_id,e.source_as_of,e.before_json,e.after_json,e.status,m.display_name FROM growth_auto_events e LEFT JOIN growth_members m USING(member_id) WHERE e.kind IN ('nickname','rank','new','departure_candidate') ORDER BY e.created_at DESC LIMIT 30`);
-  const base={schema:'3on-growth-automation-v1',timezone:'Asia/Seoul',collector_cron:COLLECT_CRON,close_cron:CLOSE_CRON,ai_calls:0,control,last_run:lastRun,last_good:lastGood,last_close:close,pending_count:pending?.n||0,external_calls:counts?.calls||0,delayed:!lastGood||Date.now()-lastGood.source_as_of>2*HOUR,members,changes};
+  const lastExecution=await first(db,'SELECT cron,scheduled_at,started_at,completed_at,status,result_json,error FROM growth_auto_executions ORDER BY scheduled_at DESC LIMIT 1');
+  const base={schema:'3on-growth-automation-v1',timezone:'Asia/Seoul',collector_cron:COLLECT_CRON,close_cron:CLOSE_CRON,ai_calls:0,control,last_run:lastRun,last_good:lastGood,last_close:close,last_execution:lastExecution,pending_count:pending?.n||0,external_calls:counts?.calls||0,delayed:!lastGood||Date.now()-lastGood.source_as_of>2*HOUR,members,changes};
   if(!admin)return base;
   return {...base,all_members:await all(db,'SELECT member_id,display_name,legacy_canonical FROM growth_members ORDER BY display_name'),runs:await all(db,'SELECT run_id,trigger_kind,called_at,source_as_of,status,error,validation_json,raw_hash FROM growth_auto_runs ORDER BY called_at DESC LIMIT 48'),events:await all(db,'SELECT * FROM growth_auto_events ORDER BY created_at DESC LIMIT 150'),mappings:await all(db,'SELECT e.*,m.display_name FROM growth_external_ids e LEFT JOIN growth_members m USING(member_id)'),closes:await all(db,'SELECT * FROM growth_daily_closes ORDER BY date DESC LIMIT 31')};
 }
