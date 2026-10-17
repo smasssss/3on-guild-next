@@ -80,7 +80,7 @@ def prepare(db):
  db.execute("INSERT OR IGNORE INTO growth_auto_control VALUES(1,0,"+quote(start)+",NULL,NULL,NULL,"+str(now)+");")
  # Initial mappings do not rename members or create any old observations.
  assert baseline(db)==before,'Existing saved data changed during additive migration'
- cfg={'name':WORKER,'main':'dist/server/index.js','compatibility_date':db.settings.get('compatibility_date','2026-05-15'),'compatibility_flags':db.settings.get('compatibility_flags',['nodejs_compat']),'no_bundle':True,'rules':[{'type':'ESModule','globs':['**/*.js','**/*.mjs']}],'assets':{'directory':'dist/client'},'d1_databases':[{'binding':'DB','database_id':db.database}],'observability':{'enabled':True},'triggers':{'crons':['0 * * * *','10 15 * * *'] if TARGET=='production' else []}}
+ cfg={'name':WORKER,'main':'dist/server/index.js','compatibility_date':db.settings.get('compatibility_date','2026-05-15'),'compatibility_flags':db.settings.get('compatibility_flags',['nodejs_compat']),'no_bundle':True,'rules':[{'type':'ESModule','globs':['**/*.js','**/*.mjs']}],'assets':{'directory':'dist/client'},'d1_databases':[{'binding':'DB','database_id':db.database}],'observability':{'enabled':True},'triggers':{'crons':['0,10 * * * *'] if TARGET=='production' else []}}
  cfg['vars']={b['name']:b['text'] for b in db.settings['bindings'] if b['type']=='plain_text'};cfg['vars']['GROWTH_AUTO_MODE']='production' if TARGET=='production' else 'fixture'
  unknown=[b['type'] for b in db.settings['bindings'] if b['type'] not in ('plain_text','secret_text','d1','assets')];assert not unknown,('Unpreserved existing binding',unknown)
  Path('wrangler.automation.generated.json').write_text(json.dumps(cfg,indent=2)+'\n')
@@ -90,7 +90,7 @@ def verify(db):
  assert before==after,'Existing business or authentication data changed'
  state=public('/api/growth/automation');assert state['mode']==('production' if TARGET=='production' else 'fixture');assert state['ai_calls']==0
  schedules=db.api('GET','/workers/scripts/'+WORKER+'/schedules')['result']
- actual={s['cron'] for s in (schedules.get('schedules',[]) if isinstance(schedules,dict) else schedules)};assert actual==({'0 * * * *','10 15 * * *'} if TARGET=='production' else set())
+ actual={s['cron'] for s in (schedules.get('schedules',[]) if isinstance(schedules,dict) else schedules)};assert actual==({'0,10 * * * *'} if TARGET=='production' else set())
  nowpublic={'current':public('/api/growth/current'),'legacy':public('/api/growth/legacy'),'state':public('/api/state')}
  old=json.loads((E/'public-before.json').read_text());assert old['state']==nowpublic['state']
  assert old['legacy']==nowpublic['legacy'],'Published growth changed before the first automatic close'

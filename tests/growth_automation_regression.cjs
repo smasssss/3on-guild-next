@@ -13,6 +13,13 @@ const count=table=>sql.prepare('SELECT COUNT(*) n FROM '+table).get().n;
 const digest=()=>JSON.stringify(sql.prepare('SELECT * FROM documents ORDER BY kind').all());
 async function run(){
  const preserved=digest(),oldObs=count('growth_observations');
+ for(let h=0;h<24;h++){
+  assert.equal(auto.scheduledAction(auto.COMBINED_CRON,Date.UTC(2026,9,17,h,0)),'collect');
+  assert.equal(auto.scheduledAction(auto.COMBINED_CRON,Date.UTC(2026,9,17,h,10)),h===15?'close':'idle');
+ }
+ const idleBefore=count('growth_auto_executions');
+ assert.equal((await auto.scheduledAutomation({cron:auto.COMBINED_CRON,scheduledTime:Date.UTC(2026,9,17,14,10)},{DB:db,GROWTH_AUTO_MODE:'production'})).status,'idle');
+ assert.equal(count('growth_auto_executions'),idleBefore,'idle ticks do not touch D1 or external API');
  assert.equal(auto.kstDate(Date.parse('2026-10-17T14:59:59Z')),'2026-10-17');assert.equal(auto.kstDate(Date.parse('2026-10-17T15:00:00Z')),'2026-10-18');
  assert.equal(auto.cutoffFor('2026-10-17'),Date.parse('2026-10-17T15:00:00Z'));
  const snap=(iso)=>({...structuredClone(fixture),asOf:Date.parse(iso)/1000});
@@ -39,7 +46,8 @@ async function run(){
  const clock=Date.now();await assert.rejects(auto.collect({DB:db,GROWTH_AUTO_MODE:'production'},'test',clock,fetcher));assert.equal(fetches,1);
  await auto.collect({DB:db,GROWTH_AUTO_MODE:'production'},'test',clock+1000,fetcher);assert.equal(fetches,1);
  const actualNow=Date.now;Date.now=()=>Date.parse('2026-10-17T15:10:00Z');
- await auto.scheduledAutomation({cron:auto.CLOSE_CRON,scheduledTime:Date.parse('2026-10-17T15:10:00Z')},{DB:db,GROWTH_AUTO_MODE:'production'});Date.now=actualNow;assert.equal(fetches,1,'close never fetches');
+ const previousFetch=global.fetch;global.fetch=async()=>{throw Error('closing must never call external API')};
+ await auto.scheduledAutomation({cron:auto.COMBINED_CRON,scheduledTime:Date.parse('2026-10-17T15:10:00Z')},{DB:db,GROWTH_AUTO_MODE:'production'});global.fetch=previousFetch;Date.now=actualNow;assert.equal(fetches,1,'close never fetches');
  assert.equal(digest(),preserved,'carriage VIP canyon memos preserved');assert.equal(count('growth_observations'),oldObs+89);
  // The second close has a real previous-day baseline; new IDs stay distinct.
  const next=snap('2026-10-18T14:00:00Z');next.roster[0].power=b.roster[0].power-100;
@@ -52,6 +60,6 @@ async function run(){
  assert.equal(sql.prepare('SELECT delta FROM growth_daily_sources WHERE date=? AND game_id=?').get('2026-10-18','900000000998').delta,null,'new member has no invented previous-day power');
  const status=await auto.automaticStatus(db,true);assert(status.members.length===91);assert.equal(status.ai_calls,0);
  const code=fs.readFileSync(path.join(root,'lib/growth-automation.ts'),'utf8');assert(!/api\.openai|anthropic|gemini|CONNECTORS/.test(code));
- console.log(JSON.stringify({status:'PASS',checks:['Asia/Seoul midnight','88→89 complete roster','same JSON deduplication','hourly/daily separation','ID-preserving nickname','rank event','missing member candidate only','malformed incomplete response quarantined','abnormal power excluded','postmidnight excluded','atomic D1 failure rollback and retry','daily idempotence','Staging zero external calls','hourly failure no immediate retry','closing zero fetches','operational documents and old histories preserved','no AI calls'],daily:result}));
+ console.log(JSON.stringify({status:'PASS',checks:['one-slot Cron dispatch: 24 collections / one close / 23 no-op ticks','Asia/Seoul midnight','88→89 complete roster','same JSON deduplication','hourly/daily separation','ID-preserving nickname','rank event','missing member candidate only','malformed incomplete response quarantined','abnormal power excluded','postmidnight excluded','atomic D1 failure rollback and retry','daily idempotence','Staging zero external calls','hourly failure no immediate retry','closing zero fetches','operational documents and old histories preserved','no AI calls'],daily:result}));
 }
 run().catch(e=>{console.error(e);process.exitCode=1}).finally(()=>sql.close());
