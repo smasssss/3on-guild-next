@@ -1,6 +1,6 @@
 /* Existing growth view enhancement. Reads only the guild's own Workers API. */
 (()=>{'use strict';
- const box=document.createElement('section');box.id='growthAutomatic';box.style.cssText='border:1px solid #426b70;border-radius:12px;padding:14px;margin:14px 0;background:#112a30';
+ const box=document.createElement('section');box.id='growthAutomatic';box.style.cssText='display:block;border:1px solid #426b70;border-radius:12px;padding:14px;margin:14px 0;background:#112a30';
  const root=document.querySelector('main')||document.body;root.prepend(box);
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const num=n=>n==null?'—':Number(n).toLocaleString('ko-KR');

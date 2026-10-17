@@ -9,6 +9,10 @@ export async function GET(req:Request){try{
   const gameId=url.searchParams.get('game_id');
   if(gameId){if(!/^\d{1,24}$/.test(gameId))return response(req,{error:'게임 ID 형식 오류'},400);
     return response(req,{schema:'3on-hourly-history-v1',observations:(await db().prepare('SELECT source_as_of,received_at,accepted_at,source_name,power,rank,level,activity,kills,status,reason,snapshot_id FROM growth_hourly_observations WHERE game_id=? ORDER BY source_as_of DESC LIMIT 168').bind(gameId).all()).results});}
+  const date=url.searchParams.get('date');if(date){
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return response(req,{error:'날짜 형식 오류'},400);
+    return response(req,{close:await db().prepare('SELECT * FROM growth_daily_closes WHERE date=?').bind(date).first(),sources:(await db().prepare('SELECT * FROM growth_daily_sources WHERE date=? ORDER BY member_id').bind(date).all()).results});
+  }
   if(url.searchParams.has('raw')){
     if(!await actor(req))return response(req,{error:'관리자 인증이 필요합니다.'},401);
     const row=await db().prepare('SELECT raw_json,raw_hash,status,validation_json FROM growth_auto_runs WHERE run_id=?').bind(url.searchParams.get('raw')).first();return response(req,row||{},row?200:404);
