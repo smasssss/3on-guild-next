@@ -53,8 +53,8 @@ export async function ingestStored(db:D1Database,runId:string,acceptedAt=Date.no
   }
   const sourceTime=source.asOf*1000;
   const contentHash=await digest(canonical({id:source.id,asOf:source.asOf,members:source.members,power:source.power,roster:[...source.roster].sort((a,b)=>a.id.localeCompare(b.id))}));
-  const existing=await first(db,'SELECT snapshot_id FROM growth_auto_snapshots WHERE source_as_of=? AND content_hash=?',sourceTime,contentHash);
-  if(existing){await stmt(db,"UPDATE growth_auto_runs SET status='duplicate',snapshot_id=?,source_as_of=?,content_hash=?,completed_at=?,raw_json=NULL WHERE run_id=?",existing.snapshot_id,sourceTime,contentHash,acceptedAt,runId).run();return {status:'duplicate',run_id:runId};}
+  const existing=await first(db,'SELECT s.snapshot_id,r.raw_hash FROM growth_auto_snapshots s JOIN growth_auto_runs r ON r.run_id=s.run_id WHERE s.source_as_of=? AND s.content_hash=?',sourceTime,contentHash);
+  if(existing){await stmt(db,"UPDATE growth_auto_runs SET status='duplicate',snapshot_id=?,source_as_of=?,content_hash=?,completed_at=?,raw_json=CASE WHEN raw_hash=? THEN NULL ELSE raw_json END WHERE run_id=?",existing.snapshot_id,sourceTime,contentHash,acceptedAt,existing.raw_hash,runId).run();return {status:'duplicate',run_id:runId};}
   const last=await first(db,'SELECT MAX(source_as_of) t FROM growth_auto_snapshots');
   if(last?.t>sourceTime){await stmt(db,"UPDATE growth_auto_runs SET status='stale',source_as_of=?,content_hash=?,completed_at=?,error='SOURCE_TIME_REGRESSED' WHERE run_id=?",sourceTime,contentHash,acceptedAt,runId).run();return {status:'stale',run_id:runId};}
   if(await first(db,'SELECT snapshot_id FROM growth_auto_snapshots WHERE source_as_of=?',sourceTime)){
