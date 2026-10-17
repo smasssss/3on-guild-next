@@ -20,6 +20,11 @@ const ms=s=>Date.parse(s),count=async t=>(await db.prepare('SELECT COUNT(*) n FR
  data=structuredClone(runtime.data);data.asOf=ms('2026-10-18T14:50:00Z')/1000;data.roster[0].name='STAGING_닉변시험';data.roster[0].rank=3;
  await auto.fixture(db,JSON.stringify(data),ms('2026-10-18T14:51:00Z'));assert.equal(await count('growth_hourly_observations'),177);assert.equal(await count('growth_observations'),baseline);
  assert((await db.prepare("SELECT COUNT(*) n FROM growth_auto_events WHERE kind='nickname'").first()).n>0);assert((await db.prepare("SELECT COUNT(*) n FROM growth_auto_events WHERE kind='rank'").first()).n>0);checks.push('88 to 89 roster, nickname/rank, hourly/daily separation');
+ const names=(await auto.automaticStatus(db)).nickname_changes;
+ assert.equal(names.filter(n=>n.game_id===data.roster[0].id).length,1);
+ assert.equal(names.find(n=>n.game_id===data.roster[0].id).current_name,'STAGING_닉변시험');
+ assert.equal(names.find(n=>n.game_id===data.roster[0].id).previous_name,runtime.data.roster[0].name);
+ checks.push('real D1 current and immediately previous nickname summary');
  const expected=data.roster[0].power;data.asOf=ms('2026-10-18T15:00:00Z')/1000;data.roster[0].power+=1234;await auto.fixture(db,JSON.stringify(data),ms('2026-10-18T15:00:01Z'));
  injectFailure=true;await assert.rejects(auto.closeDay(db,'2026-10-18',ms('2026-10-18T15:10:00Z')));injectFailure=false;assert.equal(await count('growth_daily_closes'),0);assert.equal(await count('growth_observations'),baseline);checks.push('real D1 rollback after injected final-statement failure');
  const result=await auto.closeDay(db,'2026-10-18',ms('2026-10-18T15:10:00Z'));assert.equal(result.members,89);

@@ -258,8 +258,18 @@ export async function automaticStatus(db:D1Database,admin=false){
   }
   const counts=await first(db,"SELECT COUNT(*) calls FROM growth_auto_runs WHERE trigger_kind<>'fixture' AND status<>'not_dispatched'");
   const changes=await all(db,`SELECT e.kind,e.game_id,e.member_id,e.source_as_of,e.before_json,e.after_json,e.status,m.display_name FROM growth_auto_events e LEFT JOIN growth_members m USING(member_id) WHERE e.kind IN ('nickname','rank','new','departure_candidate') ORDER BY e.created_at DESC LIMIT 30`);
+  // One latest confirmed rename per active game ID, independent of the recent-event limit.
+  // Full event history stays intact for auditing and identity recovery.
+  const nicknameChanges=await all(db,`WITH latest AS (
+    SELECT e.*,ROW_NUMBER() OVER(PARTITION BY game_id ORDER BY source_as_of DESC,created_at DESC,event_id DESC) position
+    FROM growth_auto_events e WHERE kind='nickname' AND status='recorded'
+  ) SELECT e.game_id,x.member_id,COALESCE(m.display_name,x.source_name) current_name,
+    json_extract(e.before_json,'$.name') previous_name,e.source_as_of
+    FROM latest e JOIN growth_external_ids x USING(game_id) LEFT JOIN growth_members m ON m.member_id=x.member_id
+    WHERE e.position=1 AND x.status='confirmed' AND x.departed_at IS NULL
+    ORDER BY e.source_as_of DESC,e.game_id`);
   const lastExecution=await first(db,'SELECT cron,scheduled_at,started_at,completed_at,status,result_json,error FROM growth_auto_executions ORDER BY scheduled_at DESC LIMIT 1');
-  const base={schema:'3on-growth-automation-v1',timezone:'Asia/Seoul',collector_cron:COLLECT_CRON,close_cron:CLOSE_CRON,registered_cron:COMBINED_CRON,ai_calls:0,control,last_run:lastRun,last_good:lastGood,last_close:close,last_execution:lastExecution,pending_count:pending?.n||0,external_calls:counts?.calls||0,delayed:!lastGood||Date.now()-lastGood.source_as_of>2*HOUR,members,changes};
+  const base={schema:'3on-growth-automation-v1',timezone:'Asia/Seoul',collector_cron:COLLECT_CRON,close_cron:CLOSE_CRON,registered_cron:COMBINED_CRON,ai_calls:0,control,last_run:lastRun,last_good:lastGood,last_close:close,last_execution:lastExecution,pending_count:pending?.n||0,external_calls:counts?.calls||0,delayed:!lastGood||Date.now()-lastGood.source_as_of>2*HOUR,members,changes,nickname_changes:nicknameChanges};
   if(!admin)return base;
   return {...base,all_members:await all(db,'SELECT member_id,display_name,legacy_canonical FROM growth_members ORDER BY display_name'),runs:await all(db,'SELECT run_id,trigger_kind,called_at,source_as_of,status,error,validation_json,raw_hash FROM growth_auto_runs ORDER BY called_at DESC LIMIT 48'),events:await all(db,'SELECT * FROM growth_auto_events ORDER BY created_at DESC LIMIT 150'),mappings:await all(db,'SELECT e.*,m.display_name FROM growth_external_ids e LEFT JOIN growth_members m USING(member_id)'),closes:await all(db,'SELECT * FROM growth_daily_closes ORDER BY date DESC LIMIT 31')};
 }

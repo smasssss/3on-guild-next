@@ -61,7 +61,16 @@ async function run(){
  await auto.closeDay(db,'2026-10-18',Date.parse('2026-10-18T15:10:00Z'));
  assert.equal(sql.prepare('SELECT delta FROM growth_daily_sources WHERE date=? AND game_id=?').get('2026-10-18',b.roster[0].id).delta,-100,'negative daily growth stays unadjusted');
  assert.equal(sql.prepare('SELECT delta FROM growth_daily_sources WHERE date=? AND game_id=?').get('2026-10-18','900000000998').delta,null,'new member has no invented previous-day power');
+ // Older nickname changes must remain visible even after 30 unrelated events.
+ for(let i=0;i<35;i++)sql.prepare("INSERT INTO growth_auto_events(event_id,kind,game_id,source_as_of,created_at,status,before_json,after_json) VALUES(?,'rank',?, ?,?,'recorded','{}','{}')").run('recent-rank-'+i,b.roster[1].id,Date.parse('2026-10-19T00:00:00Z')+i,Date.parse('2026-10-19T00:00:00Z')+i);
+ const eventCount=count('growth_auto_events');
  const status=await auto.automaticStatus(db,true);assert(status.members.length===91);assert.equal(status.ai_calls,0);
+ assert(status.changes.every(e=>e.kind==='rank'),'recent event limit is exercised');
+ const rename=status.nickname_changes.filter(e=>e.game_id===b.roster[0].id);assert.equal(rename.length,1);
+ assert.equal(rename[0].current_name,fixture.roster[0].name);assert.equal(rename[0].previous_name,'이름변경테스트');
+ assert.equal(count('growth_auto_events'),eventCount,'nickname summary never deletes event history');
+ assert(count('growth_auto_events')>status.nickname_changes.length);
+
  const code=fs.readFileSync(path.join(root,'lib/growth-automation.ts'),'utf8');assert(!/api\.openai|anthropic|gemini|CONNECTORS/.test(code));
  console.log(JSON.stringify({status:'PASS',checks:['one-slot Cron dispatch: 24 collections / one close / 23 no-op ticks','Asia/Seoul midnight','88→89 complete roster','same JSON deduplication','hourly/daily separation','ID-preserving nickname','rank event','missing member candidate only','malformed incomplete response quarantined','abnormal power excluded','postmidnight excluded','atomic D1 failure rollback and retry','daily idempotence','Staging zero external calls','hourly failure no immediate retry','closing zero fetches','operational documents and old histories preserved','no AI calls'],daily:result}));
 }
