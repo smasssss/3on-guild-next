@@ -84,7 +84,7 @@ def verify(db):
  assert before==after,'Existing business or authentication data changed'
  state=public('/api/growth/automation');assert state['mode']==('production' if TARGET=='production' else 'fixture');assert state['ai_calls']==0
  schedules=db.api('GET','/workers/scripts/'+WORKER+'/schedules')['result']
- actual={s['cron'] for s in schedules};assert actual==({'0 * * * *','10 15 * * *'} if TARGET=='production' else set())
+ actual={s['cron'] for s in (schedules.get('schedules',[]) if isinstance(schedules,dict) else schedules)};assert actual==({'0 * * * *','10 15 * * *'} if TARGET=='production' else set())
  nowpublic={'current':public('/api/growth/current'),'legacy':public('/api/growth/legacy'),'state':public('/api/state')}
  old=json.loads((E/'public-before.json').read_text());assert old['state']==nowpublic['state']
  assert old['legacy']==nowpublic['legacy'],'Published growth changed before the first automatic close'

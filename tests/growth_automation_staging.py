@@ -22,13 +22,15 @@ try:
  current=call('/api/growth/current')['members'];assert len(current)==89
  links=[{'game_id':row['id'],'member_id':member['member_id'],'source_name':row['name'],'evidence':'Staging synthetic fixture only'} for row,member in zip(synthetic['roster'],current)]
  call('/api/growth/automation',{'action':'bootstrap','mappings':links})
- data=json.loads(Path('tests/fixtures/lastasylum-50373046.json').read_text())
+ for row,member in zip(synthetic['roster'],current):row['power']=member['power'];row['castle']=max(25,member['level'])
+ def runtime_fixture():return json.loads(json.dumps(synthetic))
+ data=runtime_fixture()
  data['asOf']=ms('2026-10-18T14:00:00Z')//1000;data['roster']=data['roster'][:88];data['members']=88
  a=call('/api/growth/automation',{'action':'fixture','data':data,'called_at':ms('2026-10-18T14:01:00Z')})
  n=len(db.query('SELECT * FROM growth_hourly_observations'));assert n==88
  a=call('/api/growth/automation',{'action':'fixture','data':data,'called_at':ms('2026-10-18T14:02:00Z')});assert a['result']['status']=='duplicate';assert len(db.query('SELECT * FROM growth_hourly_observations'))==n
  checks.append('real D1 duplicate raw JSON creates no additional observations')
- data=json.loads(Path('tests/fixtures/lastasylum-50373046.json').read_text());data['asOf']=ms('2026-10-18T14:50:00Z')//1000
+ data=runtime_fixture();data['asOf']=ms('2026-10-18T14:50:00Z')//1000
  data['roster'][0]['name']='STAGING_닉변시험';data['roster'][0]['rank']=3
  call('/api/growth/automation',{'action':'fixture','data':data,'called_at':ms('2026-10-18T14:51:00Z')})
  last_power=data['roster'][0]['power'];game_id=data['roster'][0]['id']

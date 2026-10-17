@@ -15,6 +15,10 @@ const json=(x:any)=>JSON.stringify(x);
 const stmt=(db:D1Database,sql:string,...values:any[])=>db.prepare(sql).bind(...values);
 const all=async(db:D1Database,sql:string,...v:any[])=>(await stmt(db,sql,...v).all<any>()).results;
 const first=async(db:D1Database,sql:string,...v:any[])=>stmt(db,sql,...v).first<any>();
+async function approvedLatest(db:D1Database){return all(db,`WITH RECURSIVE l(batch_id) AS(
+  SELECT batch_id FROM (SELECT batch_id FROM growth_batches WHERE state='published' ORDER BY observed_date DESC,published_revision DESC LIMIT 1)
+  UNION ALL SELECT parent.batch_id FROM growth_batches b JOIN l USING(batch_id) JOIN growth_batches parent ON parent.batch_id=b.supersedes_batch_id WHERE parent.state IN ('published','superseded'))
+  SELECT e.member_id,o.power,o.level,o.rank,o.observed_date FROM growth_external_ids e JOIN growth_observations o ON o.observation_id=(SELECT x.observation_id FROM growth_observations x JOIN l USING(batch_id) WHERE x.member_id=e.member_id AND x.status='active' ORDER BY x.observed_date DESC,x.original_order DESC LIMIT 1)`);}
 
 export function validateSnapshot(input:any,calledAt:number):Snapshot {
   if(!input||String(input.id)!=='50373046'||input.server!==295||input.tag!=='3ON')throw Error('WRONG_ALLIANCE');
@@ -63,11 +67,13 @@ export async function ingestStored(db:D1Database,runId:string,acceptedAt=Date.no
   const names=new Set(identities.map(r=>r.raw));
   const previous=await all(db,`SELECT o.* FROM growth_external_ids e JOIN growth_hourly_observations o ON o.game_id=e.game_id AND o.snapshot_id=(SELECT x.snapshot_id FROM growth_hourly_observations x WHERE x.game_id=e.game_id AND x.status='valid' ORDER BY x.source_as_of DESC LIMIT 1)`);
   const prev=new Map(previous.map(p=>[p.game_id,p]));
+  const approved=new Map((await approvedLatest(db)).map(p=>[p.member_id,p]));
+  const revision=await first(db,"SELECT value FROM growth_meta WHERE key='identity_revision'");
   const rows:any[]=[],newMappings:any[]=[],newMembers:any[]=[],events:any[]=[],renames:any[]=[];
   const event=(kind:string,r:any,status:string,before:any,after:any,reason?:string)=>events.push({event_id:snapshotId+'_'+kind+'_'+r.game_id,kind,game_id:r.game_id,member_id:r.member_id,source_as_of:sourceTime,created_at:acceptedAt,status,before_json:before==null?null:json(before),after_json:after==null?null:json(after),reason:reason||null});
   const sameNames=new Map<string,number>();for(const r of source.roster)sameNames.set(r.name,(sameNames.get(r.name)||0)+1);
   for(const r of source.roster){
-    let m=byId.get(r.id),reason=anomaly(r,prev.get(r.id));
+    let m=byId.get(r.id),reason=anomaly(r,prev.get(r.id)||approved.get(m?.member_id));
     if(!m){
       const collision=names.has(r.name)||sameNames.get(r.name)!==1;
       m={game_id:r.id,member_id:collision?null:'game_50373046_'+r.id,source_name:r.name,status:collision?'review':'confirmed',evidence:collision?'동일 이름의 기존 회원 또는 동명이인 · 수동 연결 필요':'새 게임 ID · 완전한 허가 길드 로스터',departed_at:null};
@@ -86,7 +92,7 @@ export async function ingestStored(db:D1Database,runId:string,acceptedAt=Date.no
   for(const m of mappings)if(m.status==='confirmed'&&!m.departed_at&&!present.has(m.game_id))event('departure_candidate',m,'pending',null,null,'명단 미관측 · 탈퇴 미확정');
   const guard='auto-ingest-'+runId;
   const statements=[
-    stmt(db,"INSERT INTO growth_tx_guards VALUES(?,CASE WHEN NOT EXISTS(SELECT 1 FROM growth_auto_snapshots WHERE source_as_of=? ) AND EXISTS(SELECT 1 FROM growth_auto_runs WHERE run_id=? AND status IN ('received','db_error')) THEN 1 ELSE NULL END,?)",guard,sourceTime,runId,new Date(acceptedAt).toISOString()),
+    stmt(db,"INSERT INTO growth_tx_guards VALUES(?,CASE WHEN NOT EXISTS(SELECT 1 FROM growth_auto_snapshots WHERE source_as_of=? ) AND EXISTS(SELECT 1 FROM growth_auto_runs WHERE run_id=? AND status IN ('received','db_error')) AND (SELECT value FROM growth_meta WHERE key='identity_revision')=? THEN 1 ELSE NULL END,?)",guard,sourceTime,runId,revision.value,new Date(acceptedAt).toISOString()),
     stmt(db,'INSERT INTO growth_auto_snapshots(snapshot_id,source_as_of,content_hash,run_id,received_at,accepted_at,member_count,guild_power) VALUES(?,?,?,?,?,?,?,?)',snapshotId,sourceTime,contentHash,runId,run.received_at,acceptedAt,source.members,source.power),
   ];
   // The explicit column list deliberately keeps all writes out of unrelated tables.
@@ -210,10 +216,7 @@ export async function automaticStatus(db:D1Database,admin=false){
     LEFT JOIN growth_daily_sources p ON p.member_id=e.member_id AND p.date=(SELECT MAX(date) FROM growth_daily_sources x WHERE x.member_id=e.member_id)
     WHERE e.departed_at IS NULL ORDER BY o.power DESC`);
   // The first day uses the existing approved daily observation as its baseline.
-  const baseline=await all(db,`WITH RECURSIVE l(batch_id) AS(
-    SELECT batch_id FROM (SELECT batch_id FROM growth_batches WHERE state='published' ORDER BY observed_date DESC,published_revision DESC LIMIT 1)
-    UNION ALL SELECT b.supersedes_batch_id FROM growth_batches b JOIN l USING(batch_id) WHERE b.supersedes_batch_id IS NOT NULL)
-    SELECT e.member_id,o.power,o.observed_date FROM growth_external_ids e JOIN growth_observations o ON o.observation_id=(SELECT x.observation_id FROM growth_observations x JOIN l USING(batch_id) WHERE x.member_id=e.member_id AND x.status='active' ORDER BY x.observed_date DESC,x.original_order DESC LIMIT 1)`);
+  const baseline=await approvedLatest(db);
   const powers=new Map<string,any>();for(const r of baseline)powers.set(r.member_id,r);
   for(const m of members)if(m.closed_power==null&&powers.has(m.member_id)){const p=powers.get(m.member_id);m.closed_power=p.power;m.closed_date=p.observed_date;m.delta=m.power==null?null:m.power-p.power;}
   const counts=await first(db,"SELECT COUNT(*) calls FROM growth_auto_runs WHERE trigger_kind<>'fixture'");
