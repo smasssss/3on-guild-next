@@ -22,6 +22,9 @@ async function run(){
  assert.equal(count('growth_auto_executions'),idleBefore,'idle ticks do not touch D1 or external API');
  assert.equal(auto.kstDate(Date.parse('2026-10-17T14:59:59Z')),'2026-10-17');assert.equal(auto.kstDate(Date.parse('2026-10-17T15:00:00Z')),'2026-10-18');
  assert.equal(auto.cutoffFor('2026-10-17'),Date.parse('2026-10-17T15:00:00Z'));
+ assert.equal(auto.recoveryThrough(Date.parse('2026-10-17T15:00:00Z')),'2026-10-16','midnight collection must not close before 00:10');
+ assert.equal(auto.recoveryThrough(Date.parse('2026-10-17T15:10:00Z')),'2026-10-17');
+ assert.equal(auto.recoveryThrough(Date.parse('2026-10-17T16:00:00Z')),'2026-10-17','failed 00:10 close remains retryable');
  const snap=(iso)=>({...structuredClone(fixture),asOf:Date.parse(iso)/1000});
  let a=snap('2026-10-17T13:00:00Z');a.roster=a.roster.slice(0,88);a.members=88;
  await auto.fixture(db,JSON.stringify(a),Date.parse('2026-10-17T13:01:00Z'));
@@ -41,7 +44,7 @@ async function run(){
  const result=await auto.closeDay(db,'2026-10-17',Date.parse('2026-10-17T15:10:00Z'));assert.equal(result.members,89);
  const selected=sql.prepare('SELECT * FROM growth_daily_sources WHERE game_id=?').get(b.roster[0].id);assert.equal(selected.power,b.roster[0].power);assert(selected.source_as_of<Date.parse('2026-10-17T15:00:00Z'));assert(selected.received_at<Date.parse('2026-10-17T15:00:00Z'));
  assert.equal((await auto.closeDay(db,'2026-10-17',Date.parse('2026-10-17T15:11:00Z'))).duplicate,true);assert.equal(count('growth_observations'),oldObs+89);
- let fetches=0;const fetcher=async()=>{fetches++;throw Error('simulated outage')};
+ let fetches=0;const fetcher=async(url,options)=>{assert.equal(url,auto.ALLIANCE_URL);assert.equal(options.redirect,'manual','Workers supports manual redirect without following other endpoints');fetches++;throw Error('simulated outage')};
  await auto.collect({DB:db,GROWTH_AUTO_MODE:'fixture'},'test',Date.now(),fetcher);assert.equal(fetches,0);
  const clock=Date.now();await assert.rejects(auto.collect({DB:db,GROWTH_AUTO_MODE:'production'},'test',clock,fetcher));assert.equal(fetches,1);
  await auto.collect({DB:db,GROWTH_AUTO_MODE:'production'},'test',clock+1000,fetcher);assert.equal(fetches,1);

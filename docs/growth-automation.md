@@ -76,3 +76,5 @@ row metrics; do not delete historical records silently to stay within a free pla
 ## Account Cron capacity
 
 On 2026-10-17 the account had four unrelated active auction schedules and one free slot. The 3ON Worker registers `0,10 * * * *` (one Cron expression). UTC minute 00 dispatches hourly collection; UTC 15:10 dispatches the previous Asia/Seoul day close; the other 23 minute-10 ticks return before D1 access or external fetch. This preserves hourly collection and 00:10 KST closing without changing the other service or upgrading billing. There are 48 lightweight Worker ticks/day, 24 maximum external calls/day, and one closing operation/day. The separate logical schedules remain exposed by the status API along with registered_cron.
+
+Cloudflare Fetch requires `redirect: manual`; redirects return HTTP errors and are never followed. The first runtime attempt failed locally on the unsupported `error` mode before any network request. The release preserves that error row as `not_dispatched`, excludes it from external call counts, and releases only its exact pending reservation so the first real call can proceed. Other failed calls retain the normal hourly limit.
