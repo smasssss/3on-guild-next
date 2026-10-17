@@ -16,7 +16,7 @@ jobs:
     env:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      VALIDATED_SOURCE_SHA: 6a579747a38410617d27ac02f0281e161866cdba
+      VALIDATED_SOURCE_SHA: c24d2138f36cd8a9f77d7e23f06f52ac6103b5e2
     steps:
       - name: Require successful exact-source Staging validation
         env:
@@ -33,7 +33,7 @@ jobs:
           PY
       - uses: actions/checkout@v6
         with:
-          ref: 6a579747a38410617d27ac02f0281e161866cdba
+          ref: c24d2138f36cd8a9f77d7e23f06f52ac6103b5e2
       - uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -45,6 +45,7 @@ jobs:
       - name: Verify the exact release source
         run: |
           npx tsc --noEmit
+          node tests/growth_auto_ui_regression.cjs
           node tests/growth_automation_regression.cjs
           node tests/growth_changes_regression.cjs
           node tests/production_growth_regression.cjs
@@ -55,7 +56,7 @@ jobs:
         run: |
           npm run build
           python tests/automation_operations_preserved.py
-      - name: Deploy the tested Worker with hourly and 00:10 KST schedules
+      - name: Deploy the tested Worker with one combined hourly and 00:10 KST schedule
         run: npx wrangler deploy --config wrangler.automation.generated.json --strict
       - name: Verify Production schedules, public APIs and unchanged saved data
         run: python scripts/growth-automation-release.py verify production

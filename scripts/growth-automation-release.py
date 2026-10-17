@@ -67,24 +67,37 @@ def inspect(db):
  assert restored.execute('PRAGMA integrity_check').fetchone()[0]=='ok'
  (E/'restore-rehearsal.json').write_text(json.dumps({'status':'PASS','tables':len(data),'rows':sum(map(len,data.values())),'credentials_excluded':True}))
  print(json.dumps({'status':'BACKUP_AND_RESTORE_PASS','target':TARGET,'business_tables':len(data),'binding_types':[b['type'] for b in db.settings['bindings']],'growth_meta':before['growth_meta'],'schedules':schedules,'time_travel_available':'bookmark' in bookmark}))
+def inventory(db):
+ scripts=db.api('GET','/workers/scripts')['result'];rows=[]
+ for worker in scripts:
+  name=worker['id'];value=db.api('GET','/workers/scripts/'+name+'/schedules')['result'];schedules=value.get('schedules',[]) if isinstance(value,dict) else value
+  if schedules:rows.append({'worker':name,'crons':[x['cron'] for x in schedules]})
+ print(json.dumps({'status':'READ_ONLY_CRON_INVENTORY','total':sum(len(x['crons']) for x in rows),'scheduled_workers':rows}))
 def prepare(db):
  before=json.loads((E/'before.json').read_text());assert baseline(db)==before,'Production changed after backup; inspect again'
  db.execute(Path('drizzle/0005_growth_automation.sql').read_text())
  now=int(datetime.datetime.now(datetime.timezone.utc).timestamp()*1000);start=datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9))).date().isoformat()
  db.execute("INSERT OR IGNORE INTO growth_auto_control VALUES(1,0,"+quote(start)+",NULL,NULL,NULL,"+str(now)+");")
+ # The first deployed runtime rejected redirect='error' locally before dispatch.
+ # Release only that proven no-network reservation, retaining its error/audit row.
+ if TARGET=='production':
+  db.api('POST','/d1/database/'+db.database+'/query',{'batch':[
+   {'sql':"UPDATE growth_auto_runs SET status='not_dispatched' WHERE status='failed' AND http_status IS NULL AND raw_json IS NULL AND error LIKE 'Invalid redirect value,%' AND error LIKE '%won''t be implemented%' AND run_id=(SELECT last_run_id FROM growth_auto_control WHERE id=1)", 'params':[]},
+   {'sql':"UPDATE growth_auto_control SET last_call_at=NULL,last_hour=NULL,last_run_id=NULL WHERE id=1 AND last_run_id IN(SELECT run_id FROM growth_auto_runs WHERE status='not_dispatched' AND error LIKE 'Invalid redirect value,%')", 'params':[]}
+  ]})
  # Initial mappings do not rename members or create any old observations.
  assert baseline(db)==before,'Existing saved data changed during additive migration'
- cfg={'name':WORKER,'main':'dist/server/index.js','compatibility_date':db.settings.get('compatibility_date','2026-05-15'),'compatibility_flags':db.settings.get('compatibility_flags',['nodejs_compat']),'no_bundle':True,'rules':[{'type':'ESModule','globs':['**/*.js','**/*.mjs']}],'assets':{'directory':'dist/client'},'d1_databases':[{'binding':'DB','database_id':db.database}],'observability':{'enabled':True},'triggers':{'crons':['0 * * * *','10 15 * * *'] if TARGET=='production' else []}}
+ cfg={'name':WORKER,'main':'dist/server/index.js','compatibility_date':db.settings.get('compatibility_date','2026-05-15'),'compatibility_flags':db.settings.get('compatibility_flags',['nodejs_compat']),'no_bundle':True,'rules':[{'type':'ESModule','globs':['**/*.js','**/*.mjs']}],'assets':{'directory':'dist/client'},'d1_databases':[{'binding':'DB','database_id':db.database}],'observability':{'enabled':True},'triggers':{'crons':['0,10 * * * *'] if TARGET=='production' else []}}
  cfg['vars']={b['name']:b['text'] for b in db.settings['bindings'] if b['type']=='plain_text'};cfg['vars']['GROWTH_AUTO_MODE']='production' if TARGET=='production' else 'fixture'
  unknown=[b['type'] for b in db.settings['bindings'] if b['type'] not in ('plain_text','secret_text','d1','assets')];assert not unknown,('Unpreserved existing binding',unknown)
  Path('wrangler.automation.generated.json').write_text(json.dumps(cfg,indent=2)+'\n')
- print('Additive schema applied; collector remains paused until authenticated identity bootstrap. Existing tables and credentials unchanged.')
+ print('Additive schema applied; existing collector setting preserved (new setup stays paused until authenticated identity bootstrap). Existing tables and credentials unchanged.')
 def verify(db):
  before=json.loads((E/'before.json').read_text());after=baseline(db)
  assert before==after,'Existing business or authentication data changed'
  state=public('/api/growth/automation');assert state['mode']==('production' if TARGET=='production' else 'fixture');assert state['ai_calls']==0
  schedules=db.api('GET','/workers/scripts/'+WORKER+'/schedules')['result']
- actual={s['cron'] for s in (schedules.get('schedules',[]) if isinstance(schedules,dict) else schedules)};assert actual==({'0 * * * *','10 15 * * *'} if TARGET=='production' else set())
+ actual={s['cron'] for s in (schedules.get('schedules',[]) if isinstance(schedules,dict) else schedules)};assert actual==({'0,10 * * * *'} if TARGET=='production' else set())
  nowpublic={'current':public('/api/growth/current'),'legacy':public('/api/growth/legacy'),'state':public('/api/state')}
  old=json.loads((E/'public-before.json').read_text());assert old['state']==nowpublic['state']
  assert old['legacy']==nowpublic['legacy'],'Published growth changed before the first automatic close'
@@ -93,4 +106,4 @@ def verify(db):
  (E/'after.json').write_text(json.dumps({'baseline':after,'automation':state,'schedules':schedules,'current':nowpublic['current']},ensure_ascii=False,indent=2))
  print(json.dumps({'status':'DEPLOYMENT_VERIFIED','target':TARGET,'members':len(nowpublic['current']['members']),'revision':nowpublic['current']['revision'],'schedules':sorted(actual),'existing_data_and_credentials_preserved':True}))
 if __name__=='__main__':
- db=Remote();{'inspect':inspect,'prepare':prepare,'verify':verify}[sys.argv[1]](db)
+ db=Remote();{'inspect':inspect,'prepare':prepare,'verify':verify,'inventory':inventory}[sys.argv[1]](db)

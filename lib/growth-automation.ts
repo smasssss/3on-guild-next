@@ -2,6 +2,15 @@
 export const ALLIANCE_URL='https://lastasylum.gg/api/alliance/50373046';
 export const COLLECT_CRON='0 * * * *';
 export const CLOSE_CRON='10 15 * * *';
+// One account Cron slot; only the hourly tick and 15:10 UTC do work.
+export const COMBINED_CRON='0,10 * * * *';
+export function scheduledAction(cron:string,time:number){
+ if(cron===CLOSE_CRON)return 'close';
+ if(cron===COLLECT_CRON)return 'collect';
+ if(cron!==COMBINED_CRON)return 'idle';
+ const d=new Date(time);
+ return d.getUTCMinutes()===0?'collect':d.getUTCHours()===15&&d.getUTCMinutes()===10?'close':'idle';
+}
 const HOUR=3_600_000, DAY=24*HOUR;
 type Row={id:string;name:string;power:number;castle:number;rank:number;activity:number|null;kills:number|null;joined:number|null};
 type Snapshot={id:string;server:number;tag:string;members:number;power:number;asOf:number;roster:Row[]};
@@ -125,7 +134,7 @@ export async function collect(env:AutoEnv,triggerKind='cron',now=Date.now(),fetc
   if(!reservation)return {status:'throttled_or_paused'};
   await stmt(db,"INSERT INTO growth_auto_runs(run_id,trigger_kind,called_at,status) VALUES(?,?,?,'calling')",runId,triggerKind,now).run();
   try{
-    const response=await fetcher(ALLIANCE_URL,{headers:{Accept:'application/json','User-Agent':'3ON-Guild/1.0 (295/50373046; authorized hourly collection)'},redirect:'error',signal:AbortSignal.timeout(25_000)});
+    const response=await fetcher(ALLIANCE_URL,{headers:{Accept:'application/json','User-Agent':'3ON-Guild/1.0 (295/50373046; authorized hourly collection)'},redirect:'manual',signal:AbortSignal.timeout(25_000)});
     if(!response.ok)throw Error('HTTP_'+response.status);
     const raw=await response.text();if(new TextEncoder().encode(raw).length>1_000_000)throw Error('RESPONSE_TOO_LARGE');
     const received=Date.now();await stmt(db,"UPDATE growth_auto_runs SET status='received',received_at=?,http_status=?,raw_json=?,raw_hash=? WHERE run_id=?",received,response.status,raw,await digest(raw),runId).run();
@@ -189,18 +198,24 @@ export async function closeDay(db:D1Database,date:string,now=Date.now()){
   await db.batch(statements);return {status:stale||details.unobserved?'delayed':'closed',date,batch_id:batchId,members:rows.length,stale};
 }
 
+export function recoveryThrough(time:number){
+ const d=new Date(time);
+ // The 00:00 KST hourly tick must wait for the promised 00:10 close.
+ return kstDate(time-DAY-(d.getUTCHours()===15&&d.getUTCMinutes()<10?DAY:0));
+}
+
 async function scheduledWork(controller:{cron:string;scheduledTime:number},env:AutoEnv){
   if(env.GROWTH_AUTO_MODE!=='production'||!env.DB)return;
   const db=env.DB;
   // Closing has no reference to collect/fetch. Failed days remain retryable.
-  if(controller.cron===CLOSE_CRON){
+  if(scheduledAction(controller.cron,controller.scheduledTime)==='close'){
     return closeDay(db,kstDate(controller.scheduledTime-DAY),Date.now());
   }
-  if(controller.cron!==COLLECT_CRON)return;
+  if(scheduledAction(controller.cron,controller.scheduledTime)!=='collect')return;
   const pending=await all(db,"SELECT run_id FROM growth_auto_runs WHERE status IN ('received','db_error') ORDER BY called_at LIMIT 2");
   for(const r of pending)await ingestStored(db,r.run_id);
   // An hourly recovery closes a failed previous day without any extra API call.
-  const yesterday=kstDate(controller.scheduledTime-DAY),control=await first(db,'SELECT start_date FROM growth_auto_control WHERE id=1');
+  const yesterday=recoveryThrough(controller.scheduledTime),control=await first(db,'SELECT start_date FROM growth_auto_control WHERE id=1');
   const closed=await first(db,'SELECT MAX(date) date FROM growth_daily_closes');
   let day=closed?.date?kstDate(cutoffFor(closed.date)):control?.start_date;
   for(let i=0;day&&day<=yesterday&&i<7;i++){
@@ -212,6 +227,7 @@ async function scheduledWork(controller:{cron:string;scheduledTime:number},env:A
 
 export async function scheduledAutomation(controller:{cron:string;scheduledTime:number},env:AutoEnv){
   if(env.GROWTH_AUTO_MODE!=='production'||!env.DB)return;
+  if(scheduledAction(controller.cron,controller.scheduledTime)==='idle')return {status:'idle'};
   const id=controller.cron+'_'+controller.scheduledTime,db=env.DB;
   await stmt(db,"INSERT OR IGNORE INTO growth_auto_executions(execution_id,cron,scheduled_at,started_at,status) VALUES(?,?,?,?,'running')",id,controller.cron,controller.scheduledTime,Date.now()).run();
   try{const result=await scheduledWork(controller,env);await stmt(db,"UPDATE growth_auto_executions SET completed_at=?,status='success',result_json=?,error=NULL WHERE execution_id=?",Date.now(),json(result??null),id).run();return result;}
@@ -240,10 +256,10 @@ export async function automaticStatus(db:D1Database,admin=false){
     if(m.closed_power==null){m.closed_power=p.power;m.closed_date=p.observed_date;m.delta=m.power==null?null:m.power-p.power;}
     if(m.power==null){m.power=p.power;m.level=p.level;m.rank=p.rank;m.delta=0;m.last_valid_kind='previous_confirmed_record';m.observed_date=p.observed_date;}
   }
-  const counts=await first(db,"SELECT COUNT(*) calls FROM growth_auto_runs WHERE trigger_kind<>'fixture'");
+  const counts=await first(db,"SELECT COUNT(*) calls FROM growth_auto_runs WHERE trigger_kind<>'fixture' AND status<>'not_dispatched'");
   const changes=await all(db,`SELECT e.kind,e.game_id,e.member_id,e.source_as_of,e.before_json,e.after_json,e.status,m.display_name FROM growth_auto_events e LEFT JOIN growth_members m USING(member_id) WHERE e.kind IN ('nickname','rank','new','departure_candidate') ORDER BY e.created_at DESC LIMIT 30`);
   const lastExecution=await first(db,'SELECT cron,scheduled_at,started_at,completed_at,status,result_json,error FROM growth_auto_executions ORDER BY scheduled_at DESC LIMIT 1');
-  const base={schema:'3on-growth-automation-v1',timezone:'Asia/Seoul',collector_cron:COLLECT_CRON,close_cron:CLOSE_CRON,ai_calls:0,control,last_run:lastRun,last_good:lastGood,last_close:close,last_execution:lastExecution,pending_count:pending?.n||0,external_calls:counts?.calls||0,delayed:!lastGood||Date.now()-lastGood.source_as_of>2*HOUR,members,changes};
+  const base={schema:'3on-growth-automation-v1',timezone:'Asia/Seoul',collector_cron:COLLECT_CRON,close_cron:CLOSE_CRON,registered_cron:COMBINED_CRON,ai_calls:0,control,last_run:lastRun,last_good:lastGood,last_close:close,last_execution:lastExecution,pending_count:pending?.n||0,external_calls:counts?.calls||0,delayed:!lastGood||Date.now()-lastGood.source_as_of>2*HOUR,members,changes};
   if(!admin)return base;
   return {...base,all_members:await all(db,'SELECT member_id,display_name,legacy_canonical FROM growth_members ORDER BY display_name'),runs:await all(db,'SELECT run_id,trigger_kind,called_at,source_as_of,status,error,validation_json,raw_hash FROM growth_auto_runs ORDER BY called_at DESC LIMIT 48'),events:await all(db,'SELECT * FROM growth_auto_events ORDER BY created_at DESC LIMIT 150'),mappings:await all(db,'SELECT e.*,m.display_name FROM growth_external_ids e LEFT JOIN growth_members m USING(member_id)'),closes:await all(db,'SELECT * FROM growth_daily_closes ORDER BY date DESC LIMIT 31')};
 }
