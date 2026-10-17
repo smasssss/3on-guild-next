@@ -14,6 +14,7 @@ const ms=s=>Date.parse(s),count=async t=>(await db.prepare('SELECT COUNT(*) n FR
  assert.equal((await db.prepare('SELECT COUNT(*) n FROM growth_external_ids').first()).n,0,'Staging integration requires a clean mapping baseline');
  await db.batch([db.prepare(`INSERT INTO growth_external_ids SELECT json_extract(value,'$.game_id'),json_extract(value,'$.member_id'),json_extract(value,'$.source_name'),'confirmed','synthetic Staging test',NULL,1,1 FROM json_each(?)`).bind(JSON.stringify(runtime.links)),db.prepare('UPDATE growth_auto_control SET enabled=1 WHERE id=1')]);
  const baseline=await count('growth_observations'),checks=[];
+ const originalDisplay=(await db.prepare('SELECT display_name FROM growth_members WHERE member_id=?').bind(runtime.links[0].member_id).first()).display_name;
  let data=structuredClone(runtime.data);data.asOf=ms('2026-10-18T14:00:00Z')/1000;data.roster=data.roster.slice(0,88);data.members=88;
  await auto.fixture(db,JSON.stringify(data),ms('2026-10-18T14:01:00Z'));assert.equal(await count('growth_hourly_observations'),88);
  const duplicate=await auto.fixture(db,JSON.stringify(data),ms('2026-10-18T14:02:00Z'));assert.equal(duplicate.status,'duplicate');assert.equal(await count('growth_hourly_observations'),88);checks.push('real D1 duplicate prevention');
@@ -23,7 +24,7 @@ const ms=s=>Date.parse(s),count=async t=>(await db.prepare('SELECT COUNT(*) n FR
  const names=(await auto.automaticStatus(db)).nickname_changes;
  assert.equal(names.filter(n=>n.game_id===data.roster[0].id).length,1);
  assert.equal(names.find(n=>n.game_id===data.roster[0].id).current_name,'STAGING_닉변시험');
- assert.equal(names.find(n=>n.game_id===data.roster[0].id).previous_name,runtime.data.roster[0].name);
+ assert.equal(names.find(n=>n.game_id===data.roster[0].id).previous_name,originalDisplay);
  checks.push('real D1 current and immediately previous nickname summary');
  const expected=data.roster[0].power;data.asOf=ms('2026-10-18T15:00:00Z')/1000;data.roster[0].power+=1234;await auto.fixture(db,JSON.stringify(data),ms('2026-10-18T15:00:01Z'));
  injectFailure=true;await assert.rejects(auto.closeDay(db,'2026-10-18',ms('2026-10-18T15:10:00Z')));injectFailure=false;assert.equal(await count('growth_daily_closes'),0);assert.equal(await count('growth_observations'),baseline);checks.push('real D1 rollback after injected final-statement failure');

@@ -3,7 +3,7 @@
 Backs up business tables and schema, excluding authentication rows; D1 Time Travel
 provides whole-database recovery. No destructive seed/migration is executed.
 """
-import sys,os,json,hashlib,urllib.request,datetime,sqlite3
+import sys,os,json,hashlib,urllib.request,datetime,sqlite3,subprocess
 from pathlib import Path
 TARGET=sys.argv[2] if len(sys.argv)>2 else 'staging'
 assert TARGET in ('staging','production')
@@ -104,6 +104,7 @@ def verify(db):
  # /current fixes an existing superseded-lineage bug; member IDs and display names must still match.
  assert [(m['member_id'],m['display_name']) for m in old['current']['members']]==[(m['member_id'],m['display_name']) for m in nowpublic['current']['members']]
  (E/'after.json').write_text(json.dumps({'baseline':after,'automation':state,'schedules':schedules,'current':nowpublic['current']},ensure_ascii=False,indent=2))
+ subprocess.run(['node','tests/growth_auto_deployed_ui.cjs',TARGET],check=True)
  print(json.dumps({'status':'DEPLOYMENT_VERIFIED','target':TARGET,'members':len(nowpublic['current']['members']),'revision':nowpublic['current']['revision'],'schedules':sorted(actual),'existing_data_and_credentials_preserved':True}))
 if __name__=='__main__':
  db=Remote();{'inspect':inspect,'prepare':prepare,'verify':verify,'inventory':inventory}[sys.argv[1]](db)
