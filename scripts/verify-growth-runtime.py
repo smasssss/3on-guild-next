@@ -29,6 +29,11 @@ for run in now['growth_auto_runs']:
  if run['raw_json'] is not None:
   assert hashlib.sha256(run['raw_json'].encode()).hexdigest()==run['raw_hash']
 checks.append('saved raw source payload hashes match their original bytes')
+if os.environ.get('REQUIRE_CRON_COLLECTION')=='1':
+ calls=[x for x in now['growth_auto_runs'] if x['trigger_kind']=='cron']
+ assert calls and any(x['status'] in ('accepted','partial','duplicate') for x in calls),'No successful real scheduled collection observed'
+ assert any(x['status']=='success' and json.loads(x['result_json'] or '{}').get('status') in ('accepted','partial','duplicate') for x in now['growth_auto_executions'])
+ checks.append('actual hourly Cloudflare Cron requested the authorized API and stored or deduplicated its response')
 for row in now['growth_daily_sources']:
  close=next(c for c in now['growth_daily_closes'] if c['date']==row['date'])
  assert max(row['source_as_of'],row['received_at'],row['accepted_at'])<close['cutoff_at']

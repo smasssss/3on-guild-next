@@ -1,0 +1,47 @@
+name: Verify first real hourly Cloudflare collection once
+on:
+  push:
+    branches: [release/growth-automation-20261017]
+    paths: ['.github/workflows/growth-automation-first-hour-verification.yml']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      REQUIRE_REAL_CLOSE: '1'
+      REQUIRE_CRON_COLLECTION: '1'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v5
+        with:
+          name: growth-automation-production-39043177046
+          run-id: 39043177046
+          github-token: ${{ github.token }}
+          path: downloaded-backup
+      - name: Authenticate protected business backup
+        run: |
+          node scripts/decrypt-automation-evidence.mjs downloaded-backup/3ON-automation-evidence.aesgcm /tmp/production-backup.zip
+          python -c "import zipfile; zipfile.ZipFile('/tmp/production-backup.zip').extractall('restored-backup')"
+      - name: Wait read-only for the actual hourly Worker trigger
+        run: python scripts/wait-first-growth-cron.py verify production
+      - name: Verify real scheduled collection and the immutable daily close
+        run: python scripts/verify-growth-runtime.py verify production
+      - name: Encrypt private evidence
+        if: always()
+        run: |
+          mkdir -p automation-evidence/production
+          node scripts/encrypt-automation-evidence.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: growth-automation-first-hour-${{ github.run_id }}
+          path: automation-encrypted/
+          retention-days: 30
