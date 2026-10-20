@@ -41,7 +41,9 @@ jobs:
       - name: Build existing application
         run: npm run build
       - name: Verify carriage VIP canyon and authentication source preservation
-        run: python tests/automation_operations_preserved.py
+        run: |
+          python tests/automation_operations_preserved.py
+          python tests/vip_exclusions_regression.py
       - name: Deploy Staging without external collection schedules
         run: npx wrangler deploy --config wrangler.automation.generated.json --strict
       - name: Verify saved data and disabled Staging Cron

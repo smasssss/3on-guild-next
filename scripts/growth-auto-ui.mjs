@@ -6,6 +6,10 @@ if(!source.includes(before))throw Error('Expected existing growth frame loader i
 source=source.replace(before,"frame.srcdoc=new TextDecoder('utf-8').decode(bytes).replace('</body>','<script src=\"/growth-auto.js\" defer><'+'/script></body>');");
 source=source.replace('function injectGrowthUpdateLink()',"window.addEventListener('message',async e=>{if(e.source===document.getElementById('growthFrame').contentWindow&&e.data?.kind==='3on-growth-auto-refresh'){await loadProductionGrowth();initGrowthFrame();}});\nfunction injectGrowthUpdateLink()");
 source=source.replace('AI 처리 결과를 먼저 확인하고 이상한 닉네임·등급·레벨·전투력만 수정한 뒤 최종 반영합니다. 기존 member 연결과 신규 등록은 자동 처리됩니다.','자동 수집 상태·수집 오류·동일인 연결을 관리하고, 장애 시 수동 JSON 자료를 검토하여 반영합니다.');
+// Persistent VIP exclusions use the existing member ID, so renames do not re-add an account.
+const vipFilter=".filter(m=>m.observedToday!==false&&";
+if(source.split(vipFilter).length!==2)throw Error('Expected one existing VIP picker filter');
+source=source.replace(vipFilter,vipFilter+"state.vipExcludedMembers?.[m.member_id]!==1&&");
 const carriageEnd=source.lastIndexOf('</body>');
 if(carriageEnd<0)throw Error('Existing carriage page is missing its body');
 source=source.slice(0,carriageEnd)+'<script src="/carriage-date.js" defer><'+'/script>'+source.slice(carriageEnd);
