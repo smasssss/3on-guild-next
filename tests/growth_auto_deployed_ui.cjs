@@ -9,6 +9,10 @@ const fs=require('node:fs'),assert=require('node:assert/strict'),{runInNewContex
  const script=await scriptResponse.text(),state=await stateResponse.json(),page=await pageResponse.text();
  const hash=s=>createHash('sha256').update(s).digest('hex');assert.equal(hash(script),hash(fs.readFileSync('public/growth-auto.js')),'Deployed UI must match exact validated source');
  assert(page.includes('/growth-auto.js'),'Existing growth iframe loads the new display');
+ const carriage=await fetch(origin+'/carriage-date.js',{cache:'no-store'});assert(carriage.ok);
+ assert.equal(hash(await carriage.text()),hash(fs.readFileSync('public/carriage-date.js')),'Deployed carriage date selector matches validated source');
+ assert(page.includes('/carriage-date.js'),'Existing carriage page loads the scoped date selector');
+
  assert(Array.isArray(state.nickname_changes));
  assert.equal(new Set(state.nickname_changes.map(n=>n.game_id)).size,state.nickname_changes.length);
  for(const n of state.nickname_changes){const m=state.members.find(m=>m.game_id===n.game_id);assert(m);assert.equal(n.current_name,m.display_name||m.source_name);}

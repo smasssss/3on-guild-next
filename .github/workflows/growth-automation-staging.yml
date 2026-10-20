@@ -29,6 +29,7 @@ jobs:
         run: |
           npx tsc --noEmit
           node tests/growth_auto_ui_regression.cjs
+          node tests/carriage_date_regression.cjs
           node tests/growth_automation_regression.cjs
           node tests/growth_changes_regression.cjs
           node tests/production_growth_regression.cjs
