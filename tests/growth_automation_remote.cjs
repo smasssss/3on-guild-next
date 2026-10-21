@@ -20,6 +20,19 @@ const ms=s=>Date.parse(s),count=async t=>(await db.prepare('SELECT COUNT(*) n FR
  const duplicate=await auto.fixture(db,JSON.stringify(data),ms('2026-10-18T14:02:00Z'));assert.equal(duplicate.status,'duplicate');assert.equal(await count('growth_hourly_observations'),88);checks.push('real D1 duplicate prevention');
  data=structuredClone(runtime.data);data.asOf=ms('2026-10-18T14:50:00Z')/1000;data.roster[0].name='STAGING_닉변시험';data.roster[0].rank=3;
  await auto.fixture(db,JSON.stringify(data),ms('2026-10-18T14:51:00Z'));assert.equal(await count('growth_hourly_observations'),177);assert.equal(await count('growth_observations'),baseline);
+
+ // One bounded read-only comparison on the existing 177-row integration fixture.
+ const oldSql="SELECT o.* FROM growth_external_ids e JOIN growth_hourly_observations o ON o.game_id=e.game_id AND o.snapshot_id=(SELECT x.snapshot_id FROM growth_hourly_observations x WHERE x.game_id=e.game_id AND x.status='valid' ORDER BY x.source_as_of DESC LIMIT 1)";
+ const oldRead=(await query({sql:oldSql,params:[]}))[0],newRead=(await query({sql:auto.LATEST_VALID_HOURLY_SQL,params:[]}))[0];
+ const canonicalRows=rows=>JSON.stringify([...rows].sort((a,b)=>a.game_id.localeCompare(b.game_id)));
+ assert.equal(canonicalRows(newRead.results),canonicalRows(oldRead.results),'latest valid observation results must be byte-equivalent');
+ const oldRows=oldRead.meta.rows_read,newRows=newRead.meta.rows_read;
+ assert(Number.isSafeInteger(oldRows)&&Number.isSafeInteger(newRows)&&newRows<oldRows,'optimized latest-valid SQL must reduce actual D1 rows_read');
+ const readComparison={fixture_rows:177,members:oldRead.results.length,before_rows_read:oldRows,after_rows_read:newRows,reduction_percent:Math.round((1-newRows/oldRows)*10000)/100,before_rows_written:oldRead.meta.rows_written,after_rows_written:newRead.meta.rows_written};
+ assert.equal(readComparison.before_rows_written,0);assert.equal(readComparison.after_rows_written,0);
+ fs.writeFileSync('automation-evidence/staging/d1-read-comparison.json',JSON.stringify(readComparison,null,2));
+ console.log(JSON.stringify({status:'D1_READ_COMPARISON_PASS',...readComparison}));
+ checks.push('identical latest valid observations with lower measured D1 rows_read');
  assert((await db.prepare("SELECT COUNT(*) n FROM growth_auto_events WHERE kind='nickname'").first()).n>0);assert((await db.prepare("SELECT COUNT(*) n FROM growth_auto_events WHERE kind='rank'").first()).n>0);checks.push('88 to 89 roster, nickname/rank, hourly/daily separation');
  const names=(await auto.automaticStatus(db)).nickname_changes;
  assert.equal(names.filter(n=>n.game_id===data.roster[0].id).length,1);

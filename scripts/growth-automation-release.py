@@ -31,16 +31,17 @@ def tables(db):
   name=t['name'];cols='*' if name!='growth_review_assets' else 'asset_id,batch_id,row_id,mime_type,hex(bytes) bytes_hex,size_bytes,expires_at,created_at'
   result[name]=db.query('SELECT '+cols+' FROM '+name+' ORDER BY 1')
  return result
-def baseline(db):
- result=tables(db)
+def baseline(db,data=None):
+ # Reuse only an explicitly captured snapshot from this same verification boundary.
+ result=tables(db) if data is None else data
  # Credentials are compared by digest only; never exported or logged.
  auth=db.query('SELECT * FROM credentials ORDER BY 1')
- return {'tables':{k:digest(v) for k,v in result.items() if not k.startswith(('growth_auto_','growth_hourly_','growth_external_','growth_daily_'))},'credentials_hash':digest(auth),'growth_meta':db.query('SELECT * FROM growth_meta ORDER BY key')}
+ return {'tables':{k:digest(v) for k,v in result.items() if not k.startswith(('growth_auto_','growth_hourly_','growth_external_','growth_daily_'))},'credentials_hash':digest(auth),'growth_meta':sorted(result['growth_meta'],key=lambda row:row['key'])}
 def public(path):
  req=urllib.request.Request('https://'+WORKER+'.295server.workers.dev'+path,headers={'User-Agent':'3ON-release-verification'})
  with urllib.request.urlopen(req,timeout=60) as r:return json.load(r)
 def inspect(db):
- before=baseline(db);data=tables(db)
+ data=tables(db);before=baseline(db,data)
  schema=db.query("SELECT type,name,tbl_name,sql FROM sqlite_master WHERE sql IS NOT NULL AND (name='documents' OR name LIKE 'growth_%') ORDER BY type,name")
  (E/'business-backup.json').write_text(json.dumps({'schema':schema,'tables':data},ensure_ascii=False))
  (E/'before.json').write_text(json.dumps(before,ensure_ascii=False,indent=2))

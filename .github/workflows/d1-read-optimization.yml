@@ -1,0 +1,119 @@
+name: Optimize D1 reads - Staging gate then authorized Production
+on:
+  push:
+    branches: [fix/d1-read-optimization-20261021]
+permissions:
+  contents: read
+jobs:
+  staging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    concurrency:
+      group: cloudflare-staging
+      cancel-in-progress: false
+    outputs:
+      validated_sha: ${{ steps.validated.outputs.sha }}
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --include=dev --include=optional --no-audit --no-fund
+      - name: Verify SQL equivalence and snapshot boundary reuse
+        run: |
+          node tests/d1_latest_lookup.cjs
+          python tests/d1_snapshot_baseline.py
+          npx tsc --noEmit
+          node tests/growth_automation_regression.cjs
+          node tests/growth_changes_regression.cjs
+          node tests/production_growth_regression.cjs
+          node tests/growth_auto_ui_regression.cjs
+          node tests/carriage_date_regression.cjs
+          node tests/canyon_latest_regression.cjs
+      - name: Back up Staging and rehearse restoration once
+        run: python scripts/growth-automation-release.py inspect staging
+      - name: Prepare unchanged Staging bindings without migrations
+        run: python scripts/d1-read-optimization-release.py configure staging
+      - name: Build the exact tested source
+        run: |
+          npm run build
+          python tests/automation_operations_preserved.py
+          python tests/vip_exclusions_regression.py
+      - name: Deploy Staging code only
+        id: deploy
+        run: npx wrangler deploy --config wrangler.d1-optimization.generated.json --strict
+      - name: Verify Staging public APIs and preserved business data
+        run: python scripts/growth-automation-release.py verify staging
+      - name: Measure actual Staging D1 reads and run reversible integration tests
+        run: python tests/growth_automation_staging.py
+      - name: Mark the exact source as validated
+        id: validated
+        run: echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+      - name: Roll back Staging on post-deployment failure
+        if: failure() && steps.deploy.outcome == 'success'
+        run: python scripts/d1-read-optimization-release.py rollback staging
+      - name: Encrypt recovery and verification evidence
+        if: always()
+        run: node scripts/encrypt-automation-evidence.mjs
+      - name: Save encrypted Staging evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-optimization-staging-${{ github.run_id }}
+          path: automation-encrypted/
+          retention-days: 30
+  production:
+    needs: staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    concurrency:
+      group: cloudflare-production-growth-repair
+      cancel-in-progress: false
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.staging.outputs.validated_sha }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - name: Require the identical successful Staging source
+        env:
+          VALIDATED_SHA: ${{ needs.staging.outputs.validated_sha }}
+        run: test "$(git rev-parse HEAD)" = "$VALIDATED_SHA" && test "$VALIDATED_SHA" = "$GITHUB_SHA"
+      - name: Install locked dependencies
+        run: npm ci --include=dev --include=optional --no-audit --no-fund
+      - name: Back up Production and rehearse restoration once
+        run: python scripts/growth-automation-release.py inspect production
+      - name: Preserve Production bindings and Cron without migrations
+        run: python scripts/d1-read-optimization-release.py configure production
+      - name: Build the exact Staging-validated source
+        run: npm run build
+      - name: Deploy authorized Production code only
+        id: deploy
+        run: npx wrangler deploy --config wrangler.d1-optimization.generated.json --strict
+      - name: Verify Production data, authentication, public APIs and UI assets
+        run: python scripts/growth-automation-release.py verify production
+      - name: Measure actual Production lookup reads without modifying data
+        run: python scripts/d1-read-optimization-release.py compare production
+      - name: Roll back Production on post-deployment failure
+        if: failure() && steps.deploy.outcome == 'success'
+        run: python scripts/d1-read-optimization-release.py rollback production
+      - name: Encrypt recovery and verification evidence
+        if: always()
+        run: node scripts/encrypt-automation-evidence.mjs
+      - name: Save encrypted Production evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-optimization-production-${{ github.run_id }}
+          path: automation-encrypted/
+          retention-days: 30
