@@ -1,0 +1,34 @@
+// Compare the exact production lookup against the optimized lookup, using local synthetic data only.
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const {DatabaseSync}=require('node:sqlite'),{stripTypeScriptTypes}=require('node:module');
+const oldSql="SELECT o.* FROM growth_external_ids e JOIN growth_hourly_observations o ON o.game_id=e.game_id AND o.snapshot_id=(SELECT x.snapshot_id FROM growth_hourly_observations x WHERE x.game_id=e.game_id AND x.status='valid' ORDER BY x.source_as_of DESC LIMIT 1)";
+(async()=>{
+ const source=fs.readFileSync(path.join(__dirname,'../lib/growth-automation.ts'),'utf8');
+ const auto=await import('data:text/javascript;base64,'+Buffer.from(stripTypeScriptTypes(source)).toString('base64'));
+ assert(source.includes('await all(db,LATEST_VALID_HOURLY_SQL)'),'ingest must use the tested lookup');
+ const db=new DatabaseSync(':memory:');
+ db.exec(`CREATE TABLE growth_external_ids(game_id TEXT PRIMARY KEY,member_id TEXT UNIQUE);
+ CREATE TABLE growth_hourly_observations(snapshot_id TEXT NOT NULL,game_id TEXT NOT NULL,member_id TEXT,source_as_of INTEGER,status TEXT,power INTEGER,PRIMARY KEY(snapshot_id,game_id));
+ CREATE INDEX growth_hourly_player_time ON growth_hourly_observations(game_id,source_as_of DESC);
+ CREATE INDEX growth_hourly_valid_player ON growth_hourly_observations(game_id,status,source_as_of DESC);`);
+ const ins=db.prepare('INSERT INTO growth_hourly_observations VALUES(?,?,?,?,?,?)');
+ const canon=rows=>JSON.stringify(rows.sort((a,b)=>a.game_id.localeCompare(b.game_id)));
+ const check=label=>{assert.equal(canon(db.prepare(auto.LATEST_VALID_HOURLY_SQL).all()),canon(db.prepare(oldSql).all()),label)};
+ check('empty tables');
+ for(let m=0;m<93;m++)db.prepare('INSERT INTO growth_external_ids VALUES(?,?)').run('g'+m,m%7?('m'+m):null);
+ check('mappings without observations');
+ db.exec('BEGIN');
+ for(let m=0;m<93;m++)for(let h=0;h<60;h++)ins.run('s'+h,'g'+m,m%7?('m'+m):null,h,(h===59&&m%3===0)?'review':'valid',m*1000+h);
+ db.exec('COMMIT');
+ check('93 members and 60 snapshots; latest review falls back to previous valid');
+ ins.run('same-time-1','g0',null,59,'valid',10);
+ ins.run('same-time-2','g0',null,59,'valid',20);
+ check('same source timestamp preserves existing index tie behavior');
+ ins.run('unmapped','not-mapped',null,100,'valid',1);check('unmapped observations excluded');
+ db.prepare("UPDATE growth_hourly_observations SET status='review' WHERE game_id='g1'").run();check('no valid observations excluded');
+ const plan=db.prepare('EXPLAIN QUERY PLAN '+auto.LATEST_VALID_HOURLY_SQL).all().map(r=>r.detail);
+ assert(!plan.some(s=>/^SCAN o(?: |$)/.test(s)),plan.join('; '));
+ assert(plan.some(s=>/SEARCH o USING INTEGER PRIMARY KEY/.test(s)),plan.join('; '));
+ console.log(JSON.stringify({status:'LATEST_VALID_LOOKUP_PASS',checks:7,fixture_rows:db.prepare('SELECT COUNT(*) n FROM growth_hourly_observations').get().n,plan}));
+ db.close();
+})().catch(e=>{console.error(e);process.exitCode=1});

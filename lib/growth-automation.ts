@@ -24,6 +24,8 @@ const json=(x:any)=>JSON.stringify(x);
 const stmt=(db:D1Database,sql:string,...values:any[])=>db.prepare(sql).bind(...values);
 const all=async(db:D1Database,sql:string,...v:any[])=>(await stmt(db,sql,...v).all<any>()).results;
 const first=async(db:D1Database,sql:string,...v:any[])=>stmt(db,sql,...v).first<any>();
+// Select one physical row per game ID before joining; avoid scanning every hourly observation.
+export const LATEST_VALID_HOURLY_SQL = `SELECT o.* FROM growth_external_ids e JOIN growth_hourly_observations o ON o.game_id=e.game_id AND o.rowid=(SELECT x.rowid FROM growth_hourly_observations x WHERE x.game_id=e.game_id AND x.status='valid' ORDER BY x.source_as_of DESC LIMIT 1)`;
 async function approvedLatest(db:D1Database){return all(db,`WITH RECURSIVE l(batch_id) AS(
   SELECT batch_id FROM (SELECT batch_id FROM growth_batches WHERE state='published' ORDER BY observed_date DESC,published_revision DESC LIMIT 1)
   UNION ALL SELECT parent.batch_id FROM growth_batches b JOIN l USING(batch_id) JOIN growth_batches parent ON parent.batch_id=b.supersedes_batch_id WHERE parent.state IN ('published','superseded'))
@@ -74,7 +76,7 @@ export async function ingestStored(db:D1Database,runId:string,acceptedAt=Date.no
   const byId=new Map(mappings.map(m=>[m.game_id,m]));
   const identities=await all(db,"SELECT member_id,display_name raw FROM growth_members UNION SELECT member_id,legacy_canonical raw FROM growth_members WHERE legacy_canonical IS NOT NULL UNION SELECT member_id,raw_value raw FROM growth_identity_decisions WHERE status='confirmed'");
   const names=new Set(identities.map(r=>r.raw));
-  const previous=await all(db,`SELECT o.* FROM growth_external_ids e JOIN growth_hourly_observations o ON o.game_id=e.game_id AND o.snapshot_id=(SELECT x.snapshot_id FROM growth_hourly_observations x WHERE x.game_id=e.game_id AND x.status='valid' ORDER BY x.source_as_of DESC LIMIT 1)`);
+  const previous=await all(db,LATEST_VALID_HOURLY_SQL);
   const prev=new Map(previous.map(p=>[p.game_id,p]));
   const approved=new Map((await approvedLatest(db)).map(p=>[p.member_id,p]));
   const revision=await first(db,"SELECT value FROM growth_meta WHERE key='identity_revision'");

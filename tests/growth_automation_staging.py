@@ -2,7 +2,7 @@
 import os,json,importlib.util,subprocess,tempfile
 from pathlib import Path
 spec=importlib.util.spec_from_file_location('release',Path('scripts/growth-automation-release.py'));r=importlib.util.module_from_spec(spec);spec.loader.exec_module(r)
-assert r.TARGET=='staging';db=r.Remote();before=r.tables(db);auth_before=r.baseline(db)['credentials_hash']
+assert r.TARGET=='staging';db=r.Remote();before=r.tables(db);auth_before=r.baseline(db,before)['credentials_hash']
 try:
  data=json.loads(Path('tests/fixtures/lastasylum-50373046.json').read_text());current=r.public('/api/growth/current')['members'];assert len(current)==89
  links=[{'game_id':row['id'],'member_id':member['member_id'],'source_name':row['name']} for row,member in zip(data['roster'],current)]
@@ -34,6 +34,6 @@ finally:
    if any(current[row[key]][c]!=row[c] for c in columns):updates.append('UPDATE '+name+' SET '+','.join(c+'='+('NULL' if row[c] is None else r.quote(row[c])) for c in columns)+' WHERE '+key+'='+r.quote(row[key])+';')
   if updates:db.execute('\n'.join(updates))
 after=r.tables(db);assert r.digest(before)==r.digest(after),'Staging test cleanup changed existing business data'
-assert r.baseline(db)['credentials_hash']==auth_before,'Existing administrator credentials changed'
+assert r.baseline(db,after)['credentials_hash']==auth_before,'Existing administrator credentials changed'
 result['checks'].append('exact Staging business data and authentication restoration; carriage/VIP preserved')
 (r.E/'staging-tests.json').write_text(json.dumps(result,ensure_ascii=False,indent=2));print(json.dumps({'status':'PASS','checks':result['checks'],'external_calls':0}))
