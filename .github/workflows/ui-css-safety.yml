@@ -1,0 +1,50 @@
+name: UI CSS-only safety (no deployment)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/globals.css"
+      - "docs/ui-skills-safe-polish-20261022.md"
+      - ".github/workflows/ui-css-safety.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Reject changes outside approved CSS, note, or this workflow
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          git diff --name-only "$BASE_SHA" HEAD > /tmp/ui-changed-files.txt
+          cat /tmp/ui-changed-files.txt
+          unexpected="$(grep -Ev '^(app/globals\.css|docs/ui-skills-safe-polish-20261022\.md|\.github/workflows/ui-css-safety\.yml)$' /tmp/ui-changed-files.txt || true)"
+          test -z "$unexpected"
+          grep -qx 'app/globals.css' /tmp/ui-changed-files.txt
+      - name: Check accessibility CSS guardrails
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const css = fs.readFileSync('app/globals.css', 'utf8');
+          const checks = [':focus-visible','prefers-reduced-motion','max-width:520px','.simpleOverlay .editFields','.simpleAdmin .resultCounts'];
+          for (const token of checks) if (!css.includes(token)) throw new Error('Required CSS safeguard missing: '+token);
+          if ((css.match(/{/g)||[]).length !== (css.match(/}/g)||[]).length) throw new Error('Unbalanced CSS blocks');
+          NODE
+      - name: Install project dependencies (no Cloudflare credentials)
+        run: npm ci --include=dev --include=optional --no-audit --no-fund
+      - name: Lint
+        run: npm run lint
+      - name: Build
+        run: npm run build
