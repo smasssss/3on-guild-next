@@ -12,3 +12,59 @@ button{border:1px solid #4d7394;background:#dbeeff;color:#0d2136;border-radius:1
 .simpleOverlay{position:fixed;inset:0;z-index:100;background:#03090fd9;display:grid;place-items:end center;padding:0}.simpleSheet{width:min(760px,100%);max-height:96dvh;display:flex;flex-direction:column;background:#0e1a27;border:1px solid #36536d;border-radius:18px 18px 0 0;box-shadow:0 -18px 55px #000c;overflow:hidden}.simpleSheet>header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 14px;border-bottom:1px solid var(--line)}.simpleSheet>header span{font-size:10px;color:var(--muted)}.simpleSheet>header h2{font-size:19px;margin:3px 0}.closeButton{width:44px;padding:0;border-radius:999px;background:#172b3e;color:white}.sheetContent{padding:14px;overflow:auto}.sheetContent label{display:grid;gap:5px;font-size:11px;color:var(--muted);margin:11px 0}.editCrop{display:block;max-width:100%;max-height:190px;margin:0 auto 12px;border-radius:10px}.readInfo{background:var(--panel);border-radius:10px;padding:10px}.readInfo span,.readInfo b,.readInfo small{display:block}.readInfo span,.readInfo small{color:var(--muted);font-size:10px}.readInfo b{margin:4px 0}.editFields{display:grid;grid-template-columns:90px 90px minmax(0,1fr);gap:8px}.advanced{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:10px;margin-top:12px}.advanced summary{font-weight:900;cursor:pointer}.advanced p,.advanced small{font-size:10px;color:var(--muted);line-height:1.5}.advanced .check{display:flex;grid-template-columns:22px 1fr;align-items:center}.advanced .check input{width:20px;min-height:20px}.selectedMember{color:var(--muted);font-size:11px}.editDock{display:flex;justify-content:flex-end;gap:8px;padding:11px 14px max(11px,env(safe-area-inset-bottom));border-top:1px solid var(--line);background:#101e2c}.publishCard{width:min(460px,calc(100% - 24px));margin:auto;background:#102030;border:1px solid #3b5b78;border-radius:16px;padding:17px}.publishCard>span{font-size:11px;color:var(--muted)}.publishCard h2{margin:4px 0 14px}.publishCard dl{margin:0}.publishCard dl div{display:flex;justify-content:space-between;border-bottom:1px solid #263b4f;padding:8px 0}.publishCard dt{color:var(--muted)}.publishCard dd{font-weight:900}.publishCard p{font-size:12px;line-height:1.55;color:var(--muted)}.publishCard>div:last-child{display:flex;justify-content:flex-end;gap:8px}.publishedToast{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:120;width:min(520px,calc(100% - 24px));display:flex;align-items:center;gap:10px;background:#174332;border:1px solid #3a8b6b;border-radius:13px;padding:11px 13px;box-shadow:0 12px 35px #000b}.publishedToast span{color:#bfead7;font-size:11px;flex:1}.publishedToast a{color:white;font-weight:900}
 @media(max-width:520px){.simpleAdmin{padding-inline:10px}.stagingBanner{margin-inline:-10px}.adminHeader{grid-template-columns:auto 1fr}.adminHeader>button{grid-column:1/-1}.adminHeader h1{font-size:20px}.uploadCard{align-items:stretch;flex-direction:column}.batchPicker{grid-template-columns:1fr}.resultCounts{grid-template-columns:repeat(3,1fr)}.resultCounts div:nth-child(4),.resultCounts div:nth-child(5){grid-column:span 1}.resultRow{grid-template-columns:minmax(0,1fr) auto}.rowStats{grid-column:1/-1;justify-content:flex-end}.chevron{position:absolute;right:18px}.publishBar{bottom:6px}.editFields{grid-template-columns:74px 74px minmax(0,1fr)}.editDock{display:grid;grid-template-columns:1fr 1fr}.editDock button:last-child{grid-column:1/-1}.publishedToast{align-items:flex-start;flex-wrap:wrap}}
 @media(max-width:340px){.simpleAdmin{padding-inline:8px}.stagingBanner{margin-inline:-8px}.adminHeader{gap:7px}.adminHeader h1{font-size:18px}.resultCounts{gap:5px}.resultCounts b{font-size:15px}.editFields{grid-template-columns:1fr}.publishBar{align-items:stretch;flex-direction:column}.publishBar button{width:100%}}
+
+/*
+ * 3ON Growth Admin visual safety pass — 2026-10-22
+ * UI UX Pro Max: mobile touch targets, readable labels, responsive fields.
+ * Impeccable: "Operate" mode refinement, focus/contrast/overflow checks.
+ * Presentation-only selectors; no markup, events, storage, API or DB changes.
+ */
+.simpleAdmin :is(button,a,input,select,textarea,summary):focus-visible,
+.simpleOverlay :is(button,a,input,select,textarea,summary):focus-visible{
+  outline:3px solid #b6e3ff;
+  outline-offset:3px;
+}
+.simpleAdmin :is(button,a,input,select),
+.simpleOverlay :is(button,a,input,select){
+  -webkit-tap-highlight-color:rgba(124,195,255,.22);
+}
+.simpleAdmin .resultCounts span{font-size:12px;line-height:1.45;overflow-wrap:break-word}
+.simpleAdmin .resultCounts b{font-size:19px;line-height:1.25;font-variant-numeric:tabular-nums}
+.simpleAdmin .rowBadge,.simpleAdmin .draftBadge,.simpleAdmin .testBadge{
+  font-size:11px;line-height:1.45;
+}
+.simpleAdmin .rowStats,.simpleAdmin .resultRow small{font-size:12px;line-height:1.5}
+.simpleAdmin .publishBar span{font-size:12px;line-height:1.45}
+.simpleAdmin .resultRow{position:relative;min-height:52px}
+.simpleAdmin .blocking button{min-height:44px}
+.simpleOverlay .sheetContent label{font-size:13px;line-height:1.5}
+.simpleOverlay .readInfo span,.simpleOverlay .readInfo small,
+.simpleOverlay .advanced p,.simpleOverlay .advanced small{font-size:12px;line-height:1.55}
+.simpleOverlay .advanced summary{min-height:44px;display:flex;align-items:center}
+.simpleOverlay .selectedMember,.simpleOverlay .publishCard>span{font-size:12px}
+.simpleAdmin .publishedToast span{font-size:12px;line-height:1.5}
+@media (hover:hover) and (pointer:fine){
+  .simpleAdmin .resultRow:hover{border-color:#7da6ca;background:#1a2d42}
+  .simpleAdmin .viewButtons button:hover{border-color:#7da6ca}
+}
+@media (max-width:520px){
+  .simpleAdmin{padding-bottom:calc(136px + env(safe-area-inset-bottom,0px))}
+  .simpleAdmin .resultRow{padding-right:44px}
+  .simpleAdmin .resultRow .chevron{right:14px}
+  .simpleAdmin .publishBar{bottom:max(6px,env(safe-area-inset-bottom,0px))}
+  .simpleOverlay .editFields{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .simpleOverlay .editFields>label:last-child{grid-column:1/-1}
+  .simpleAdmin .resultCounts{gap:8px}
+}
+@media (max-width:340px){
+  .simpleOverlay .editFields{grid-template-columns:1fr}
+  .simpleOverlay .editFields>label:last-child{grid-column:auto}
+}
+@media (prefers-reduced-motion:reduce){
+  .simpleAdmin *, .simpleOverlay *{
+    scroll-behavior:auto!important;
+    transition-duration:0.01ms!important;
+    animation-duration:0.01ms!important;
+    animation-iteration-count:1!important;
+  }
+}
