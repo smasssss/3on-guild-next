@@ -1,4 +1,4 @@
-name: 3ON live Worker and backup destination inventory (read only)
+name: 3ON full D1 encrypted backup relay (no deployment)
 on:
   push:
     branches: [feature/20261022-safe-ui-polish]
@@ -9,53 +9,117 @@ concurrency:
   group: 3on-staging-preflight
   cancel-in-progress: false
 jobs:
-  live-inventory:
+  full-backup:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     env:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      WRANGLER_SEND_METRICS: 'false'
     steps:
-      - name: Inspect live bindings, deployments and existing R2 names without database writes
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install existing locked dependencies
+        run: npm ci --include=dev --include=optional --no-audit --no-fund
+      - name: Write PUBLIC encryption recipient (private key never enters GitHub)
         run: |
+          cat > /tmp/3on-recipient.pem <<'CERT'
+          -----BEGIN CERTIFICATE-----
+          MIIENTCCAp2gAwIBAgIURan7xAchDzWVTT4ZiQng3wCjbSswDQYJKoZIhvcNAQEL
+          BQAwKjEoMCYGA1UEAwwfM09OIFVJIEJhY2t1cCBSZWNvdmVyeSAyMDI2MTAyMjAe
+          Fw0yNjEwMjIwOTQ4MThaFw0zNjEwMTkwOTQ4MThaMCoxKDAmBgNVBAMMHzNPTiBV
+          SSBCYWNrdXAgUmVjb3ZlcnkgMjAyNjEwMjIwggGiMA0GCSqGSIb3DQEBAQUAA4IB
+          jwAwggGKAoIBgQCwT/0a0Yu7l18+eL2yWXIMrTr1/J7nyeeKHxVDy3I+cY4NMSVd
+          EWIycVXNZWVMvNtgXVrYUpXmDwKtIqe3V2M0Kt2NhgyuakM+lf+WZH8ZfJIF0/Ko
+          6N3w5qVL53OzQaulz0JmbXslfiob25PyT93v830YWyu39gSuSYS+9WXBMtguD4Lh
+          2BKQO2ATex99lsh+eqLa1gMHYTeWX/8vv8+2f6SYVkWrK4J7RfvW0upGPYxl+cmA
+          bpRXxKopZWy807L619zMlbONuB0cxN5eGu4+HaEawg4o4vCiDkwJHtGaXdGHUvrc
+          hybbuZjf3QoC3Pc1iK/CIQGR5Ha1nWe5sjk6e/rRiO0Jy5sbBNJlLsKiYAocRZoh
+          GBu9y+BIOQNTaIQaEM3RSc63ne8ZT/zhCmWyuwEbqm35VwLvEqaLETw0yORUH5JX
+          L43ou8g0zlAKLn1OGIwgpsKNBOmXi5MkSt+hDCrjw8dOdQNKAEuoJlEs73wIyRtD
+          at1F4RLPZ0QuuuUCAwEAAaNTMFEwHQYDVR0OBBYEFPUK7nnh15oqG1TbH0TOu4l+
+          7UzAMB8GA1UdIwQYMBaAFPUK7nnh15oqG1TbH0TOu4l+7UzAMA8GA1UdEwEB/wQF
+          MAMBAf8wDQYJKoZIhvcNAQELBQADggGBAEdAGxyHnzoZwy6XLJZVQomY5Fo010i2
+          9NhBzCHUMEZ9/hs1dmUvhhCyy4Lb6yLmkJY4NRInqo0Ige0wsEbxR6Nn4JUStDAE
+          ew6IlEegRmi1g1c903ETo/IUb5gCb2wF87nl8Yz0JCo1CpTiYhLnFWLZt2FCTBX/
+          KCSiHf431zD6dTR2Ll2jywl8LoWNmpJaTEVGPBfI4HRIo+IGANXj0GxXk+wSpSue
+          Nc9DCb7Mcgxx3omNfe2+bR9ZC0bviMbiPRk+FlcWAVbd0RkPVr2u1apAMtp6+x6G
+          NcvNrMx1nxE0MoG2Noa50kLJSjfU61LUlsu04/C5Dq7bPk+vQ+9ix+KBcAL7fpoG
+          sBWZSX7HYuOtONOjDGqZmrHGFsKg4TVnohn4Ps7vaHDTWydHpGsCmz6BQKS8Oe6j
+          seM+Y5xtVqg+axdMKWiBPqXenLNxGod7QQy/oT9664tdarK8Ws++zsy0+SiMK8Ss
+          ia8sOo4k/rYvtaBSZpW5yNxD0lGnj6utCg==
+          -----END CERTIFICATE-----
+          CERT
+      - name: Export both uniquely bound D1 databases and restore into isolated SQLite
+        run: |
+          umask 077
           python3 <<'PY'
-          import os, json, urllib.request, urllib.error, datetime
-          account = os.environ["CLOUDFLARE_ACCOUNT_ID"]
-          token = os.environ["CLOUDFLARE_API_TOKEN"]
-          def get(path):
-              req = urllib.request.Request("https://api.cloudflare.com/client/v4/accounts/"+account+path, headers={"Authorization":"Bearer "+token})
-              try:
-                  with urllib.request.urlopen(req, timeout=40) as response:
-                      value=json.load(response)
-              except urllib.error.HTTPError as exc:
-                  return {"error_http_status":exc.code}
-              except Exception:
-                  return {"error":"request_failed"}
-              if not value.get("success"): return {"error":"api_unsuccessful"}
-              return value.get("result")
-          databases=get("/d1/database?per_page=100")
-          output={"checked_at":datetime.datetime.now(datetime.timezone.utc).isoformat(),"read_only":True}
-          output["d1"]=([{k:d.get(k) for k in ["name","uuid","version"]} for d in databases] if isinstance(databases,list) else databases)
-          output["workers"]={}
-          for worker in ["3on-guild-staging","3on-guild-production"]:
-              settings=get("/workers/scripts/"+worker+"/settings")
-              deployments=get("/workers/scripts/"+worker+"/deployments")
-              versions=get("/workers/scripts/"+worker+"/versions")
-              item={}
-              if isinstance(settings,dict):
-                  item["d1_bindings"]=[{k:b.get(k) for k in ["name","type","id"]} for b in settings.get("bindings",[]) if b.get("type")=="d1"]
-                  if "error" in settings or "error_http_status" in settings:item["settings_error"]=settings
-              if isinstance(deployments,dict):
-                  items=deployments.get("deployments",[])
-                  item["deployments"]=[{k:d.get(k) for k in ["id","created_on","source","strategy","versions"]} for d in items[:3]]
-                  if "error_http_status" in deployments:item["deployments_error"]=deployments
-              if isinstance(versions,dict):
-                  item["versions"]=[{"id":v.get("id"),"metadata":{k:(v.get("metadata") or {}).get(k) for k in ["created_on","source"]},"annotations":{k:v.get("annotations",{}).get(k) for k in ["workers/message","workers/tag"]}} for v in versions.get("items",[])[:5]]
-              output["workers"][worker]=item
-          buckets=get("/r2/buckets")
-          output["r2"] = ([{"name":b.get("name"),"creation_date":b.get("creation_date")} for b in buckets.get("buckets",[])] if isinstance(buckets,dict) and "buckets" in buckets else buckets)
-          bindings=[b.get("id") for w in output["workers"].values() for b in w.get("d1_bindings",[])]
-          output["two_unique_d1_bindings"] = len(bindings)==2 and len(set(bindings))==2
-          print(json.dumps(output,ensure_ascii=False,indent=2))
-          
+          import os,json,urllib.request,subprocess,pathlib,datetime,hashlib,sqlite3,tarfile
+          account=os.environ["CLOUDFLARE_ACCOUNT_ID"];token=os.environ["CLOUDFLARE_API_TOKEN"]
+          root=pathlib.Path("/tmp/3on-ui-private");root.mkdir(mode=0o700)
+          out=pathlib.Path("/tmp/3on-ui-cipher");out.mkdir(mode=0o700)
+          expected={"staging":("9c3667a6-e510-40a6-b4e6-4852515fdb3a","f8e4f477-5444-4648-b4b6-3bf712a98840"),"production":("31e3bbb6-2860-40cb-9390-d989d37f11c2","6a95b797-7be3-45fc-a8be-d5e7c69061f9")}
+          def api(path):
+           req=urllib.request.Request("https://api.cloudflare.com/client/v4/accounts/"+account+path,headers={"Authorization":"Bearer "+token})
+           with urllib.request.urlopen(req,timeout=60) as r:value=json.load(r)
+           assert value.get("success"),"Cloudflare API did not succeed"
+           return value["result"]
+          dbs=api("/d1/database?per_page=100")
+          manifest={"created_utc":datetime.datetime.now(datetime.timezone.utc).isoformat(),"encryption":"OpenSSL CMS AES-256-GCM + RSA-3072 recipient","backups":[]}
+          for target,(database,version) in expected.items():
+           worker="3on-guild-"+target;name=worker+"-db"
+           matches=[d for d in dbs if d["name"]==name]
+           assert len(matches)==1 and matches[0]["uuid"]==database,"Database name is not uniquely mapped"
+           settings=api("/workers/scripts/"+worker+"/settings")
+           bindings=[b for b in settings["bindings"] if b.get("type")=="d1"]
+           assert len(bindings)==1 and bindings[0]["name"]=="DB" and bindings[0]["id"]==database,"Worker DB binding changed"
+           deployment=api("/workers/scripts/"+worker+"/deployments")["deployments"][0]
+           assert deployment["versions"]==[{"version_id":version,"percentage":100}],"Worker active version changed"
+           directory=root/target;directory.mkdir(mode=0o700)
+           (directory/"settings.json").write_text(json.dumps(settings))
+           (directory/"deployments.json").write_text(json.dumps(deployment))
+           (directory/"schedules.json").write_text(json.dumps(api("/workers/scripts/"+worker+"/schedules")))
+           (directory/"bookmark.json").write_text(json.dumps(api("/d1/database/"+database+"/time_travel/bookmark")))
+           sql=directory/(name+".sql")
+           result=subprocess.run(["npx","wrangler","d1","export",name,"--remote","--output",str(sql),"--skip-confirmation"],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+           assert result.returncode==0 and sql.is_file() and sql.stat().st_size>0,"Full SQL export failed; private details withheld"
+           sql.chmod(0o600)
+           restored=sqlite3.connect(directory/"restore-validation.sqlite")
+           restored.executescript(sql.read_text())
+           integrity=restored.execute("PRAGMA integrity_check").fetchone()[0]
+           assert integrity=="ok","Export restore integrity check failed"
+           violations=restored.execute("PRAGMA foreign_key_check").fetchall()
+           assert not violations,"Export restore foreign-key check failed"
+           tables=[x[0] for x in restored.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")]
+           counts={t:restored.execute('SELECT COUNT(*) FROM "'+t.replace('"','""')+'"').fetchone()[0] for t in tables}
+           restored.close()
+           (directory/"restore-validation.sqlite").unlink()
+           entry={"target":target,"worker":worker,"database_name":name,"database_id":database,"worker_version":version,"sql_file":target+"/"+sql.name,"sha256":hashlib.sha256(sql.read_bytes()).hexdigest(),"size_bytes":sql.stat().st_size,"export_completed_utc":datetime.datetime.now(datetime.timezone.utc).isoformat(),"restore_integrity":"ok","foreign_key_violations":0,"tables":len(tables)}
+           (directory/"table-counts.json").write_text(json.dumps(counts))
+           manifest["backups"].append(entry)
+          (root/"manifest.json").write_text(json.dumps(manifest,indent=2))
+          tar=root/"3ON-D1-before-ui-20261022.tar.gz"
+          with tarfile.open(tar,"w:gz") as archive:
+           for target in expected:archive.add(root/target,arcname=target)
+           archive.add(root/"manifest.json",arcname="manifest.json")
+          cipher=out/"3ON-D1-before-ui-20261022.cms"
+          subprocess.run(["openssl","cms","-encrypt","-aes-256-gcm","-binary","-in",str(tar),"-outform","DER","-out",str(cipher),"-recip","/tmp/3on-recipient.pem"],check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+          manifest["cipher_sha256"]=hashlib.sha256(cipher.read_bytes()).hexdigest()
+          manifest["cipher_size_bytes"]=cipher.stat().st_size
+          manifest["temporary_relay_only"]=True
+          (out/"manifest.json").write_text(json.dumps(manifest,indent=2))
+          print(json.dumps(manifest,indent=2))
           PY
+      - name: Relay only authenticated ciphertext to the authorized recovery workspace
+        uses: actions/upload-artifact@v4
+        with:
+          name: 3ON-D1-encrypted-relay-${{ github.run_id }}
+          path: /tmp/3on-ui-cipher/
+          retention-days: 1
+          if-no-files-found: error
+      - name: Remove runner plaintext after encryption and relay
+        if: always()
+        run: rm -rf /tmp/3on-ui-private
