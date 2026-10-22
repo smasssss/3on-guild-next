@@ -1,0 +1,96 @@
+name: Deploy verified CSS polish while preserving growth automation
+on:
+  push:
+    branches: [release/ui-polish-current-20261022]
+    paths: [.github/workflows/ui-polish-deploy.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  staging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    concurrency:
+      group: cloudflare-staging
+      cancel-in-progress: false
+    outputs:
+      validated_sha: ${{ steps.validated.outputs.sha }}
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Require successful six-width validation of this exact runtime source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/smasssss/3on-guild-next/actions/runs/39759860304 > /tmp/ui-validation-run.json
+          jq -e '.conclusion == "success" and .head_sha == "1c86477f065804e19ee1eb0d6c31de8d9757c78f"' /tmp/ui-validation-run.json > /dev/null
+          git merge-base --is-ancestor 1c86477f065804e19ee1eb0d6c31de8d9757c78f HEAD
+          test -z "$(git diff --name-only 1c86477f065804e19ee1eb0d6c31de8d9757c78f HEAD -- app lib build public drizzle scripts package.json package-lock.json vite.config.ts)"
+          test "$(git hash-object app/globals.css)" = d6bbfaa146548eb8c55337dba9efbc5cea91b319
+          test "$(git diff --name-only e26a522fd687124a28bdff60b9867e85b147bf9a HEAD -- app lib build public drizzle package.json package-lock.json vite.config.ts)" = app/globals.css
+      - name: Build verified CSS with unchanged deployed application code
+        run: |
+          npm ci --include=dev --include=optional --no-audit --no-fund
+          npm run build
+      - name: Recheck Staging binding, saved data, auth, Cron and automation mode (SELECT only)
+        run: python scripts/ui-polish-release.py before staging
+      - name: Deploy Staging UI code without migrations or password changes
+        id: deploy
+        run: npx wrangler deploy --config wrangler.ui-polish.generated.json --strict
+      - name: Verify Staging data, auth, automation and new CSS (read only)
+        run: python scripts/ui-polish-release.py verify staging
+      - name: Pin the successful source
+        id: validated
+        run: echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+      - name: Code-only rollback if deployed verification fails
+        if: failure() && steps.deploy.outcome == 'success'
+        run: python scripts/ui-polish-release.py rollback staging
+  production:
+    needs: staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    concurrency:
+      group: cloudflare-production-growth-repair
+      cancel-in-progress: false
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.staging.outputs.validated_sha }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Require the identical successfully deployed Staging runtime
+        env:
+          VALIDATED_SHA: ${{ needs.staging.outputs.validated_sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$VALIDATED_SHA"
+          test "$VALIDATED_SHA" = "$GITHUB_SHA"
+          test "$(git hash-object app/globals.css)" = d6bbfaa146548eb8c55337dba9efbc5cea91b319
+      - name: Build the Staging-validated source
+        run: |
+          npm ci --include=dev --include=optional --no-audit --no-fund
+          npm run build
+      - name: Recheck Production binding, saved data, auth, Cron and enabled collection (SELECT only)
+        run: python scripts/ui-polish-release.py before production
+      - name: Deploy authorized Production UI code without migrations
+        id: deploy
+        run: npx wrangler deploy --config wrangler.ui-polish.generated.json --strict
+      - name: Verify Production data, auth, enabled automation, Cron and new CSS (read only)
+        run: python scripts/ui-polish-release.py verify production
+      - name: Code-only rollback if deployed verification fails
+        if: failure() && steps.deploy.outcome == 'success'
+        run: python scripts/ui-polish-release.py rollback production
