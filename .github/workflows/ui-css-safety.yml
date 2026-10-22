@@ -7,6 +7,7 @@ on:
       - "app/globals.css"
       - "docs/ui-skills-safe-polish-20261022.md"
       - ".github/workflows/ui-css-safety.yml"
+      - ".github/workflows/staging-d1-backup-preflight.yml"
 
 permissions:
   contents: read
@@ -21,7 +22,7 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-      - name: Reject changes outside approved CSS, note, or this workflow
+      - name: Reject changes outside approved CSS, note, or safety workflows
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         shell: bash
@@ -30,7 +31,7 @@ jobs:
           git fetch --no-tags --depth=1 origin "$BASE_SHA"
           git diff --name-only "$BASE_SHA" HEAD > /tmp/ui-changed-files.txt
           cat /tmp/ui-changed-files.txt
-          unexpected="$(grep -Ev '^(app/globals\.css|docs/ui-skills-safe-polish-20261022\.md|\.github/workflows/ui-css-safety\.yml)$' /tmp/ui-changed-files.txt || true)"
+          unexpected="$(grep -Ev '^(app/globals\.css|docs/ui-skills-safe-polish-20261022\.md|\.github/workflows/(ui-css-safety|staging-d1-backup-preflight)\.yml)$' /tmp/ui-changed-files.txt || true)"
           test -z "$unexpected"
           grep -qx 'app/globals.css' /tmp/ui-changed-files.txt
       - name: Check accessibility CSS guardrails
