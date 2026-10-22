@@ -1,75 +1,61 @@
-name: 3ON Staging D1 backup preflight (no deployment)
+name: 3ON live Worker and backup destination inventory (read only)
 on:
   push:
-    branches:
-      - feature/20261022-safe-ui-polish
-    paths:
-      - .github/workflows/staging-d1-backup-preflight.yml
+    branches: [feature/20261022-safe-ui-polish]
+    paths: [.github/workflows/staging-d1-backup-preflight.yml]
 permissions:
   contents: read
 concurrency:
   group: 3on-staging-preflight
   cancel-in-progress: false
 jobs:
-  backup-preflight:
+  live-inventory:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 10
     env:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      DATABASE_NAME: 3on-guild-staging-db
-      WORKER_NAME: 3on-guild-staging
-      CONFIG_FILE: wrangler.ui-backup-check.json
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-          cache: npm
-      - name: Require Cloudflare credentials
+      - name: Inspect live bindings, deployments and existing R2 names without database writes
         run: |
-          test -n "$CLOUDFLARE_ACCOUNT_ID"
-          test -n "$CLOUDFLARE_API_TOKEN"
-      - name: Install pinned project dependencies
-        run: npm ci --include=dev --include=optional --no-audit --no-fund
-      - name: Find existing staging D1 only (never create)
-        id: database
-        run: |
-          set -euo pipefail
-          database_id="$(npx wrangler d1 list --json | jq -r --arg name "$DATABASE_NAME" '.[] | select(.name == $name) | .uuid' | head -n1)"
-          test -n "$database_id"
-          node scripts/cloudflare-config.mjs "$CONFIG_FILE" "$WORKER_NAME" "$DATABASE_NAME" "$database_id"
-          echo "Existing staging database identified."
-      - name: Record read-only D1 restore bookmark BEFORE migration
-        run: |
-          set -euo pipefail
-          date -u +"%Y-%m-%dT%H:%M:%SZ" | tee /tmp/3on-ui-backup-utc.txt
-          npx wrangler d1 time-travel info "$DATABASE_NAME" --json > /tmp/3on-ui-d1-bookmark.json
-          test -s /tmp/3on-ui-d1-bookmark.json
-          {
-            echo "### Staging D1 preflight restore point"
-            echo "Time UTC: $(cat /tmp/3on-ui-backup-utc.txt)"
-            echo 'Cloudflare Time Travel (limited retention):'
-            echo '~~~json'
-            cat /tmp/3on-ui-d1-bookmark.json
-            echo '~~~'
-          } >> "$GITHUB_STEP_SUMMARY"
-      - name: List unapplied remote migrations (READ ONLY)
-        run: |
-          set -euo pipefail
-          npx wrangler d1 migrations list DB --remote --config "$CONFIG_FILE" 2>&1 | tee /tmp/3on-ui-migrations.txt
-          {
-            echo "### Pending remote migrations — review before applying"
-            echo '~~~'
-            cat /tmp/3on-ui-migrations.txt
-            echo '~~~'
-          } >> "$GITHUB_STEP_SUMMARY"
-      - name: Verify full SQL export can be generated privately on runner
-        run: |
-          set -euo pipefail
-          npx wrangler d1 export "$DATABASE_NAME" --remote --output /tmp/3on-ui-staging-before.sql --skip-confirmation
-          test -s /tmp/3on-ui-staging-before.sql
-          sha256sum /tmp/3on-ui-staging-before.sql | awk '{print "SQL export SHA256:", $1}' >> "$GITHUB_STEP_SUMMARY"
-          wc -c /tmp/3on-ui-staging-before.sql | awk '{print "SQL export size:", $1, "bytes"}' >> "$GITHUB_STEP_SUMMARY"
-          echo "SQL export verified locally on runner only; not published to public repository."
-          rm -f /tmp/3on-ui-staging-before.sql
+          python3 <<'PY'
+          import os, json, urllib.request, urllib.error, datetime
+          account = os.environ["CLOUDFLARE_ACCOUNT_ID"]
+          token = os.environ["CLOUDFLARE_API_TOKEN"]
+          def get(path):
+              req = urllib.request.Request("https://api.cloudflare.com/client/v4/accounts/"+account+path, headers={"Authorization":"Bearer "+token})
+              try:
+                  with urllib.request.urlopen(req, timeout=40) as response:
+                      value=json.load(response)
+              except urllib.error.HTTPError as exc:
+                  return {"error_http_status":exc.code}
+              except Exception:
+                  return {"error":"request_failed"}
+              if not value.get("success"): return {"error":"api_unsuccessful"}
+              return value.get("result")
+          databases=get("/d1/database?per_page=100")
+          output={"checked_at":datetime.datetime.now(datetime.timezone.utc).isoformat(),"read_only":True}
+          output["d1"]=([{k:d.get(k) for k in ["name","uuid","version"]} for d in databases] if isinstance(databases,list) else databases)
+          output["workers"]={}
+          for worker in ["3on-guild-staging","3on-guild-production"]:
+              settings=get("/workers/scripts/"+worker+"/settings")
+              deployments=get("/workers/scripts/"+worker+"/deployments")
+              versions=get("/workers/scripts/"+worker+"/versions")
+              item={}
+              if isinstance(settings,dict):
+                  item["d1_bindings"]=[{k:b.get(k) for k in ["name","type","id"]} for b in settings.get("bindings",[]) if b.get("type")=="d1"]
+                  if "error" in settings or "error_http_status" in settings:item["settings_error"]=settings
+              if isinstance(deployments,dict):
+                  items=deployments.get("deployments",[])
+                  item["deployments"]=[{k:d.get(k) for k in ["id","created_on","source","strategy","versions"]} for d in items[:3]]
+                  if "error_http_status" in deployments:item["deployments_error"]=deployments
+              if isinstance(versions,dict):
+                  item["versions"]=[{"id":v.get("id"),"metadata":{k:(v.get("metadata") or {}).get(k) for k in ["created_on","source"]},"annotations":{k:v.get("annotations",{}).get(k) for k in ["workers/message","workers/tag"]}} for v in versions.get("items",[])[:5]]
+              output["workers"][worker]=item
+          buckets=get("/r2/buckets")
+          output["r2"] = ([{"name":b.get("name"),"creation_date":b.get("creation_date")} for b in buckets.get("buckets",[])] if isinstance(buckets,dict) and "buckets" in buckets else buckets)
+          bindings=[b.get("id") for w in output["workers"].values() for b in w.get("d1_bindings",[])]
+          output["two_unique_d1_bindings"] = len(bindings)==2 and len(set(bindings))==2
+          print(json.dumps(output,ensure_ascii=False,indent=2))
+          
+          PY
