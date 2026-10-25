@@ -6,7 +6,15 @@ export function validate(kind:string,data:any){
   const id=(s:any)=>typeof s==='string'&&/^(guild:|unverified:).+/.test(s)&&s.length<=200;
   if(!obj(data))bad();
   if(kind==='carriage'){
-    if(!Number.isInteger(data.pointer)||data.pointer<0||data.pointer>7||!Array.isArray(data.records)||data.records.length>30000)bad();
+    const rotation=data.rotationMembers;
+    if(rotation!==undefined){
+      if(!Array.isArray(rotation)||rotation.length<1||rotation.length>100)bad();
+      const members=new Set(),names=new Set();
+      for(const e of rotation){if(!obj(e)||typeof e.memberId!=='string'||!e.memberId.trim()||e.memberId.length>200||['__proto__','constructor','prototype'].includes(e.memberId)||typeof e.name!=='string'||!e.name.trim()||e.name.length>100||members.has(e.memberId)||names.has(e.name))bad();members.add(e.memberId);names.add(e.name);}
+    }
+    if(!Number.isInteger(data.pointer)||data.pointer<0||data.pointer>=(rotation?.length||8)||!Array.isArray(data.records)||data.records.length>30000)bad();
+    const anchor=data.rotationAnchor;
+    if(anchor!==undefined&&(!rotation||!obj(anchor)||!Array.isArray(anchor.recordIds)||anchor.recordIds.length>30000||anchor.recordIds.some((id:any)=>typeof id!=='string'||id.length>200)||new Set(anchor.recordIds).size!==anchor.recordIds.length||!rotation.some((e:any)=>e.memberId===anchor.nextMemberId)))bad();
     const ids=new Set();
     for(const r of data.records){if(!obj(r)||typeof r.id!=='string'||r.id.length>200||ids.has(r.id)||!date(r.date)||!date(r.weekKey)||!['base','insert'].includes(r.type)||typeof r.leader!=='string')bad();ids.add(r.id);}
     for(const field of ['vipCarry','vipResolution'])if(data[field]!==undefined){if(!obj(data[field]))bad();for(const [k,v]of Object.entries(data[field]))if(['__proto__','constructor','prototype'].includes(k)||!Number.isSafeInteger(Number(v))||Number(v)<0)bad();}

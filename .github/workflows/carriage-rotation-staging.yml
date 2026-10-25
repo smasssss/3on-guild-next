@@ -1,0 +1,54 @@
+name: Validate and stage editable carriage rotation
+on:
+  push:
+    branches: [feat/carriage-rotation-20261025]
+permissions:
+  contents: read
+jobs:
+  staging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    concurrency:
+      group: cloudflare-staging
+      cancel-in-progress: false
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies and verify source
+        run: |
+          npm ci --include=dev --include=optional --no-audit --no-fund
+          npm run lint -- --ignore-pattern tests
+          npx tsc --noEmit
+          python tests/rotation_scope_preserved.py
+          node tests/carriage_rotation_regression.cjs
+          node tests/carriage_date_regression.cjs
+          node tests/d1_latest_lookup.cjs
+          node tests/growth_automation_regression.cjs
+          node tests/growth_changes_regression.cjs
+          node tests/production_growth_regression.cjs
+          node tests/growth_auto_ui_regression.cjs
+          node tests/canyon_latest_regression.cjs
+      - name: Build and verify preserved VIP and operational code
+        run: |
+          npm run build
+          python tests/automation_operations_preserved.py
+          python tests/vip_exclusions_regression.py
+      - name: Back up deployment configuration and verify unchanged Staging data
+        run: python scripts/carriage-rotation-release.py before staging
+      - name: Deploy Staging only without database migrations
+        id: deploy
+        run: npx wrangler deploy --config wrangler.rotation.generated.json --strict
+      - name: Verify actual Staging assets, authentication, saved data and fixture mode
+        run: python scripts/carriage-rotation-release.py verify staging
+      - name: Roll back code if deployed validation fails
+        if: failure() && steps.deploy.outcome == 'success'
+        run: python scripts/carriage-rotation-release.py rollback staging
