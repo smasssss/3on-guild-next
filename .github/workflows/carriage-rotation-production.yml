@@ -1,0 +1,54 @@
+name: Promote Staging-verified carriage rotation
+on:
+  push:
+    branches: [release/carriage-rotation-20261025]
+    paths: [.github/workflows/carriage-rotation-production.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  production:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    concurrency:
+      group: cloudflare-production-growth-repair
+      cancel-in-progress: false
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: 8caefa5c8b0259f847ab72180016d045d8566f60
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Require successful deployment of this exact source to Staging
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(git rev-parse HEAD)" = 8caefa5c8b0259f847ab72180016d045d8566f60
+          gh api repos/smasssss/3on-guild-next/actions/runs/40159403425 > /tmp/rotation-stage.json
+          jq -e '.conclusion == "success" and .head_sha == "8caefa5c8b0259f847ab72180016d045d8566f60"' /tmp/rotation-stage.json > /dev/null
+      - name: Build identical source and recheck rotation, VIP and unrelated code
+        run: |
+          npm ci --include=dev --include=optional --no-audit --no-fund
+          npm run build
+          node tests/carriage_rotation_regression.cjs
+          node tests/carriage_date_regression.cjs
+          python tests/rotation_scope_preserved.py
+          python tests/automation_operations_preserved.py
+          python tests/vip_exclusions_regression.py
+      - name: Back up active deployment and verify current Production source and data
+        run: python scripts/carriage-rotation-release.py before production
+      - name: Deploy verified source without database migrations
+        id: deploy
+        run: npx wrangler deploy --config wrangler.rotation.generated.json --strict
+      - name: Verify Production data, credentials, assets, enabled automation and Cron
+        run: python scripts/carriage-rotation-release.py verify production
+      - name: Roll back code if deployed verification fails
+        if: failure() && steps.deploy.outcome == 'success'
+        run: python scripts/carriage-rotation-release.py rollback production
