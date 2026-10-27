@@ -55,9 +55,9 @@ export async function readRoster(db:D1Database){
  const latest=await db.prepare('SELECT snapshot_id,source_as_of,received_at FROM growth_auto_snapshots ORDER BY source_as_of DESC LIMIT 1').first<{snapshot_id:string;source_as_of:number;received_at:number}>();
  if(!latest)return {snapshotId:null,sourceAsOf:null,receivedAt:null,members:[] as Member[]};
  const result=await db.prepare(`SELECT o.game_id,e.member_id,e.status identity_status,e.departed_at,m.legacy_canonical,m.display_name,o.source_name,o.rank,o.level,o.status,
-   (SELECT json_group_array(raw_value) FROM growth_identity_decisions a WHERE a.member_id=e.member_id AND a.status='confirmed') aliases
+   a.aliases
    FROM growth_hourly_observations o JOIN growth_external_ids e ON e.game_id=o.game_id
-   LEFT JOIN growth_members m ON m.member_id=e.member_id WHERE o.snapshot_id=?`).bind(latest.snapshot_id).all<Observed>();
+   LEFT JOIN growth_members m ON m.member_id=e.member_id LEFT JOIN (SELECT member_id,json_group_array(raw_value) aliases FROM growth_identity_decisions WHERE status='confirmed' GROUP BY member_id) a ON a.member_id=e.member_id WHERE o.snapshot_id=?`).bind(latest.snapshot_id).all<Observed>();
  const members=result.results.filter(r=>!!r.member_id).map(r=>({memberId:r.member_id!,gameId:r.game_id,canonical:r.legacy_canonical||r.member_id!,nickname:r.display_name||r.source_name,rank:r.rank,level:r.level,current:r.identity_status==='confirmed'&&r.departed_at===null&&r.status==='valid',temporary:[r.legacy_canonical,r.source_name,r.display_name,...JSON.parse(r.aliases||'[]')].some(n=>TEMPORARY.has(n))}));
  return {snapshotId:latest.snapshot_id,sourceAsOf:latest.source_as_of,receivedAt:latest.received_at,members};
 }

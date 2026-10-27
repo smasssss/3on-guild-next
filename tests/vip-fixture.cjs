@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- Node CommonJS regression harness, matching existing tests. */
 const fs=require('node:fs'),path=require('node:path'),ts=require('typescript');
 const {DatabaseSync}=require('node:sqlite');
 module.exports=function fixture(){

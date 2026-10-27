@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- Node CommonJS regression harness, matching existing tests. */
 // Catches weekly carry-over/addition, early activation, unsafe identity linking and lost exclusions.
 const assert=require('node:assert/strict'),fs=require('node:fs');
 assert(fs.existsSync('lib/vip-weekly.ts'),'weekly policy service is not implemented');
@@ -39,6 +40,10 @@ async function run(){
  assert.equal((await v.readRoster(f.db)).members.find(m=>m.memberId==='blocked').current,false);
  f.sql.prepare("UPDATE growth_external_ids SET departed_at=NULL WHERE member_id='blocked'").run();
  assert.equal((await v.readRoster(f.db)).members.find(m=>m.memberId==='blocked').memberId,'blocked');
+ const sixteen=['언데드킬러','Fallwarrior','Natasha21','호야호야','백구김구','Bogui','MJ2012','레녹스','lina12bwina','수영민트','DrBillX','디디뽀','파츠','봉근대','반달gh','СкульпторДуш'];
+ for(const [i,name] of sixteen.entries()){const id='temporary-'+i;f.seedMember(id,name,null);f.observe('new',id,name);}
+ const fullRoster=await v.readRoster(f.db);
+ for(let i=0;i<16;i++)assert.equal(v.eligibility(fullRoster.members.find(m=>m.memberId==='temporary-'+i),{},null,now).reason,'temporary',sixteen[i]);
  assert.equal(JSON.stringify(carriage),original);
  console.log('PASS: KST boundaries, threshold, replace-only, missing week/member, temporary/permanent, exact identity, latest roster, rename/rejoin and preserved VIP data');
 }

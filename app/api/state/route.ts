@@ -19,10 +19,14 @@ export async function POST(req:Request){
       const previous=await read('carriage');
       if(previous.revision!==b.revision)return response(req,{error:'다른 기기에서 자료가 변경되었습니다.',document:previous},409);
       if(!b.data||typeof b.data!=='object')return response(req,{error:'자료 형식을 확인해 주세요.'},400);
-      protectExclusions(previous.data as any,b.data);
+      validate(kind,b.data);protectExclusions(previous.data as any,b.data);
+      const previousRecords=new Map((previous.data as any).records.map((r:any)=>[r.id,r]));
+      const changedVip=b.data.records.some((r:any)=>{const old:any=previousRecords.get(r.id);return (r.vip||r.vipCanonical||r.vipMemberId)&&(!old||['vip','vipCanonical','vipMemberId'].some(k=>old[k]!==r[k]));});
+      if(changedVip){
       const [roster,weekly]=await Promise.all([readRoster(db()),readWeekly(db())]);
       weeklyRevision=weekly.revision;rosterSnapshot=roster.snapshotId;
       try{validateAssignments(previous.data as any,b.data,roster.members,weeklyView(weekly.data).active);}catch{return response(req,{error:'VIP 선택 자격을 확인해 주세요. 현재 소속·영구 제외·이번 주 제한·주간 점수 기준을 서버에서 확인했습니다.'},422);}
+      }
     }
     const data=validate(kind,b.data),payload=JSON.stringify(data),now=new Date().toISOString();
     // D1 batch atomically snapshots and changes only the expected revision.

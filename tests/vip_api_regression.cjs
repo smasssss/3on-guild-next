@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports -- Node CommonJS regression harness, matching existing tests. */
 // Catches authentication bypass, duplicate writes, document overwrite and forged VIP assignment.
 const assert=require('node:assert/strict'),fs=require('node:fs');
 assert(fs.existsSync('app/api/carriage/vip/route.ts'),'weekly VIP API is not implemented');

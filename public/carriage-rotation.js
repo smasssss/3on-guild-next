@@ -44,7 +44,7 @@ function renderRotationEditor(){
   });
   const field=document.createElement('div');field.className='field';const label=document.createElement('label');label.htmlFor='rotationAddMember';label.textContent='추가할 길드원';const select=document.createElement('select');select.id='rotationAddMember';
   const existing=new Set(rotationDraft.map(e=>e.memberId));
-  const available=GROWTH.members.filter(m=>m.observedToday!==false&&m.member_id&&!existing.has(m.member_id)).sort((a,b)=>labelOfMember(a).localeCompare(labelOfMember(b),'ko'));
+  const available=(typeof carriageMembers==='function'?carriageMembers():GROWTH.members).filter(m=>m.observedToday!==false&&m.member_id&&!existing.has(m.member_id)).sort((a,b)=>labelOfMember(a).localeCompare(labelOfMember(b),'ko'));
   for(const m of available){const option=document.createElement('option');option.value=m.member_id;option.textContent=labelOfMember(m);select.append(option);}
   field.append(label,select);box.append(field);
   const actions=document.createElement('div');actions.className='actions';box.append(actions);
