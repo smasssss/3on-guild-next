@@ -33,10 +33,10 @@ Files: `lib/vip-weekly.ts`, `tests/vip_weekly_regression.cjs`.
 Interfaces: `weekOf(ms)`, `readRoster(db)`, `weeklyView(data,now)`,
 `prepareWeekly(input,roster,now)`, `eligibility(member,carriage,weekly,now)`.
 
-- [ ] 정수 경계·KST 11/02·11/09·미제공·부분 누락·16명·영구 제외 테스트를 먼저 작성하고 실패 확인.
-- [ ] latest snapshot 한 번, 로스터 한 번을 읽고 기존 인덱스를 사용한다. 주간 자료를 순수 함수로 검증한다.
-- [ ] 실제 SQLite fixture에서 가입·미관측·이름 변경·재가입 검토·영구 제외 유지 검증.
-- [ ] `node tests/vip_weekly_regression.cjs` 통과 후 커밋.
+- [x] 정수 경계·KST 11/02·11/09·미제공·부분 누락·16명·영구 제외 테스트를 먼저 작성하고 실패 확인.
+- [x] latest snapshot 한 번, 로스터 한 번을 읽고 기존 인덱스를 사용한다. 주간 자료를 순수 함수로 검증한다.
+- [x] 실제 SQLite fixture에서 가입·미관측·이름 변경·재가입 검토·영구 제외 유지 검증.
+- [x] `node tests/vip_weekly_regression.cjs` 통과 후 커밋.
 
 ### Task 2: 인증된 업로드와 서버 저장 차단
 
@@ -44,27 +44,29 @@ Files: `app/api/carriage/vip/route.ts`, `lib/vip-weekly.ts`,
 `app/api/state/route.ts`, `lib/validate.ts`, `tests/vip_api_regression.cjs`.
 Interfaces: GET returns roster/weekly/eligibility/revision; authenticated POST accepts revision/mutation/snapshot.
 
-- [ ] 실제 route+SQLite로 무인증·origin·업로드 중복·CAS·백업·복구·VIP 서버 거부 테스트 RED 확인.
-- [ ] 기존 문서 자동 백업 트랜잭션을 점수 문서에 적용하고 동일 자료는 no-op 처리한다.
-- [ ] carriage 수정 시 영구 제외와 주간 문서 보호, 신규/교체 VIP 자격 검사. 기존 기록은 재계산하지 않는다.
-- [ ] API 회귀와 Task 1 시험 GREEN 후 커밋.
+- [x] 실제 route+SQLite로 무인증·origin·업로드 중복·CAS·백업·복구·VIP 서버 거부 테스트 RED 확인.
+- [x] 기존 문서 자동 백업 트랜잭션을 점수 문서에 적용하고 동일 자료는 no-op 처리한다.
+- [x] carriage 수정 시 영구 제외와 주간 문서 보호, 신규/교체 VIP 자격 검사. 기존 기록은 재계산하지 않는다.
+- [x] API 회귀와 Task 1 시험 GREEN 후 커밋.
 
 ### Task 3: 마차 UI와 스냅샷 입력
 
 Files: `public/carriage-vip.js`, `public/legacy.html`, `scripts/growth-auto-ui.mjs`,
 `tests/vip_ui_regression.cjs`, 기존 영향받은 VIP 빌드 시험.
 
-- [ ] 실제 생성 UI의 제한 버튼·주간 점수·자료 누락·파일 검증·이름 변경 시험 RED 확인.
-- [ ] existing canonical을 보존한 hourly projection으로 선택기를 갱신한다.
-- [ ] 파일 JSON 검토·예정분 표시·업로드·템플릿 다운로드를 관리자 설정에 추가한다.
-- [ ] 빌드 후처리 중복을 방지하고 기존 날짜·로테이션 스크립트를 유지한다.
-- [ ] UI, date, rotation, 운영 보존 시험 GREEN 후 커밋.
+- [x] 실제 생성 UI의 제한 버튼·주간 점수·자료 누락·파일 검증·이름 변경 시험 RED 확인.
+- [x] existing canonical을 보존한 hourly projection으로 선택기를 갱신한다.
+- [x] 파일 JSON 검토·예정분 표시·업로드·템플릿 다운로드를 관리자 설정에 추가한다.
+- [x] 빌드 후처리 중복을 방지하고 기존 날짜·로테이션 스크립트를 유지한다.
+- [x] UI, date, rotation, 운영 보존 시험 GREEN 후 커밋.
 
 ### Task 4: 로컬 통합·브라우저 검증과 인계
 
 Files: `docs/vip-weekly.md`, local-only evidence under `/workspace/3on-vip-evidence`.
 
-- [ ] lint/typecheck/build 및 관련 성장·자동수집·협곡·VIP 회귀 실행.
-- [ ] 로컬 D1 fixture와 관리자 session으로 업로드·DB 재조회·화면 버튼·서버 차단·모바일 날짜 선택 검증.
-- [ ] 독립 코드 검토 후 중요한 발견은 회귀시험으로 수정.
-- [ ] 인증·백업 경계가 해결되지 않으면 배포 미실행으로 명시하고 검증 결과와 커밋을 보고.
+- [x] lint/typecheck/build 및 관련 성장·자동수집·협곡·VIP 회귀 실행.
+- [x] 로컬 D1 fixture와 관리자 session으로 업로드·DB 재조회·화면 버튼·서버 차단·모바일 날짜 선택 검증.
+- [x] 독립 코드 검토 후 중요한 발견은 회귀시험으로 수정.
+- [x] 인증·백업 경계가 해결되지 않으면 배포 미실행으로 명시하고 검증 결과와 커밋을 보고.
+
+검증 상태: 로컬 단계 완료. 원격 검증·배포는 토큰 expired로 미실행. 자세한 범위와 예외는 docs/vip-management-validation.md.

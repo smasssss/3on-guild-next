@@ -16,6 +16,7 @@ async function run(){
  const eligible=roster.members.find(m=>m.memberId==='eligible'),blocked=roster.members.find(m=>m.memberId==='blocked');
  assert.equal(eligible.rank,'R4');assert.equal(eligible.level,30);
  assert.equal(v.eligibility(blocked,{},null,now).reason,'temporary');assert.equal(v.eligibility(eligible,carriage,null,now).reason,'permanent');
+ assert.equal(v.eligibility(blocked,{vipExcludedMembers:{blocked:1}},null,now).reason,'permanent','permanent outranks temporary');
  assert.equal(v.eligibility(eligible,{},null,now).eligible,true);
  const input={providedOn:'2026-10-31',appliesOn:'2026-11-02',coverage:'partial',rows:[{memberId:'eligible',nickname:'Eligible',points:21720000}]};
  const weekly=v.prepareWeekly(input,roster.members,now);assert.equal(weekly.rows[0].points,21720000);
@@ -24,6 +25,9 @@ async function run(){
  assert.equal(v.eligibility(eligible,{},view.active,at('2026-11-01T15:00:00Z')).eligible,true);
  assert.equal(v.eligibility(eligible,carriage,view.active,at('2026-11-01T15:00:00Z')).reason,'permanent');
  assert.equal(v.eligibility(blocked,{},view.active,at('2026-11-01T15:00:00Z')).reason,'score_missing');
+ const released={...weekly,rows:[{memberId:'blocked',nickname:'언데드킬러',points:21720000}]};
+ assert.equal(v.eligibility(blocked,{},released,at('2026-11-01T15:00:00Z')).eligible,true,'temporary restriction expires on Monday');
+ assert.equal(v.eligibility(blocked,{vipExcludedMembers:{blocked:1}},released,at('2026-11-01T15:00:00Z')).reason,'permanent','Monday never lifts permanent exclusion');
  assert.equal(v.weeklyView(doc,at('2026-11-08T15:00:00Z')).active,null,'previous week cannot roll over');
  for(const points of [21719999,15000000]){const w={...weekly,rows:[{...weekly.rows[0],points}]};assert.equal(v.eligibility(eligible,{},w,at('2026-11-02T01:00Z')).reason,'score_low');}
  const second=v.prepareWeekly({...input,providedOn:'2026-11-07',appliesOn:'2026-11-09',rows:[{...input.rows[0],points:15000000}]},roster.members,at('2026-11-07T13:00Z'));
