@@ -77,3 +77,9 @@ Files: `docs/vip-weekly.md`, local-only evidence under `/workspace/3on-vip-evide
 - [x] 실제 점수 기준 주차와 운영 주차·유지 상태 표시 및 UI 회귀.
 - [x] 계속 사용하는 과거 원본 수정 시 예정 자료 보존, API 중복·CAS·VIP 횟수 보존 검증.
 - [x] 변경 파일 lint·타입·빌드·보존 회귀와 최종 검토.
+
+## 후속 확정: 첫 점수 적용 전
+
+- [x] 초기 점수 미등록 상태에서도 일반 인원 선택 허용, 16명·영구 제외 유지 정책/API/UI 회귀 RED→GREEN.
+- [x] 첫 자료 업로드와 실제 월요일 적용 분리, 기존 VIP·운행·횟수 보존 API 검증.
+- [x] 초기 모드 문서·타입·lint·빌드·보존 회귀 확인.

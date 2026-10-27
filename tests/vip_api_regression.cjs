@@ -14,6 +14,12 @@ const saved=()=>JSON.parse(f.sql.prepare("SELECT payload FROM documents WHERE ki
 const assign=(id,vip='Alice',member='alice')=>({...original,records:[...original.records,{id,date:'2026-11-02',weekKey:'2026-11-02',type:'insert',leader:'Leader',vip,vipCanonical:vip,vipMemberId:member}]});
 async function run(){
  f.sql.prepare('INSERT INTO credentials VALUES(?,?,?,?,?)').run(await store.hash(token),'password-session-v1','admin',await store.hash(f.env.ADMIN_PASSWORD_HASH),clock+30*86400000);
+ // No score has ever been applied: roster membership and exclusions still govern selection.
+ clock=Date.parse('2026-11-09T00:00Z');
+ let initial=await (await api.GET(new Request(origin+'/api/carriage/vip'))).json();
+ assert.equal(initial.members.find(m=>m.memberId==='alice').eligibility.eligible,true,'API must preserve normal eligibility before first score');
+ assert.equal(initial.members.find(m=>m.memberId==='bob').eligibility.reason,'permanent');assert.equal(initial.awaitingFirstSnapshot,true);
+ clock=Date.parse('2026-10-31T13:00Z');
  let body={revision:0,mutation:key(),snapshot};
  assert.equal((await post(api,body,false)).status,401);assert.equal((await post(api,body,true,'https://other.example')).status,403);
  let r=await post(api,body);assert.equal(r.status,200,await r.clone().text());assert.equal((await r.json()).revision,1);

@@ -14,7 +14,7 @@ function carriagePoints(m){return carriageVip.view?.active?.rows.find(r=>r.membe
 function carriageTime(value){return value?new Date(value).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+' KST':'미확인';}
 function carriageWeekText(){
  const v=carriageVip.view;if(!v)return carriageVip.error||'마차 명단·주간 점수 확인 중';
- return `${v.week} 주차 · ${v.active?`${v.active.appliesOn} 점수 기준${v.carriedForward?' · 새 자료 없음, 이전 점수·자격 유지':''} · 점수 갱신 ${carriageTime(v.active.updatedAt)}`:v.week<'2026-11-02'?'주간 점수 기준 11/2 시작':'최초 주간 자료 미제공'} · 명단 관측 ${carriageTime(v.roster.sourceAsOf)}`;
+ return `${v.week} 주차 · ${v.active?`${v.active.appliesOn} 점수 기준${v.carriedForward?' · 새 자료 없음, 이전 점수·자격 유지':''} · 점수 갱신 ${carriageTime(v.active.updatedAt)}`:'첫 점수 적용 전 · 기존 자격 유지 · 지정 16명 제한'} · 명단 관측 ${carriageTime(v.roster.sourceAsOf)}`;
 }
 function carriageInfo(label){
  const m=memberByLabel(label);if(!m)return '길드원 정보 미확인';const score=carriagePoints(m);

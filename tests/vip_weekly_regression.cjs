@@ -18,6 +18,11 @@ async function run(){
  assert.equal(v.eligibility(blocked,{},null,now).reason,'temporary');assert.equal(v.eligibility(eligible,carriage,null,now).reason,'permanent');
  assert.equal(v.eligibility(blocked,{vipExcludedMembers:{blocked:1}},null,now).reason,'permanent','permanent outranks temporary');
  assert.equal(v.eligibility(eligible,{},null,now).eligible,true);
+ for(const time of ['2026-11-02T00:00Z','2026-11-09T00:00Z']){
+  assert.equal(v.eligibility(eligible,{},null,at(time)).eligible,true,'no first snapshot keeps existing non-excluded eligibility');
+  assert.equal(v.eligibility(blocked,{},null,at(time)).reason,'temporary','16-member restriction remains until first score takes effect');
+  assert.equal(v.eligibility(eligible,carriage,null,at(time)).reason,'permanent');
+ }
  const input={providedOn:'2026-10-31',appliesOn:'2026-11-02',coverage:'partial',rows:[{memberId:'eligible',nickname:'Eligible',points:21720000}]};
  const weekly=v.prepareWeekly(input,roster.members,now);assert.equal(weekly.rows[0].points,21720000);
  const doc={current:null,pending:weekly};assert.equal(v.weeklyView(doc,now).active,null);
@@ -35,6 +40,7 @@ async function run(){
  assert.equal(v.eligibility(eligible,carriage,carried.active,at('2026-11-09T00:00Z')).reason,'permanent');
  const gap=v.weeklyView(doc,at('2026-11-22T15:00Z'));assert.equal(gap.active.rows[0].points,21720000);assert.equal(gap.carriedForward,true,'multiple missing weeks retain one snapshot');
  assert.equal(v.weeklyView({current:null,pending:{...weekly,appliesOn:'2026-11-09'}},at('2026-11-02T00:00Z')).active,null,'future pending scores never activate early');
+ assert.equal(v.eligibility(eligible,{},null,at('2026-11-02T00:00Z')).eligible,true,'first pending snapshot must not block current normal selection');
  assert.equal(JSON.stringify(doc),JSON.stringify({current:null,pending:weekly}),'read-time rollover does not write records');
  for(const points of [21719999,15000000]){const w={...weekly,rows:[{...weekly.rows[0],points}]};assert.equal(v.eligibility(eligible,{},w,at('2026-11-02T01:00Z')).reason,'score_low');}
  const second=v.prepareWeekly({...input,providedOn:'2026-11-07',appliesOn:'2026-11-09',rows:[{...input.rows[0],points:15000000}]},roster.members,at('2026-11-07T13:00Z'));
@@ -63,6 +69,7 @@ async function run(){
  for(const [i,name] of sixteen.entries()){const id='temporary-'+i;f.seedMember(id,name,null);f.observe('new',id,name);}
  const fullRoster=await v.readRoster(f.db);
  for(let i=0;i<16;i++)assert.equal(v.eligibility(fullRoster.members.find(m=>m.memberId==='temporary-'+i),{},null,now).reason,'temporary',sixteen[i]);
+ for(let i=0;i<16;i++)assert.equal(v.eligibility(fullRoster.members.find(m=>m.memberId==='temporary-'+i),{},null,at('2026-11-09T00:00Z')).reason,'temporary',sixteen[i]);
  assert.equal(JSON.stringify(carriage),original);
  console.log('PASS: KST boundaries, threshold, replace-only, missing week/member, temporary/permanent, exact identity, latest roster, rename/rejoin and preserved VIP data');
 }

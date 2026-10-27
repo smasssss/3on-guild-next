@@ -14,7 +14,7 @@ export function weekOf(now:number){const d=new Date(kstDay(now)+'T00:00:00Z');d.
 export function weeklyView(data:WeeklyData,now=Date.now()){
  const week=weekOf(now);
  const active=[data.pending,data.current].filter((w):w is Weekly=>!!w&&w.appliesOn<=week).sort((a,b)=>b.appliesOn.localeCompare(a.appliesOn))[0]||null;
- return {week,active,carriedForward:!!active&&active.appliesOn<week,pending:data.pending&&data.pending.appliesOn>week?data.pending:null};
+ return {week,active,awaitingFirstSnapshot:!active,carriedForward:!!active&&active.appliesOn<week,pending:data.pending&&data.pending.appliesOn>week?data.pending:null};
 }
 function invalid(message:string):never{throw Error(message);}
 function date(value:unknown):value is string{return typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&Number.isFinite(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value;}
@@ -44,9 +44,11 @@ export function eligibility(member:Member|undefined,carriage:Carriage,weekly:Wee
  if(member&&carriage.vipExcludedMembers?.[member.memberId]===1)return {eligible:false,reason:'permanent'};
  if(!member?.current)return {eligible:false,reason:'membership'};
  const week=weekOf(now);
- if(week==='2026-10-26'&&member.temporary)return {eligible:false,reason:'temporary'};
- if(week<'2026-11-02')return {eligible:true,reason:'eligible'};
- if(!weekly||weekly.appliesOn>week)return {eligible:false,reason:'week_missing'};
+ const awaitingFirstSnapshot=!weekly||weekly.appliesOn>week;
+ if(member.temporary&&(week==='2026-10-26'||awaitingFirstSnapshot))return {eligible:false,reason:'temporary'};
+ // Until the first snapshot actually takes effect, keep the existing selection rules.
+ // Uploading the first future snapshot must not change eligibility ahead of Monday.
+ if(week<'2026-11-02'||awaitingFirstSnapshot)return {eligible:true,reason:'eligible'};
  const row=weekly.rows.find(r=>r.memberId===member.memberId);
  if(!row)return {eligible:false,reason:'score_missing'};
  return row.points>=THRESHOLD?{eligible:true,reason:'eligible'}:{eligible:false,reason:'score_low'};
