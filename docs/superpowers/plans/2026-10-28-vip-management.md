@@ -70,3 +70,10 @@ Files: `docs/vip-weekly.md`, local-only evidence under `/workspace/3on-vip-evide
 - [x] 인증·백업 경계가 해결되지 않으면 배포 미실행으로 명시하고 검증 결과와 커밋을 보고.
 
 검증 상태: 로컬 단계 완료. 원격 검증·배포는 토큰 expired로 미실행. 자세한 범위와 예외는 docs/vip-management-validation.md.
+
+## 후속 변경: 새 주 자료 미제공
+
+- [x] 이전 적용 점수·자격 유지, 여러 주 공백, 새 자료 월요일 대체, 영구 제외·저점수 유지 테스트 RED→GREEN.
+- [x] 실제 점수 기준 주차와 운영 주차·유지 상태 표시 및 UI 회귀.
+- [x] 계속 사용하는 과거 원본 수정 시 예정 자료 보존, API 중복·CAS·VIP 횟수 보존 검증.
+- [x] 변경 파일 lint·타입·빌드·보존 회귀와 최종 검토.

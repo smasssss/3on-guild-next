@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Node CommonJS regression harness, matching existing tests. */
-// Catches weekly carry-over/addition, early activation, unsafe identity linking and lost exclusions.
+// Catches lost fallback scores, addition, early activation, unsafe identity linking and lost exclusions.
 const assert=require('node:assert/strict'),fs=require('node:fs');
 assert(fs.existsSync('lib/vip-weekly.ts'),'weekly policy service is not implemented');
 const f=require('./vip-fixture.cjs')(),v=f.load('lib/vip-weekly.ts');
@@ -28,12 +28,27 @@ async function run(){
  const released={...weekly,rows:[{memberId:'blocked',nickname:'언데드킬러',points:21720000}]};
  assert.equal(v.eligibility(blocked,{},released,at('2026-11-01T15:00:00Z')).eligible,true,'temporary restriction expires on Monday');
  assert.equal(v.eligibility(blocked,{vipExcludedMembers:{blocked:1}},released,at('2026-11-01T15:00:00Z')).reason,'permanent','Monday never lifts permanent exclusion');
- assert.equal(v.weeklyView(doc,at('2026-11-08T15:00:00Z')).active,null,'previous week cannot roll over');
+ const carried=v.weeklyView(doc,at('2026-11-08T15:00:00Z'));
+ assert.equal(carried.week,'2026-11-09');assert(carried.active,'missing snapshot must retain previous applied scores');assert.equal(carried.active.appliesOn,'2026-11-02','missing snapshot retains last applied scores');assert.equal(carried.carriedForward,true);
+ assert.equal(carried.active.updatedAt,weekly.updatedAt,'carry-forward must not fabricate an update timestamp');
+ assert.equal(v.eligibility(eligible,{},carried.active,at('2026-11-09T00:00Z')).eligible,true);
+ assert.equal(v.eligibility(eligible,carriage,carried.active,at('2026-11-09T00:00Z')).reason,'permanent');
+ const gap=v.weeklyView(doc,at('2026-11-22T15:00Z'));assert.equal(gap.active.rows[0].points,21720000);assert.equal(gap.carriedForward,true,'multiple missing weeks retain one snapshot');
+ assert.equal(v.weeklyView({current:null,pending:{...weekly,appliesOn:'2026-11-09'}},at('2026-11-02T00:00Z')).active,null,'future pending scores never activate early');
+ assert.equal(JSON.stringify(doc),JSON.stringify({current:null,pending:weekly}),'read-time rollover does not write records');
  for(const points of [21719999,15000000]){const w={...weekly,rows:[{...weekly.rows[0],points}]};assert.equal(v.eligibility(eligible,{},w,at('2026-11-02T01:00Z')).reason,'score_low');}
  const second=v.prepareWeekly({...input,providedOn:'2026-11-07',appliesOn:'2026-11-09',rows:[{...input.rows[0],points:15000000}]},roster.members,at('2026-11-07T13:00Z'));
  const replaced=v.replaceWeekly(doc,second,at('2026-11-07T13:00Z'));assert.equal(v.weeklyView(replaced,at('2026-11-08T15:00Z')).active.rows[0].points,15000000);
+ assert.equal(v.weeklyView(replaced,at('2026-11-08T14:59:59Z')).active.rows[0].points,21720000,'new pending upload keeps previous score until Monday');
+ assert.equal(v.weeklyView(replaced,at('2026-11-08T15:00Z')).carriedForward,false);
+ assert.equal(v.eligibility(eligible,{},v.weeklyView(replaced,at('2026-11-15T15:00Z')).active,at('2026-11-16T00:00Z')).reason,'score_low','retained low scores stay ineligible');
  const third=v.prepareWeekly({...input,providedOn:'2026-11-14',appliesOn:'2026-11-16',rows:[{...input.rows[0],points:23000000}]},roster.members,at('2026-11-14T13:00Z'));
  assert.equal(v.weeklyView(v.replaceWeekly(replaced,third,at('2026-11-14T13:00Z')),at('2026-11-15T15:00Z')).active.rows[0].points,23000000);
+ const later={...third,providedOn:'2026-11-21',appliesOn:'2026-11-23'};
+ const afterGap=v.replaceWeekly(doc,later,at('2026-11-21T13:00Z'));assert.equal(afterGap.current.appliesOn,'2026-11-02');assert.equal(v.weeklyView(afterGap,at('2026-11-21T13:00Z')).active.rows[0].points,21720000);
+ const correctedRetained=v.prepareWeekly({...input,rows:[{...input.rows[0],points:15000000}]},roster.members,at('2026-11-21T13:00Z'),'2026-11-02');
+ const repaired=v.replaceWeekly(afterGap,correctedRetained,at('2026-11-21T13:00Z'));assert.equal(v.weeklyView(repaired,at('2026-11-21T13:00Z')).active.rows[0].points,15000000);assert.equal(repaired.pending.appliesOn,'2026-11-23','correcting retained data preserves the future scheduled snapshot');
+ assert.throws(()=>v.prepareWeekly(input,roster.members,at('2026-11-21T13:00Z'),'2026-11-16'),'an unrelated obsolete week cannot replace the active retained week');
  for(const change of [{appliesOn:'2026-11-03'},{providedOn:'2026-10-30'},{coverage:'full'},{rows:[input.rows[0],input.rows[0]]},{rows:[{...input.rows[0],nickname:'eligible'}]},{rows:[{...input.rows[0],points:-1}]},{rows:[{...input.rows[0],points:'21,720,000'}]},{rows:[{...input.rows[0],memberId:'left'}]}])assert.throws(()=>v.prepareWeekly({...input,...change},roster.members,now));
  // Confirmed alias/canonical survives a rename without a fuzzy nickname match.
  f.sql.prepare("UPDATE growth_members SET display_name='New name' WHERE member_id='blocked'").run();

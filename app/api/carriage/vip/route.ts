@@ -24,7 +24,7 @@ export async function POST(req:Request){try{
  if(duplicate)return duplicate.kind===VIP_KIND?response(req,{...await readWeekly(database),duplicate:true}):response(req,{error:'저장 요청 식별자가 중복되었습니다.'},409);
  const [roster,current]=await Promise.all([readRoster(database),readWeekly(database)]),now=Date.now();
  if(current.revision!==b.revision)return response(req,{error:'다른 기기에서 점수가 변경되었습니다. 최신 자료를 다시 확인해 주세요.',revision:current.revision},409);
- const next=prepareWeekly(b.snapshot,roster.members,now);
+ const next=prepareWeekly(b.snapshot,roster.members,now,weeklyView(current.data,now).active?.appliesOn);
  if([current.data.current,current.data.pending].some(w=>sameSnapshot(w,next)))return response(req,{...current,duplicate:true});
  const data=replaceWeekly(current.data,next,now),stamp=new Date(now).toISOString();
  const results=await database.batch([

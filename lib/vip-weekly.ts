@@ -13,14 +13,15 @@ export const kstDay = (now:number) => new Date(now+9*3_600_000).toISOString().sl
 export function weekOf(now:number){const d=new Date(kstDay(now)+'T00:00:00Z');d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7));return d.toISOString().slice(0,10);}
 export function weeklyView(data:WeeklyData,now=Date.now()){
  const week=weekOf(now);
- return {week,active:[data.pending,data.current].find(w=>w?.appliesOn===week)||null,pending:data.pending&&data.pending.appliesOn>week?data.pending:null};
+ const active=[data.pending,data.current].filter((w):w is Weekly=>!!w&&w.appliesOn<=week).sort((a,b)=>b.appliesOn.localeCompare(a.appliesOn))[0]||null;
+ return {week,active,carriedForward:!!active&&active.appliesOn<week,pending:data.pending&&data.pending.appliesOn>week?data.pending:null};
 }
 function invalid(message:string):never{throw Error(message);}
 function date(value:unknown):value is string{return typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&Number.isFinite(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value;}
-export function prepareWeekly(input:unknown,members:Member[],now=Date.now()):Weekly{
+export function prepareWeekly(input:unknown,members:Member[],now=Date.now(),retainedWeek?:string):Weekly{
  if(!input||typeof input!=='object')return invalid('주간 자료 형식을 확인해 주세요.');
  const b=input as Record<string,unknown>;
- if(!date(b.providedOn)||!date(b.appliesOn)||new Date(b.providedOn).getUTCDay()!==6||new Date(Date.parse(b.providedOn)+2*DAY).toISOString().slice(0,10)!==b.appliesOn||b.providedOn>kstDay(now)||b.appliesOn<'2026-11-02'||b.appliesOn<weekOf(now))return invalid('자료 제공일은 토요일, 적용일은 다음 월요일로 지정해 주세요. 지난 주와 미래 제공일은 저장할 수 없습니다.');
+ if(!date(b.providedOn)||!date(b.appliesOn)||new Date(b.providedOn).getUTCDay()!==6||new Date(Date.parse(b.providedOn)+2*DAY).toISOString().slice(0,10)!==b.appliesOn||b.providedOn>kstDay(now)||b.appliesOn<'2026-11-02'||(b.appliesOn<weekOf(now)&&b.appliesOn!==retainedWeek))return invalid('자료 제공일은 토요일, 적용일은 다음 월요일로 지정해 주세요. 미래 제공일과 현재 사용하지 않는 과거 주차는 저장할 수 없습니다.');
  if(!['full','partial'].includes(String(b.coverage))||!Array.isArray(b.rows)||b.rows.length<1||b.rows.length>500)return invalid('전체/일부 명단 여부와 점수 행을 확인해 주세요.');
  const byId=new Map(members.filter(m=>m.current).map(m=>[m.memberId,m])),ids=new Set<string>(),names=new Set<string>();
  const rows:ScoreRow[]=b.rows.map((value:unknown)=>{
@@ -35,7 +36,7 @@ export function prepareWeekly(input:unknown,members:Member[],now=Date.now()):Wee
 }
 export function replaceWeekly(data:WeeklyData,next:Weekly,now=Date.now()):WeeklyData{
  const view=weeklyView(data,now);
- return next.appliesOn===view.week?{current:next,pending:view.pending}:{current:view.active,pending:next};
+ return next.appliesOn<=view.week?{current:next,pending:view.pending}:{current:view.active,pending:next};
 }
 export function sameSnapshot(a:Weekly|null,b:Weekly){return !!a&&JSON.stringify({...a,updatedAt:''})===JSON.stringify({...b,updatedAt:''});}
 export function eligibility(member:Member|undefined,carriage:Carriage,weekly:Weekly|null,now=Date.now()){
@@ -45,7 +46,7 @@ export function eligibility(member:Member|undefined,carriage:Carriage,weekly:Wee
  const week=weekOf(now);
  if(week==='2026-10-26'&&member.temporary)return {eligible:false,reason:'temporary'};
  if(week<'2026-11-02')return {eligible:true,reason:'eligible'};
- if(!weekly||weekly.appliesOn!==week)return {eligible:false,reason:'week_missing'};
+ if(!weekly||weekly.appliesOn>week)return {eligible:false,reason:'week_missing'};
  const row=weekly.rows.find(r=>r.memberId===member.memberId);
  if(!row)return {eligible:false,reason:'score_missing'};
  return row.points>=THRESHOLD?{eligible:true,reason:'eligible'}:{eligible:false,reason:'score_low'};
