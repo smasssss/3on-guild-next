@@ -1,5 +1,5 @@
 import { actor,db,read,response,validOrigin } from '../../../../lib/store';
-import { VIP_KIND,THRESHOLD,emptyWeekly,readWeekly,readRoster,weeklyView,prepareWeekly,replaceWeekly,sameSnapshot,eligibility } from '../../../../lib/vip-weekly';
+import { VIP_KIND,THRESHOLD,ROSTER_GUARD_SQL,emptyWeekly,readWeekly,readRoster,weeklyView,prepareWeekly,replaceWeekly,sameSnapshot,eligibility } from '../../../../lib/vip-weekly';
 export const dynamic='force-dynamic';
 export function OPTIONS(req:Request){return response(req,{},204);}
 export async function GET(req:Request){try{
@@ -30,7 +30,7 @@ export async function POST(req:Request){try{
  const results=await database.batch([
   database.prepare('INSERT INTO documents(kind,revision,payload,updated_at,actor,last_mutation) VALUES(?,0,?,?,?,?) ON CONFLICT(kind) DO NOTHING').bind(VIP_KIND,JSON.stringify(emptyWeekly()),stamp,user,''),
   database.prepare('INSERT INTO backups(mutation,kind,revision,payload,saved_at,actor) SELECT ?,kind,revision,payload,?,? FROM documents WHERE kind=? AND revision=?').bind(b.mutation,stamp,user,VIP_KIND,b.revision),
-  database.prepare(`UPDATE documents SET payload=CASE WHEN (SELECT snapshot_id FROM growth_auto_snapshots ORDER BY source_as_of DESC LIMIT 1) IS ? THEN ? ELSE NULL END,revision=revision+1,updated_at=?,actor=?,last_mutation=? WHERE kind=? AND revision=? AND EXISTS(SELECT 1 FROM backups WHERE mutation=? AND kind=? AND revision=?)`).bind(roster.snapshotId,JSON.stringify(data),stamp,user,b.mutation,VIP_KIND,b.revision,b.mutation,VIP_KIND,b.revision),
+  database.prepare(`UPDATE documents SET payload=CASE WHEN (SELECT snapshot_id FROM growth_auto_snapshots ORDER BY source_as_of DESC LIMIT 1) IS ? AND (SELECT value FROM growth_meta WHERE key='identity_revision') IS ? AND ${ROSTER_GUARD_SQL} THEN ? ELSE NULL END,revision=revision+1,updated_at=?,actor=?,last_mutation=? WHERE kind=? AND revision=? AND EXISTS(SELECT 1 FROM backups WHERE mutation=? AND kind=? AND revision=?)`).bind(roster.snapshotId,roster.identityRevision,JSON.stringify(roster.members.filter(m=>next.rows.some(r=>r.memberId===m.memberId))),roster.snapshotId,next.rows.length,JSON.stringify(data),stamp,user,b.mutation,VIP_KIND,b.revision,b.mutation,VIP_KIND,b.revision),
   database.prepare('DELETE FROM backups WHERE kind=? AND revision<(SELECT revision-2 FROM documents WHERE kind=?)').bind(VIP_KIND,VIP_KIND),
  ]);
  if(results[2].meta.changes!==1)return response(req,{error:'명단 또는 점수가 변경되었습니다. 최신 자료로 다시 확인해 주세요.'},409);

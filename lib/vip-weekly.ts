@@ -51,15 +51,23 @@ export function eligibility(member:Member|undefined,carriage:Carriage,weekly:Wee
  return row.points>=THRESHOLD?{eligible:true,reason:'eligible'}:{eligible:false,reason:'score_low'};
 }
 type Observed = {member_id:string|null;game_id:string;legacy_canonical:string|null;display_name:string|null;source_name:string;rank:string|null;level:number|null;status:string;identity_status:string;departed_at:number|null;aliases:string|null};
+// Recheck live mapping, membership and observation inside the same D1 transaction.
+// A departure approval need not bump identity_revision, so that revision alone is insufficient.
+export const ROSTER_GUARD_SQL = `(SELECT COUNT(*) FROM json_each(?) j
+ JOIN growth_external_ids e ON e.member_id=json_extract(j.value,'$.memberId') AND e.game_id=json_extract(j.value,'$.gameId')
+ JOIN growth_members m ON m.member_id=e.member_id
+ JOIN growth_hourly_observations o ON o.game_id=e.game_id AND o.snapshot_id=?
+ WHERE e.status='confirmed' AND e.departed_at IS NULL AND o.status='valid'
+ AND COALESCE(m.display_name,o.source_name)=json_extract(j.value,'$.nickname'))=?`;
 export async function readRoster(db:D1Database){
- const latest=await db.prepare('SELECT snapshot_id,source_as_of,received_at FROM growth_auto_snapshots ORDER BY source_as_of DESC LIMIT 1').first<{snapshot_id:string;source_as_of:number;received_at:number}>();
- if(!latest)return {snapshotId:null,sourceAsOf:null,receivedAt:null,members:[] as Member[]};
+ const latest=await db.prepare("SELECT snapshot_id,source_as_of,received_at,(SELECT value FROM growth_meta WHERE key='identity_revision') identity_revision FROM growth_auto_snapshots ORDER BY source_as_of DESC LIMIT 1").first<{snapshot_id:string;source_as_of:number;received_at:number;identity_revision:string}>();
+ if(!latest)return {snapshotId:null,sourceAsOf:null,receivedAt:null,identityRevision:null,members:[] as Member[]};
  const result=await db.prepare(`SELECT o.game_id,e.member_id,e.status identity_status,e.departed_at,m.legacy_canonical,m.display_name,o.source_name,o.rank,o.level,o.status,
    a.aliases
    FROM growth_hourly_observations o JOIN growth_external_ids e ON e.game_id=o.game_id
    LEFT JOIN growth_members m ON m.member_id=e.member_id LEFT JOIN (SELECT member_id,json_group_array(raw_value) aliases FROM growth_identity_decisions WHERE status='confirmed' GROUP BY member_id) a ON a.member_id=e.member_id WHERE o.snapshot_id=?`).bind(latest.snapshot_id).all<Observed>();
  const members=result.results.filter(r=>!!r.member_id).map(r=>({memberId:r.member_id!,gameId:r.game_id,canonical:r.legacy_canonical||r.member_id!,nickname:r.display_name||r.source_name,rank:r.rank,level:r.level,current:r.identity_status==='confirmed'&&r.departed_at===null&&r.status==='valid',temporary:[r.legacy_canonical,r.source_name,r.display_name,...JSON.parse(r.aliases||'[]')].some(n=>TEMPORARY.has(n))}));
- return {snapshotId:latest.snapshot_id,sourceAsOf:latest.source_as_of,receivedAt:latest.received_at,members};
+ return {snapshotId:latest.snapshot_id,sourceAsOf:latest.source_as_of,receivedAt:latest.received_at,identityRevision:latest.identity_revision,members};
 }
 export async function readWeekly(db:D1Database){
  const row=await db.prepare('SELECT revision,payload,updated_at FROM documents WHERE kind=?').bind(VIP_KIND).first<{revision:number;payload:string;updated_at:string}>();
@@ -72,6 +80,7 @@ export function protectExclusions(previous:Carriage,next:Carriage){
  if(Object.keys(saved).length)next.vipExcludedMembers={...next.vipExcludedMembers,...saved};
 }
 export function validateAssignments(previous:{records:Ride[]},next:{records:Ride[]}&Carriage,members:Member[],weekly:Weekly|null,now=Date.now()){
+ const assigned:Member[]=[];
  const old=new Map(previous.records.map(r=>[r.id,r]));
  for(const r of next.records){
   if(!r.vip&&!r.vipCanonical&&!r.vipMemberId)continue;
@@ -82,5 +91,7 @@ export function validateAssignments(previous:{records:Ride[]},next:{records:Ride
   if(!member||(r.vipCanonical&&r.vipCanonical!==member.canonical)||(!r.vipCanonical&&r.vip!==member.nickname&&r.vip!==member.canonical))throw Error('VIP_IDENTITY');
   const result=eligibility(member,next,weekly,now);
   if(!result.eligible)throw Error('VIP_'+result.reason);
+  r.vipMemberId=member.memberId;assigned.push(member);
  }
+ return assigned;
 }

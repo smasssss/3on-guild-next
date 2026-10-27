@@ -32,8 +32,8 @@ async function run(){
  r=await post(state,{kind:'carriage',revision:43,mutation:key(),data:forged});assert.equal(r.status,422,await r.clone().text());assert.deepEqual(saved(),original);
  const valid=assign('valid');r=await post(state,{kind:'carriage',revision:43,mutation:key(),data:valid});assert.equal(r.status,200,await r.clone().text());
  assert.equal(saved().records.length,2);assert.equal(saved().vipCarry.Other,999);assert.equal(saved().vipResolution['공 주'],1);
- const omitted=structuredClone(saved());delete omitted.vipExcludedMembers;omitted.records[1].memo='memo edit';
- clock=Date.parse('2026-11-09T00:00Z');r=await post(state,{kind:'carriage',revision:44,mutation:key(),data:omitted});assert.equal(r.status,200,await r.clone().text());assert.equal(saved().vipExcludedMembers.bob,1,'old clients/restores cannot drop permanent exclusions');
+ const omitted=structuredClone(saved());delete omitted.vipExcludedMembers;delete omitted.records[1].vipMemberId;omitted.records[1].vip='Renamed Alice';omitted.records[1].memo='memo edit';
+ clock=Date.parse('2026-11-09T00:00Z');r=await post(state,{kind:'carriage',revision:44,mutation:key(),data:omitted});assert.equal(r.status,200,await r.clone().text());assert.equal(saved().vipExcludedMembers.bob,1,'old clients/restores cannot drop permanent exclusions');assert.equal(saved().records[1].vipMemberId,'alice','old clients cannot drop a stored stable ID');
  view=await get();assert.equal(view.active,null);assert.equal(view.members.find(m=>m.memberId==='alice').eligibility.reason,'week_missing');
  r=await post(state,{kind:'carriage',revision:45,mutation:key(),data:{...saved(),records:[...saved().records,{...valid.records[1],id:'missing-week'}]}});assert.equal(r.status,422,'API blocks missing-week selection');
  const backup=f.sql.prepare("SELECT payload FROM backups WHERE kind='carriage' AND revision=43").get();assert.deepEqual(JSON.parse(backup.payload),original,'pre-write backup is recoverable');
@@ -48,6 +48,10 @@ async function run(){
  // Current identity and the stored canonical must agree; member ID cannot disguise a different VIP.
  clock=Date.parse('2026-10-31T13:00Z');
  r=await post(state,{kind:'carriage',revision:45,mutation:key(),data:{...saved(),records:[...saved().records,{...valid.records[1],id:'mismatch',vipCanonical:'Bob',vipMemberId:'alice'}]}});assert.equal(r.status,422);
+ // A departure approval does not bump the growth identity revision.
+ const departureKey=key();f.db.beforeBatch=()=>f.sql.prepare("UPDATE growth_external_ids SET departed_at=1 WHERE member_id='alice'").run();
+ r=await post(state,{kind:'carriage',revision:45,mutation:departureKey,data:{...saved(),records:[...saved().records,{...valid.records[1],id:'departure-race'}]}});assert.equal(r.status,409,'commit must recheck actual current membership');
+ assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM backups WHERE mutation=?').get(departureKey).n,0);
  console.log('PASS: actual routes + SQLite auth/origin/CAS/idempotence/backups/replacement/permanent protection/new VIP enforcement/unchanged historical ride');
 }
 run().catch(e=>{console.error(e);process.exitCode=1}).finally(()=>{Date.now=realNow});
