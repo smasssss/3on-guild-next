@@ -16,7 +16,9 @@ export function validate(kind:string,data:any){
     const anchor=data.rotationAnchor;
     if(anchor!==undefined&&(!rotation||!obj(anchor)||!Array.isArray(anchor.recordIds)||anchor.recordIds.length>30000||anchor.recordIds.some((id:any)=>typeof id!=='string'||id.length>200)||new Set(anchor.recordIds).size!==anchor.recordIds.length||!rotation.some((e:any)=>e.memberId===anchor.nextMemberId)))bad();
     const ids=new Set();
+    if(data.vipExcludedMembers!==undefined){if(!obj(data.vipExcludedMembers))bad();for(const [key,value]of Object.entries(data.vipExcludedMembers))if(!key||key.length>200||['__proto__','constructor','prototype'].includes(key)||value!==1)bad();}
     for(const r of data.records){if(!obj(r)||typeof r.id!=='string'||r.id.length>200||ids.has(r.id)||!date(r.date)||!date(r.weekKey)||!['base','insert'].includes(r.type)||typeof r.leader!=='string')bad();ids.add(r.id);}
+    for(const r of data.records)if(r.vipMemberId!==undefined&&(typeof r.vipMemberId!=='string'||!r.vipMemberId||r.vipMemberId.length>200||['__proto__','constructor','prototype'].includes(r.vipMemberId)))bad();
     for(const field of ['vipCarry','vipResolution'])if(data[field]!==undefined){if(!obj(data[field]))bad();for(const [k,v]of Object.entries(data[field]))if(['__proto__','constructor','prototype'].includes(k)||!Number.isSafeInteger(Number(v))||Number(v)<0)bad();}
   }else if(kind==='power'){
     if(data.version!==1||!Array.isArray(data.weeks)||data.weeks.length>2000)bad();const dates=new Set();

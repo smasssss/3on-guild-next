@@ -3,7 +3,7 @@ const {DatabaseSync}=require('node:sqlite');
 module.exports=function fixture(){
  const sql=new DatabaseSync(':memory:');
  for(const f of fs.readdirSync('drizzle').filter(f=>f.endsWith('.sql')).sort())sql.exec(fs.readFileSync('drizzle/'+f,'utf8').replaceAll('--> statement-breakpoint',''));
- const db={prepare(query){let args=[];const s={bind(...v){args=v;return s},async first(){return sql.prepare(query).get(...args)||null},async all(){return {results:sql.prepare(query).all(...args)}},async run(){const r=sql.prepare(query).run(...args);return {meta:{changes:Number(r.changes)}}},execute(){return {meta:{changes:Number(sql.prepare(query).run(...args).changes)}}}};return s},async batch(statements){sql.exec('BEGIN');try{const r=statements.map(s=>s.execute());sql.exec('COMMIT');return r}catch(e){sql.exec('ROLLBACK');throw e}}};
+ const db={prepare(query){let args=[];const s={bind(...v){args=v;return s},async first(){return sql.prepare(query).get(...args)||null},async all(){return {results:sql.prepare(query).all(...args)}},async run(){const r=sql.prepare(query).run(...args);return {meta:{changes:Number(r.changes)}}},execute(){return {meta:{changes:Number(sql.prepare(query).run(...args).changes)}}}};return s},async batch(statements){if(db.beforeBatch){const hook=db.beforeBatch;db.beforeBatch=null;hook();}sql.exec('BEGIN');try{const r=statements.map(s=>s.execute());sql.exec('COMMIT');return r}catch(e){sql.exec('ROLLBACK');throw e}}};
  const env={DB:db,ADMIN_PASSWORD_HASH:'fixture-password-config',GROWTH_AUTO_MODE:'fixture'},cache=new Map();
  function load(file){file=path.resolve(file);if(cache.has(file))return cache.get(file).exports;
   const mod={exports:{}};cache.set(file,mod);

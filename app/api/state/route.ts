@@ -1,5 +1,6 @@
 import { actor, db, defaults, kinds, read, response, validOrigin, type Kind } from '../../../lib/store';
 import { validate } from '../../../lib/validate';
+import { VIP_KIND,readRoster,readWeekly,weeklyView,protectExclusions,validateAssignments } from '../../../lib/vip-weekly';
 export const dynamic='force-dynamic';
 export function OPTIONS(req:Request){return response(req,{},204);}
 export async function GET(req:Request){try{return response(req,{schema:'3on-shared-v1',documents:await Promise.all(kinds.map(read))});}catch{return response(req,{error:'공유 DB를 읽지 못했습니다. 기존 자료는 유지됩니다.'},503);}}
@@ -13,15 +14,25 @@ export async function POST(req:Request){
     if(!kinds.includes(kind)||!Number.isSafeInteger(b.revision)||b.revision<0||typeof b.mutation!=='string'||! /^[a-f0-9-]{32,64}$/.test(b.mutation))return response(req,{error:'잘못된 저장 요청입니다.'},400);
     const duplicate=await db().prepare('SELECT kind FROM backups WHERE mutation=?').bind(b.mutation).first<{kind:string}>();
     if(duplicate)return duplicate.kind===kind?response(req,{document:await read(kind),duplicate:true}):response(req,{error:'저장 요청 식별자가 중복되었습니다.'},409);
+    let weeklyRevision:number|null=null,rosterSnapshot:string|null=null;
+    if(kind==='carriage'){
+      const previous=await read('carriage');
+      if(previous.revision!==b.revision)return response(req,{error:'다른 기기에서 자료가 변경되었습니다.',document:previous},409);
+      if(!b.data||typeof b.data!=='object')return response(req,{error:'자료 형식을 확인해 주세요.'},400);
+      protectExclusions(previous.data as any,b.data);
+      const [roster,weekly]=await Promise.all([readRoster(db()),readWeekly(db())]);
+      weeklyRevision=weekly.revision;rosterSnapshot=roster.snapshotId;
+      try{validateAssignments(previous.data as any,b.data,roster.members,weeklyView(weekly.data).active);}catch{return response(req,{error:'VIP 선택 자격을 확인해 주세요. 현재 소속·영구 제외·이번 주 제한·주간 점수 기준을 서버에서 확인했습니다.'},422);}
+    }
     const data=validate(kind,b.data),payload=JSON.stringify(data),now=new Date().toISOString();
     // D1 batch atomically snapshots and changes only the expected revision.
     const result=await db().batch([
       db().prepare('INSERT INTO documents(kind,revision,payload,updated_at,actor,last_mutation) VALUES(?,0,?,?,?,?) ON CONFLICT(kind) DO NOTHING').bind(kind,JSON.stringify(defaults(kind)),now,user,''),
       db().prepare('INSERT INTO backups(mutation,kind,revision,payload,saved_at,actor) SELECT ?,kind,revision,payload,?,? FROM documents WHERE kind=? AND revision=?').bind(b.mutation,now,user,kind,b.revision),
-      db().prepare('UPDATE documents SET payload=?,revision=revision+1,updated_at=?,actor=?,last_mutation=? WHERE kind=? AND revision=? AND EXISTS(SELECT 1 FROM backups WHERE mutation=? AND kind=? AND revision=?)').bind(payload,now,user,b.mutation,kind,b.revision,b.mutation,kind,b.revision),
+      db().prepare(`UPDATE documents SET payload=CASE WHEN ? IS NULL OR (COALESCE((SELECT revision FROM documents WHERE kind=?),0)=? AND (SELECT snapshot_id FROM growth_auto_snapshots ORDER BY source_as_of DESC LIMIT 1) IS ?) THEN ? ELSE NULL END,revision=revision+1,updated_at=?,actor=?,last_mutation=? WHERE kind=? AND revision=? AND EXISTS(SELECT 1 FROM backups WHERE mutation=? AND kind=? AND revision=?)`).bind(weeklyRevision,VIP_KIND,weeklyRevision,rosterSnapshot,payload,now,user,b.mutation,kind,b.revision,b.mutation,kind,b.revision),
     ]);
     const document=await read(kind);
     if(result[2].meta.changes!==1)return response(req,{error:'다른 기기에서 자료가 변경되었습니다. 작성 내용을 유지했습니다. 최신 자료를 다시 불러온 뒤 확인해 주세요.',document},409);
     return response(req,{document});
-  }catch(e){return response(req,{error:e instanceof Error&&e.message==='자료 형식을 확인해 주세요.'?e.message:'저장을 완료하지 못했습니다. 입력 내용을 유지하고 다시 시도해 주세요.'},400);}
+  }catch(e){if(e instanceof Error&&e.message.includes('NOT NULL constraint failed: documents.payload'))return response(req,{error:'VIP 명단 또는 주간 점수가 변경되었습니다. 최신 자료로 다시 확인해 주세요.'},409);return response(req,{error:e instanceof Error&&e.message==='자료 형식을 확인해 주세요.'?e.message:'저장을 완료하지 못했습니다. 입력 내용을 유지하고 다시 시도해 주세요.'},400);}
 }

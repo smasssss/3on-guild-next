@@ -65,3 +65,22 @@ export async function readWeekly(db:D1Database){
  const row=await db.prepare('SELECT revision,payload,updated_at FROM documents WHERE kind=?').bind(VIP_KIND).first<{revision:number;payload:string;updated_at:string}>();
  return {revision:row?.revision||0,data:row?JSON.parse(row.payload) as WeeklyData:emptyWeekly(),updatedAt:row?.updated_at||null};
 }
+
+type Ride = {id:string;vip?:string;vipCanonical?:string;vipMemberId?:string};
+export function protectExclusions(previous:Carriage,next:Carriage){
+ const saved=previous.vipExcludedMembers||{};
+ if(Object.keys(saved).length)next.vipExcludedMembers={...next.vipExcludedMembers,...saved};
+}
+export function validateAssignments(previous:{records:Ride[]},next:{records:Ride[]}&Carriage,members:Member[],weekly:Weekly|null,now=Date.now()){
+ const old=new Map(previous.records.map(r=>[r.id,r]));
+ for(const r of next.records){
+  if(!r.vip&&!r.vipCanonical&&!r.vipMemberId)continue;
+  const before=old.get(r.id);
+  if(before&&['vip','vipCanonical','vipMemberId'].every(k=>before[k as keyof Ride]===r[k as keyof Ride]))continue;
+  const matches=members.filter(m=>r.vipMemberId?m.memberId===r.vipMemberId:m.canonical===(r.vipCanonical||r.vip));
+  const member=matches.length===1?matches[0]:undefined;
+  if(!member||(r.vipCanonical&&r.vipCanonical!==member.canonical)||(!r.vipCanonical&&r.vip!==member.nickname&&r.vip!==member.canonical))throw Error('VIP_IDENTITY');
+  const result=eligibility(member,next,weekly,now);
+  if(!result.eligible)throw Error('VIP_'+result.reason);
+ }
+}
