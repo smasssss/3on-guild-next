@@ -1,4 +1,4 @@
-name: Check existing API settings against pinned deployment schema
+name: Read-only Production verification after VIP deployment
 on:
   push:
     branches: [diag/vip-cloudflare-20261028]
@@ -6,45 +6,43 @@ on:
 permissions:
   contents: read
 jobs:
-  settings:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: 55763aa3e5995b8b40a7659d630bae1ab0f8e0bf
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '24'
-          cache: npm
-      - name: Install pinned schema validator dependencies without credentials
-        run: npm ci --include=dev --include=optional --no-audit --no-fund
-      - name: Read only existing placement and observability settings into private temporary files
+          ref: 3e40399b2c7fa4e443e7d6ba384c889c966049a1
+      - name: Check current Production rules and collection status without changing any data
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           python - <<'PY'
-          import runpy,os,json
-          from pathlib import Path
+          import runpy,json
           R=runpy.run_path('scripts/vip-management-release.py')['Release']
-          for target in ['staging','production']:
-              settings=R(target).settings()
-              path=Path(os.environ['RUNNER_TEMP'])/(target+'-settings-probe.json')
-              path.write_text(json.dumps({k:settings[k] for k in ['placement','observability'] if settings.get(k) is not None}))
-              path.chmod(0o600)
-          print('Existing settings read: PASS')
+          r=R('production')
+          auto=json.loads(r.public('/api/growth/automation'))
+          vip=json.loads(r.public('/api/carriage/vip'))
+          state=json.loads(r.public('/api/state'))
+          carriage=next(d['data'] for d in state['documents'] if d['kind']=='carriage')
+          excluded=carriage.get('vipExcludedMembers',{})
+          def check(label,value):
+              print(label+': '+('PASS' if value else 'FAIL'))
+              assert value,label
+          check('Production collector remains enabled',auto['control']['enabled']==1)
+          check('Production original Cron remains registered',r.crons()==['0,10 * * * *'])
+          check('Initial no-score mode remains active',vip['awaitingFirstSnapshot'] and vip['active'] is None)
+          check('Current temporary targets are blocked',all(not m['eligibility']['eligible'] for m in vip['members'] if m['current'] and m['temporary']))
+          check('Current permanent exclusions are blocked',all(m['eligibility']['reason']=='permanent' and not m['eligibility']['eligible'] for m in vip['members'] if excluded.get(m['memberId'])==1))
+          check('Departed or unconfirmed members cannot be selected',all(not m['eligibility']['eligible'] for m in vip['members'] if not m['current']))
+          check('Ordinary current members remain selectable before first score',any(m['current'] and not m['temporary'] and excluded.get(m['memberId'])!=1 and m['eligibility']['eligible'] for m in vip['members']))
+          last=auto.get('last_run') or {}
+          if 'INCOMPLETE_ROSTER' in str(last.get('error','')):
+              print('Existing upstream INCOMPLETE_ROSTER still observed: PASS')
+          elif last.get('status') in ['accepted','duplicate','partial']:
+              print('Latest upstream collection has accepted stored data: PASS')
+          else:
+              print('Latest upstream collection normal-status confirmation: FAIL')
+          print('Read-only post-deployment verification completed: PASS')
           PY
-      - name: Report schema paths and extra property names only without values
-        run: |
-          node - <<'JS'
-          const fs=require('fs'),path=require('path'),Ajv=require('ajv');
-          const schema=require('./node_modules/wrangler/config-schema.json');
-          const a=new Ajv({allErrors:true,strict:false});
-          for(const target of ['staging','production']){
-            const value=JSON.parse(fs.readFileSync(path.join(process.env.RUNNER_TEMP,target+'-settings-probe.json')));
-            const ok=a.validate(schema,value);
-            console.log('Existing '+target+' settings config schema: '+(ok?'PASS':'FAIL'));
-            if(!ok)for(const e of a.errors)console.log(JSON.stringify({check:'schema',target,path:e.instancePath,keyword:e.keyword,property:e.params.additionalProperty||e.params.missingProperty||null}));
-          }
-          JS
