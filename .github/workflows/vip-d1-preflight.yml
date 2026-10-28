@@ -1,0 +1,28 @@
+name: Back up existing D1 and verify isolated recovery
+on:
+  push:
+    branches: [diag/vip-cloudflare-20261028]
+    paths: ['.github/workflows/vip-d1-preflight.yml', 'scripts/vip-remote-preflight.py', 'scripts/vip-backup-recipient.pem']
+permissions:
+  contents: read
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: 3on-vip-readonly-backup
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+      - name: Read current settings, export full backups and verify isolated SQLite recovery
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: python scripts/vip-remote-preflight.py
+      - name: Retain encrypted recovery evidence only
+        uses: actions/upload-artifact@v4
+        with:
+          name: 3on-vip-encrypted-recovery-${{ github.run_id }}
+          path: encrypted-evidence/recovery.cms
+          if-no-files-found: error
+          retention-days: 14
