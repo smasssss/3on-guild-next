@@ -1,192 +1,186 @@
-# VIP 개편 개발·검증 보고
+# VIP 개편 개발·배포 완료 보고
 
-상태: **로컬 구현·fixture 검증 완료. 원격 Staging·Production 미반영.**
+확인일: 2026-10-28, 한국시간.
+**Staging 검증 후 동일 빌드의 Production 배포와 실제 화면·API 검증까지 완료했다.**
 
-## 1. 기존 구조
+- 배포 소스: `3e40399b2c7fa4e443e7d6ba384c889c966049a1`.
+- 실행: https://github.com/smasssss/3on-guild-next/actions/runs/40637332671
+- Production: https://3on-guild-production.295server.workers.dev/
+- Staging: https://3on-guild-staging.295server.workers.dev/
+- Staging 실제 검증 완료: 2026-10-28 14:21 KST.
+- Production 전환 확인: 2026-10-28 14:22 KST; 마지막 화면·API·데이터 검증 14:22:42 KST.
+- 독립 읽기 전용 운영 점검: 14:25:45 KST, https://github.com/smasssss/3on-guild-next/actions/runs/40637928936
 
-실제 운영 기준은 `smasssss/3on-guild-next`의
-`8caefa5c8b0259f847ab72180016d045d8566f60`이며, `main b82f6ed`가 아니다.
-원격 브랜치를 가져와 tree `33e268bb165d0c3f7eb0c41db32a85eddfdd9b90`를 확인했다.
-원래 `/workspace/3on-guild-next`의 work 브랜치는 변경하지 않았다.
+## 1. 기존 구조 분석
 
-작업 위치: `/workspace/3on-guild-vip`, 브랜치 `feat/vip-management-v2`.
-운영 소스와 마지막 배포 관계는 사용자 인계보고서를 기준으로 삼았고,
-현재 active Worker UUID를 새로 검증했다고 주장하지 않는다.
+실제 저장소는 `smasssss/3on-guild-next`, 기존 운영 소스는
+`8caefa5c8b0259f847ab72180016d045d8566f60`이었다. 오래된 main `b82f6ed`는 배포하지 않았다.
+기존 프로젝트와 운영 Worker를 유지했고 원래 작업 트리는 변경하지 않았다.
+배포 직전 실제 active UUID, HTML·자산, DB 바인딩, 변수, 관리자 secret 이름,
+compatibility 설정, Cron, 로그·개인정보 보호 설정을 확인했다.
 
-## 2. 실제 구현
+자동수집은 기존 Worker의 scheduled handler에서 실행한다. 마차·VIP 기록은
+기존 documents/carriage, 기초값·해결값·실제 VIP 기록으로 집계한다.
+영구 제외는 기존 회원 ID별 vipExcludedMembers를 그대로 사용한다.
 
-- 기존 자동수집이 저장한 최신 완전 로스터·게임 ID·확정 회원 연결로 마차 명단을 구성한다.
-- 미관측 인원은 선택 대상에서 제외하고 기록은 보존한다. 재가입·동일인 검토는 기존 절차를 따른다.
-- 이번 주 지정 16명 제한과 영구 제외를 분리했다. 둘 다 있는 경우 영구 제외가 우선한다.
-- 토요일 자료와 다음 월요일 적용을 분리했다. 새 주 자료가 없으면 이전 적용 점수·자격을 유지한다. 해당 자료의 개인 점수가 누락된 경우는 선택 불가다.
-- 점수는 매주 대체한다. 21,720,000점 경계, KST 월요일 전환, 다음 주 미제공을 서버에서 판정한다.
-- 화면은 주간 점수·주차·갱신시각을 표시한다. 성장용 투력과 기존 과거 snapshot은 유지했다.
-- JSON 양식 다운로드, 파일 검토, 누락 수 표시, 업로드, 최소 복구 사본 다운로드를 추가했다.
-- 실제 VIP 저장 API도 자격을 검사한다. UI 비활성화를 우회한 요청은 422로 거부한다.
-- 기존 기록의 메모 수정은 현재 점수 없이 가능하며, 새 VIP 선택이 없으면 기존 VIP를 유지한다.
+## 2. 수정한 기능
 
-## 3. 수정 파일·커밋
+- 저장된 최신 정상 관측과 확정 game/member ID로 마차 명단을 구성한다.
+- 닉네임·등급·레벨을 반영하고 확인되지 않은 소속·동일인은 선택하지 않는다.
+  기록을 삭제하거나 닉네임만으로 다른 인물과 연결하지 않는다.
+- 첫 주간 점수가 실제 적용되기 전에는 기존 자격과 지정 16명 제한·영구 제외를 적용한다.
+  일반 길드원은 점수 미제공만으로 차단하지 않는다.
+- 토요일 제공 점수는 다음 월요일 KST부터 적용하고 이전 점수를 대체한다.
+  새 주 전체 자료가 없으면 마지막 적용 점수·자격과 원래 갱신시각을 유지한다.
+- 첫 점수 적용 후 21,720,000점 경계로 판정한다. 영구 제외가 언제나 우선한다.
+- 마차 화면의 투력 표시를 주간 포인트로 바꾸고 미확인·주차·원본 기준·갱신시각을 표시한다.
+  성장용 투력과 과거 운행 snapshot은 보존한다.
+- JSON 양식·자료 검토·인증 업로드·최소 복구 사본을 추가했다.
+- 서버가 실제 VIP 저장 자격을 검증한다. 기존 동일 VIP의 메모 수정은 재선정으로 처리하지 않는다.
+- 구버전 클라이언트가 ID·제외 플래그를 누락하더라도 기존 정보를 유지한다.
+
+주간 포인트는 LastAsylum의 activity를 임의로 해석하지 않고 사용자 스냅샷을 사용한다.
+서버에서 스크린샷을 자동 인식하거나 별도의 외부 수집을 추가하지 않았다.
+
+## 3. 파일·커밋
 
 | 역할 | 파일 |
 |---|---|
-| 정책·시간·명단·검증 | `lib/vip-weekly.ts` |
-| 주간 조회·인증 업로드·복구 사본 | `app/api/carriage/vip/route.ts` |
-| 실제 VIP 저장 검증·기존 ID/제외 보존 | `app/api/state/route.ts`, `lib/validate.ts` |
-| 화면·JSON 검토·실시간 명단 | `public/carriage-vip.js`, `public/legacy.html` |
-| 로테이션 편집의 명단 공급 | `public/carriage-rotation.js` |
-| 빌드 후처리 안전검사 | `scripts/growth-auto-ui.mjs` |
-| 검증 | `tests/vip_*`, `tests/vip-fixture.cjs`, 기존 빌드/VIP 회귀시험 |
-| 운영 문서 | `docs/vip-weekly.md`, `docs/superpowers/*` |
+| KST 주간 정책·명단·자격 | lib/vip-weekly.ts |
+| 주간 조회·업로드·최소 백업 | app/api/carriage/vip/route.ts |
+| 실제 VIP 저장·영구 제외 보존 | app/api/state/route.ts, lib/validate.ts |
+| 명단·점수·입력 UI | public/carriage-vip.js, public/legacy.html |
+| 로테이션 명단 공급 | public/carriage-rotation.js |
+| 빌드 통합 | scripts/growth-auto-ui.mjs |
+| 검증 | tests/vip_*, tests/vip-fixture.cjs, 기존 보존 회귀 |
+| 안전 배포 | scripts/vip-management-release.py, scripts/vip-management-browser.mjs, .github/workflows/vip-management-release.yml |
+| 운영·설계 | docs/vip-weekly.md, docs/superpowers/* |
 
-로컬 구현 커밋:
+애플리케이션 기능 최종 구현은 `8415433`, 원격 배포 절차를 포함한 실제 배포 커밋은 `3e40399`다.
+브랜치는 `feat/vip-management-v2`이며 기본 main을 덮어쓰거나 과거 릴리스 workflow를 재실행하지 않았다.
 
-- `0e1e65b` — KST 주간 정책과 저장 명단 조회.
-- `fbd889b` — 주간 업로드·서버 차단·원자적 백업.
-- `e52300c` — UI·파일 검토 연결.
-- `a8b6f7c` — 리뷰 반영: 과거 VIP 수정 보존, 현재 소속 트랜잭션 검사.
+## 4. D1 변경과 복구
 
-GitHub push·PR·워크플로 실행은 하지 않았다.
+**테이블·컬럼·migration 변경 없음. 초기 seed 재적용 없음.**
+기존 documents/backups의 독립 vip-weekly 문서에 current/pending을 저장하도록 구현했다.
+실제 사용자 점수는 아직 없으므로 운영에 임의 주간 문서를 만들거나 점수를 입력하지 않았다.
 
-## 4. D1 변경
+각 환경의 배포 직전 전체 SQL을 내보내 격리 in-memory SQLite에서 복구했다.
+integrity_check=ok, 보호 테이블 존재, 문서 digest 일치를 확인했다.
+실제 원격 D1로 복원하는 파괴적 시험은 하지 않았다.
+백업 이후 문서·설정·active version이 바뀌면 전환을 중단하도록 검사했다.
 
-테이블·컬럼·migration 변경 없음. 기존 documents/backups의 독립 `vip-weekly`
-문서에 current/pending을 저장한다. 점수 백업은 최소 두 사본만 보관한다.
-기존 `/api/state` 세 문서 응답 계약은 유지한다. 점수 갱신은 carriage를 쓰지 않는다.
-실제 운영 D1에는 접근·변경·초기 migration 재적용을 하지 않았다.
+백업·설정·원문 검증은 RSA3072 수신자/AES256-GCM CMS로 암호화해
+사용자 승인에 따라 GitHub Actions에 14일 보관한다. 개인키는 GitHub에 올리지 않았다.
+배포 전 암호화 artifact 업로드 완료를 배포 전제조건으로 삼았다.
 
-## 5~6. VIP 횟수·영구 제외 보존
+| Artifact | ID | 만료 KST |
+|---|---|---|
+| vip-staging-before-40637332671 | 12793114617 | 2026-11-11 14:20 |
+| vip-staging-after-40637332671 | 12793279055 | 2026-11-11 14:21 |
+| vip-production-before-40637332671 | 12794286703 | 2026-11-11 14:21 |
+| vip-production-after-40637332671 | 12794256975 | 2026-11-11 14:22 |
 
-VIP_IMPORT, effectiveCarry, vipTotalCount, 기존 carry/resolution 집계 코드는
-운영 기준 소스와 동일함을 검사했다. 999 기초값·공주 1회·기존 기록·제외를
-로컬 fixture에서 검증했다. 구버전 클라이언트가 제외 목록이나 회원 ID를 누락해도 보존한다.
-기존 Production 제외 9명의 현재 실DB 상태는 이번 세션에서 다시 읽지 못했다.
+Production 배포 작업은 DB 쓰기나 실제 VIP 선정을 수행하지 않았다.
+Staging에는 유일한 ID의 검증용 회원·관측 행만 일시 삽입하고 해당 행만 제거했다.
+기존 문서·백업·성장 이력·동일인 revision·스키마 불변성을 다시 확인했다.
+로그인 과정의 정상적인 세션 발급·만료 정리·로그아웃은 기존 인증 로직을 따랐다.
 
-## 7. 주간 교체 검증
+## 5. VIP 누적 횟수 보존
 
-Node 실제 정책과 SQLite route fixture에서 다음을 통과했다.
+배포 전 실제 브라우저에서 기존 회원·VIP 기초값·조정값·선정 이력의 모든 canonical에 대한
+누적 횟수와 로테이션 ID 순서를 기록하고, 배포 후 실제 브라우저에서 같은 값인지 비교했다.
+**Staging·Production 모두 전원 일치했다.**
+배포 전후 documents payload/revision/updated_at, backups, 성장 관측 건수·스키마·migration을
+비교했다. 주간 점수 입력 자체가 carriage에 쓰지 않는 것은 실제 route+SQLite 회귀에서도 확인했다.
+과거 VIP 메모 수정 시 VIP·회원 ID·당시 snapshot 보존 시험도 통과했다.
 
-- KST 11/1 23:59:59 → 11/2 00:00:00 전환.
-- 11/2 첫 점수, 11/9 다음 점수 교체, 새 자료로 대체하며 합산 금지; 새 자료 미제공 시 기존 점수·자격 유지.
+## 6. 영구 제외 보존
+
+실제 기존 carriage 문서와 제외 플래그가 배포 전후 같음을 확인했다.
+현재 명단의 제외 회원은 실제 API에서 permanent로 차단되는 것을 검증했다.
+새 점수나 주간 제한 종료로 기존 제외가 해제되지 않으며, 구버전 전송에서도 이전 제외를 보존한다.
+영구 제외 고득점 차단과 소속/매핑 변경 경합은 실제 SQL 트랜잭션 회귀로 검증했다.
+
+## 7. 주간 점수 교체 검증
+
+시간을 고정한 실제 정책·route+SQLite 시험에서 다음이 통과했다.
+
+- 11/1 23:59:59 KST → 11/2 00:00:00 KST 전환.
+- 11/2 첫 점수, 11/9 다음 점수 대체; 합산 금지.
 - 21,719,999 불가 / 21,720,000 가능.
-- 21,720,000 → 15,000,000 → 23,000,000의 주간 대체, 부분 누락 unknown.
-- 16명 제한, 월요일 해제 후 점수 재판정, 영구 제외는 계속 차단.
-- 중복 파일·mutation no-op, 수정 자료 대체, revision 충돌 409.
-- 점수 변경·탈퇴/매핑/관측 변경과 저장 경합 시 전체 트랜잭션·백업 취소.
+- 여러 주 자료 공백 시 마지막 적용 점수·자격·실제 갱신시각 유지.
+- 첫 점수 적용 전 일반 선택 허용·16명 제한·영구 제외 유지.
+- 첫 미래 자료 업로드와 월요일 실제 적용 분리.
+- 부분 누락 unknown, 중복 업로드 no-op, 수정 자료 대체, revision 충돌409.
+- 점수·소속·연결 변경 경합 시 전체 트랜잭션과 mutation/백업 취소.
+- VIP 누적·운행 이력 독립 보존.
 
-실제 미래 날짜의 원격 Cron이나 실제 운영 월요일 적용을 기다려 확인한 것은 아니다.
-월요일 정책은 시간을 고정한 테스트로 검증했다.
+실제 Staging에서는 제공일이 서버 기준 최소 7일 이후인 토요일 자료가 400으로 거부되고,
+주간 revision과 기존 문서가 유지되는 것을 확인했다.
+실제 11월의 월요일을 기다려 검증하거나 실제 사용자가 주지 않은 점수를 적용한 것은 아니다.
 
 ## 8. 자동수집 유지
 
-`lib/growth-automation.ts`, Worker scheduled handler, growth API, 기존 인덱스/마감
-코드를 변경하지 않았다. 기존 collector 회귀와 D1 lookup query-plan 시험이 통과했다.
-로컬 Worker mode는 fixture이고 외부 호출 집계 0을 유지했다.
-Production의 INCOMPLETE_ROSTER·delayed는 사용자 인계 시 알려진 상태로 남겨 두었다.
-현재 실제 Production 수집 성공 여부는 이번 세션에서 검증하지 않았다.
+collector, scheduled handler, 기존 growth API·인덱스·마감 로직은 변경하지 않았다.
+기존 회귀에서 하루24회 수집/1회 마감/23회 idle, 중복 방지·실패·복구와
+인덱스를 사용하는 latest lookup을 확인했다.
 
-## 9. 로컬 검증과 Staging 상태
+실제 Production mode, enabled 상태, Cron `0,10 * * * *`가 유지됨을 확인했다.
+Staging fixture mode, Cron 없음, 외부 호출0도 유지했다.
+배포 후 별도 읽기 전용 점검에서도 enabled·Cron을 재확인했고, 최신 수집 상태에
+정상 저장된 자료가 있음을 확인했다. 과거 INCOMPLETE_ROSTER가 계속된다고 단정하지 않는다.
+배포 검증을 위해 LastAsylum을 추가 호출하거나 별도 수집 작업을 만들지 않았다.
+새 배포 이후 다음 자연 정시 수집의 실제 완료는 아직 확인하지 않았으므로 정상으로 주장하지 않는다.
 
-통과:
+## 9. Staging 검증 결과
 
-- 신규 weekly/API/UI/save 회귀 네 종류.
-- date/rotation, growth automation, D1 latest lookup.
-- growth changes, canyon latest, production growth의 로컬 SQLite 회귀.
-- `vip_scope_preserved.py`, 빌드 후처리 보존, built VIP 제외 회귀.
-- 실제 로컬 Worker+D1의 legacy lineage 회귀 **17 checks**.
-- TypeScript `tsc --noEmit`, 실제 build, 변경 파일 ESLint, diff whitespace 검사.
-- 독립 코드 리뷰. 중요 발견 3건 모두 실패 재현 테스트 후 수정·검증.
+실제 원격 Worker·D1·Playwright에서 다음이 통과했다.
 
-Playwright + 로컬 Worker/D1에서 확인:
+- 배포 전 소스·active version·DB·설정 확인과 전체 백업/격리 복구.
+- 실제 배포 자산이 검증한 dist와 byte 단위로 동일함.
+- 기존 모든 VIP 횟수와 로테이션 순서의 배포 전후 일치.
+- 임시 명단의 지정16명 버튼 비활성화, 일반회원 버튼 활성화.
+- 기존 관리자 로그인·점수 관리 패널 진입·로그아웃.
+- 직접 제한 VIP 저장 요청422, 미래 자료400, 기존 기록과 점수 revision 유지.
+- 날짜 선택·네 기존 공개 메뉴·모바일 날짜 UI.
+- 해당 검증 행만 제거 후 기존 문서·백업·성장·설정 재검증.
 
-- 관리자 로그인, 16명 버튼 모두 비활성화, 공주 누적 1회 표시.
-- 실제 저장으로 기존 fixture 운행 4건을 유지한 채 1건 추가, 회원 ID 저장.
-- 실제 API의 제한 대상 거부 422, 수정 전 백업 4건 재조회.
-- 메모 수정 후 VIP·회원 ID와 총 기록 5건 유지.
-- 모바일 날짜 선택 UI, 주간 JSON 파일 검토와 쉼표 점수 표시.
-- 미래 제공일의 업로드를 서버가 400으로 거부.
-- 성장·협곡·마차·운영이력·관리설정 메뉴 진입.
+이미 끝난 초기 구현·로컬 브라우저 검증을 새 프로젝트로 다시 만들지 않았다.
+최종 독립 리뷰의 중요한 발견은 모두 수정했고 14개 배포 guard 시험도 통과했다.
+기존 전체 lint는 기반 소스에서도 CommonJS 테스트 규칙으로 45 errors/2 warnings가 난다.
+이번 변경 파일 lint, 타입 검사, 실제 빌드와 관련 회귀는 통과했다.
 
-전체 `npm run lint`는 수정 전 기준 소스에서도 **45 errors / 2 warnings**로 실패한다.
-기존 CommonJS 테스트의 require/module 규칙 문제이며 이번 변경 파일의 lint는 통과했다.
-과거 전체 해시 고정 운영/로테이션 scope 테스트는 더 오래된 작업 기준이므로,
-이번에는 실제 운영 소스 기준의 `vip_scope_preserved.py`로 보존을 확인했다.
+## 10. Production 배포·검증
 
-원격 Staging에는 배포·쓰기 시험을 하지 않았다. 로컬 fixture와 원격 Staging 검증을 구분한다.
-스크린샷·로컬 로그·복구용 소스 bundle 등은 `/workspace/3on-vip-evidence`에 보관한다.
+Staging 성공 후 그 실행에서 검증한 정확한 dist artifact를 Production으로 전달했다.
+다시 빌드한 다른 산출물을 배포하지 않았다.
 
-## 10~11. Production과 남은 문제
+API의 읽기 전용 감사 필드 workers/triggered_by는 업로드하지 않았다.
+Wrangler4.92의 versions upload와 공식 deployments API로 코드 트래픽만 전환했다.
+기존 로그의 redact_query_string 등 비버전 설정을 다시 쓰지 않았다.
+secret 값·관리자 인증·DB ID·변수·compatibility·로그 설정·Cron·접근 설정을 보존했다.
 
-Cloudflare `/user/tokens/verify`를 읽기 전용으로 재조회한 결과
-`success=true`, **`status=expired`**였다. 비밀값은 출력하지 않았다.
+Production 실제 검사에서 다음이 통과했다.
 
-따라서 현재 active version/설정 확인, 그 시점의 전체 D1 백업·격리 복구 검증,
-원격 Staging 시험, Production 배포 및 실제 데이터 검증은 **미실행**이다.
-토큰을 채팅에 전달할 필요는 없으며 개발환경의 정상 Cloudflare 연결을 갱신하면 된다.
-갱신 후 수행할 구체적인 안전 절차는 `docs/vip-weekly.md`의 배포 경계에 적었다.
+- 전환된 active version과 검증한 source tag 확인.
+- 배포한 HTML·VIP/로테이션/날짜/성장 자산의 정확한 일치.
+- 기존 문서·백업·성장·동일인 상태·스키마·설정 불변성.
+- 현재 점수 미등록 초기 모드와 임시/영구 제한.
+- 실제 브라우저의 전체 VIP 횟수·로테이션·메뉴·모바일 날짜 선택.
+- 공개 인증 상태와 무인증 관리 API 거부.
+- 브라우저 확인 후 재차 실제 데이터 검증.
 
-사용자가 제공한 실제 주간 점수는 아직 없다. 임의 점수를 운영에 입력하지 않았다.
-실제 스크린샷의 OCR·누락 여부와 ID 매칭은 해당 자료 제공 시 검토해야 한다.
+## 11. 남은 사항
 
-## 운영 판단
+- 사용자 실제 주간 점수 자료는 아직 제공되지 않았다. 현재 첫 점수 적용 전 운영 모드다.
+  실제 스크린샷이 오면 정확한 닉네임·ID·누락·중복·주차를 검토해 JSON으로 입력한다.
+- 신규 배포 후 다음 자연 정시 수집의 실제 실행 결과는 별도 확인이 필요하다.
+- 인계 시 제공처 INCOMPLETE_ROSTER/delayed가 알려져 있었다. 이를 해결하려고 검증 기준을
+  완화하거나 탈퇴를 확정하거나 외부 호출을 추가하지 않았다. 최종 읽기 전용 점검에서는
+  최신 수집에 정상 저장된 자료가 있음을 확인했다.
+- 전체 lint의 기존 문제는 범위 밖으로 남겼다.
+- GitHub 암호화 백업은14일 만료이므로 필요한 백업과 복구키를 사용자가 별도 보관할 수 있다.
 
-- 신규 VIP는 운행일과 별개로 현재 서버 KST 주차로 판정한다. 날짜로 제한을 우회하지 않는다.
-- 첫 점수 적용 전에는 기존 규칙 + 16명 제한, 첫 적용 월요일부터 주간 점수로 전환한다.
-- 읽기 시 월요일 전환을 계산하고 다음 업로드 때 슬롯을 정리한다. Cron/전원 쓰기를 추가하지 않는다.
-- 점수는 기존 세 문서 백업과 분리된 전용 문서·복구 사본으로 보관한다.
-- 과거 기록의 동일 VIP는 재선정으로 취급하지 않는다. 실제로 새 사람을 지정할 때만 자격을 검사한다.
-- 기존 전체 lint 문제는 이번 VIP 범위에서 무관한 설정 수정으로 해결하지 않았다.
-
-위 판단은 미래 운행의 사전 VIP 확정이나 별도의 운행일별 자격 규칙을 요구할 경우
-다시 검토해야 한다. 현재 사양은 선택 시점의 주간 자격으로 해석했다.
-
-## 후속 지시 반영: 새 자료가 없는 주
-
-후속 사용자 지시에 따라 이전 점수·자격을 유지하도록 수정했다. 운영 주차와 원본 점수 주차를
-구분하고, 원래 갱신시각과 문서 revision은 유지한다. 여러 주 공백, 다음 월요일 새 점수 대체,
-기준 미달·영구 제외 유지, 유지 중 원본 수정 및 예정 자료 보존을 정책/API/UI 회귀로 추가 검증했다.
-이번 변경의 lint·타입·빌드·날짜·로테이션·빌드 보존 검증도 통과했다. 독립 리뷰에서 중요한
-회귀는 발견되지 않았다. 이번 후속 변경에 대한 새 Playwright 실행이나 원격 검증은 하지 않았다.
-최초 점수가 없는 현재는 자동수집 명단을 사용하며 16명 제한과 기존 영구 제외를 적용한다.
-일반 인원은 점수 미제공만으로 차단하지 않는다. 첫 자료가 실제 적용될 월요일부터 점수로 전환한다.
-초기 운영 모드의 실제 route+SQLite 시험으로 일반 VIP 저장 성공, 16명·영구 제외 서버 거부,
-업로드 후 월요일 전 상태 유지, 첫 월요일 점수 전환 및 기존 VIP 기록 보존을 확인했다.
-원격 배포 상태와 인증 경계는 변하지 않았다.
-
-## 2026-10-28 원격 연결·백업 검증 후속 결과
-
-사용자가 새 Cloudflare 토큰을 개발환경에 저장했다. 새 대화에서는 active이나,
-기존 실행 인스턴스는 여전히 이전 설정의 expired 토큰으로 응답했다.
-기존 GitHub Actions 인증을 이용한 공식 `/user/tokens/verify` 검증은 성공했다.
-
-- 인증 확인 실행: https://github.com/smasssss/3on-guild-next/actions/runs/40620791740
-- 전체 백업·복구 검증 실행: https://github.com/smasssss/3on-guild-next/actions/runs/40631349912
-- 웹 연결 진단 실행: https://github.com/smasssss/3on-guild-next/actions/runs/40631626671
-
-사용자는 공개 저장소의 GitHub Actions에 **암호화한 Production·Staging 전체 D1 백업을
-14일 보관하는 작업**을 별도로 승인했다. 실제 두 DB 전체 SQL을 내보내고 각각 격리된
-in-memory SQLite에 복구하여 integrity_check=ok와 보호 테이블 존재를 검증했다.
-실제 원격 D1로의 복원·쓰기 시험은 수행하지 않았다.
-현재 DB 바인딩, 단일 100% 배포 버전, 기존 Cron, Production/fixture 모드도 확인했다.
-설정 원문과 복구 검증 정보는 SQL과 함께 암호화한 증거에 포함했다.
-
-백업은 RSA 3072 수신자 인증서와 AES-256-GCM CMS 형식으로 암호화했다.
-개인키는 GitHub에 업로드하지 않고 현재 작업 공간의 별도 증거 경로에만 저장했다.
-동일 암호화·해독 방식의 로컬 왕복 검증도 통과했다.
-
-- artifact: `3on-vip-encrypted-recovery-40631349912`, ID `12791458550`.
-- 만료: 2026-11-11 13:16 KST (14일).
-- ZIP SHA256: `6fee0149887722420564359b6481b4795f121ea1ebccce9384abd6db6dafe67d`.
-- 백업·설정 원문이나 토큰을 Actions 로그에 출력하지 않았다.
-- 웹 연결 문제의 후속 진단은 DB 내보내기를 반복하지 않는 읽기 전용 모드로 분리했다.
-
-**남은 배포 차단 요인:** 계정의 공식 현재 Workers 하위 도메인으로 확인해도
-Production·Staging의 HTML, 정적 자산과 API 요청이 모두 HTTP 403이다.
-각 Worker의 workers.dev 경로가 활성화된 것은 확인했다.
-Cloudflare 응답이라는 근거는 있지만, challenge 헤더 또는 명시적인 봇 검사 근거는
-확인하지 못했다. 보안 정책·관리자 인증·접근 권한을 변경하거나 차단을 우회하지 않았다.
-사용자 PC의 정상 브라우저에서도 해당 사이트가 열리는지 확인을 요청한 상태다.
-
-애플리케이션 수정 SHA `841543397794132312f11970530be275052f51cc`를
-GitHub `feat/vip-management-v2` 브랜치에 업로드했다. 원격 Staging·Production의
-코드 배포, 주간 자료 입력, VIP 기록 변경, DB migration은 아직 수행하지 않았다.
-따라서 현재 실제 서비스에 명단 개편·16명 제한이 적용되었다고 보고하지 않는다.
+403은 기본 Python 클라이언트의 Cloudflare1010으로 재현됐다. 기존 배포 도구의 정직한
+User-Agent와 기본 Playwright Chrome은 정상 응답했다. 봇/접근 보호를 해제하지 않았다.

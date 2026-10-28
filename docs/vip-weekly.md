@@ -83,6 +83,7 @@ node tests/carriage_date_regression.cjs
 node tests/carriage_rotation_regression.cjs
 node tests/growth_automation_regression.cjs
 node tests/d1_latest_lookup.cjs
+python tests/vip_release_guards.py
 npx tsc --noEmit
 npm run build
 ```
@@ -92,7 +93,9 @@ npm run build
 과거 `operations_regression.py`의 고정 해시와 `rotation_scope_preserved.py`는 각각
 더 오래된 작업 범위의 기준이다. 이번 개편 보존 기준은 `vip_scope_preserved.py`다.
 
-원격 Staging/Production 배포는 아직 수행하지 않았다. 다음 순서를 지킨다.
+2026-10-28 Staging 검증 후 동일 build artifact의 Production 배포와 실제 화면·API 검증을 완료했다.
+실제 배포 커밋은 `3e40399`, 실행은 https://github.com/smasssss/3on-guild-next/actions/runs/40637332671 이다.
+상세 증거·검증 한계는 `docs/vip-management-validation.md`를 참조한다. 이후 배포도 다음 순서를 지킨다.
 
 1. 정상 Cloudflare 인증으로 현재 active version, 트래픽, DB ID, mode, Cron, Secrets 이름,
    compatibility 설정을 새로 확인한다. 인계보고서의 UUID를 현재값으로 간주하지 않는다.
@@ -104,5 +107,9 @@ npm run build
 5. 검증한 소스 SHA 그대로 Production에 반영하고 실제 문서/VIP/제외 9명/공주1회/기록/
    7명 로테이션/성장/협곡/인증/다음 Cron을 확인한다.
 6. 코드 롤백은 배포 직전 active version으로 한다. DB 복구는 코드 롤백과 별도 판단한다.
+
+현재 배포 절차는 기존 API 전용 로그 개인정보 보호 설정도 유지하기 위해
+Wrangler versions upload 후 공식 deployments API로 코드 트래픽만 전환한다.
+비버전 Worker 설정·Cron·접근 정책을 다시 쓰지 않는다. 백업·원문 검증은 암호화해 보관한다.
 
 현재 Production의 INCOMPLETE_ROSTER 및 delayed 마감은 이번 범위에서 수정하지 않는다.

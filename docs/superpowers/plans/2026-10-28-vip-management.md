@@ -95,11 +95,11 @@ Files: `docs/vip-weekly.md`, local-only evidence under `/workspace/3on-vip-evide
   기본 Playwright Chrome은 모두 정상 응답. 접근·보안 설정은 변경하지 않음.
 - [x] 같은 설정·문서·버전의 backup/CAS guard, code-only rollback, 동일 artifact 전달 절차 작성.
 - [x] 새 배포 절차의 실제 로컬 browser/D1 검증 및 독립 리뷰 완료.
-- [ ] Staging 현재 소스·설정 확인, 새 전체 백업과 VIP 횟수 브라우저 기준 보관 후 배포.
-- [ ] 유일한 ID의 검증용 명단으로 16명 버튼·서버422·로그인·미래자료400·날짜·기존 메뉴 검증.
-- [ ] 삽입한 검증 행만 정리하고 문서·백업·성장 이력·설정 불변성 재확인.
-- [ ] 검증한 정확한 build artifact를 Production으로 전달, 새 백업·기준값 후 코드 배포.
-- [ ] 실제 누적 횟수 전체·영구 제외·로테이션·관리자 접근·Cron·화면 검증 및 완료 보고.
+- [x] Staging 현재 소스·설정 확인, 새 전체 백업과 VIP 횟수 브라우저 기준 보관 후 배포.
+- [x] 유일한 ID의 검증용 명단으로 16명 버튼·서버422·로그인·미래자료400·날짜·기존 메뉴 검증.
+- [x] 삽입한 검증 행만 정리하고 문서·백업·성장 이력·설정 불변성 재확인.
+- [x] 검증한 정확한 build artifact를 Production으로 전달, 새 백업·기준값 후 코드 배포.
+- [x] 실제 누적 횟수 전체·영구 제외·로테이션·관리자 접근·Cron·화면 검증 및 완료 보고.
 
 기존 `growth_automation_staging.py`는 전체 테이블 복구와 성장 변경을 포함하므로 재사용하지 않는다.
 점수 업로드 거부 시험은 실제 serverTime보다 최소 7일 이후 토요일을 사용해, 나중에 재실행해도
