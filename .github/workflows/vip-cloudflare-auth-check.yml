@@ -1,0 +1,32 @@
+name: Verify existing Cloudflare authorization
+on:
+  push:
+    branches: [diag/vip-cloudflare-20261028]
+    paths: ['.github/workflows/vip-cloudflare-auth-check.yml']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Report authentication success or failure only
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json,os,urllib.request
+          try:
+              token=os.environ['CLOUDFLARE_API_TOKEN']
+              if not token:
+                  raise ValueError()
+              request=urllib.request.Request('https://api.cloudflare.com/client/v4/user/tokens/verify',headers={'Authorization':'Bearer '+token})
+              with urllib.request.urlopen(request,timeout=20) as response:
+                  result=json.load(response)
+              success=result.get('success') is True and result.get('result',{}).get('status')=='active'
+          except Exception:
+              success=False
+          print('Cloudflare authentication: '+('PASS' if success else 'FAIL'))
+          raise SystemExit(0 if success else 1)
+          PY
