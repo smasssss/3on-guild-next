@@ -1,28 +1,50 @@
-name: Compare identified release client with standard browser access
+name: Check existing API settings against pinned deployment schema
 on:
   push:
     branches: [diag/vip-cloudflare-20261028]
-    paths: ['.github/workflows/vip-d1-preflight.yml', 'scripts/vip-remote-preflight.py', 'scripts/vip-public-browser-probe.mjs']
+    paths: ['.github/workflows/vip-d1-preflight.yml']
 permissions:
   contents: read
 jobs:
-  connection:
+  settings:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: 55763aa3e5995b8b40a7659d630bae1ab0f8e0bf
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
-      - name: Compare existing public access with an honestly identified release client
-        continue-on-error: true
+          cache: npm
+      - name: Install pinned schema validator dependencies without credentials
+        run: npm ci --include=dev --include=optional --no-audit --no-fund
+      - name: Read only existing placement and observability settings into private temporary files
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: python scripts/vip-remote-preflight.py connection
-      - name: Install pinned test-only Playwright CLI
-        run: npm install --prefix "$RUNNER_TEMP/3on-pw" --no-audit --no-fund --ignore-scripts @playwright/cli@0.1.22
-      - name: Test existing Staging with standard Chrome without changing access controls
         run: |
-          export CHROME_BIN="$(command -v google-chrome)"
-          node scripts/vip-public-browser-probe.mjs
+          python - <<'PY'
+          import runpy,os,json
+          from pathlib import Path
+          R=runpy.run_path('scripts/vip-management-release.py')['Release']
+          for target in ['staging','production']:
+              settings=R(target).settings()
+              path=Path(os.environ['RUNNER_TEMP'])/(target+'-settings-probe.json')
+              path.write_text(json.dumps({k:settings[k] for k in ['placement','observability'] if settings.get(k) is not None}))
+              path.chmod(0o600)
+          print('Existing settings read: PASS')
+          PY
+      - name: Report schema paths and extra property names only without values
+        run: |
+          node - <<'JS'
+          const fs=require('fs'),path=require('path'),Ajv=require('ajv');
+          const schema=require('./node_modules/wrangler/config-schema.json');
+          const a=new Ajv({allErrors:true,strict:false});
+          for(const target of ['staging','production']){
+            const value=JSON.parse(fs.readFileSync(path.join(process.env.RUNNER_TEMP,target+'-settings-probe.json')));
+            const ok=a.validate(schema,value);
+            console.log('Existing '+target+' settings config schema: '+(ok?'PASS':'FAIL'));
+            if(!ok)for(const e of a.errors)console.log(JSON.stringify({check:'schema',target,path:e.instancePath,keyword:e.keyword,property:e.params.additionalProperty||e.params.missingProperty||null}));
+          }
+          JS
