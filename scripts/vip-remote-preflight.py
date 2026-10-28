@@ -1,5 +1,5 @@
 """Read existing Workers and export D1; publish only encrypted recovery evidence."""
-import hashlib,json,os,sqlite3,subprocess,tarfile,tempfile,time,urllib.request
+import hashlib,json,os,sqlite3,subprocess,tarfile,tempfile,time,urllib.request,urllib.error
 from datetime import datetime,timezone
 from pathlib import Path
 
@@ -78,13 +78,18 @@ def main():
             PHASE=target+' isolated restore'
             restored=restore_check(path)
             public={}
-            for route in ['/legacy','/carriage-rotation.js','/carriage-date.js','/growth-auto.js','/api/state','/api/growth/automation','/api/session']:
+            for route in ['/legacy','/legacy.html','/carriage-rotation.js','/carriage-date.js','/growth-auto.js','/api/state','/api/growth/automation','/api/session']:
                 PHASE=target+' public verification '+route
-                with urllib.request.urlopen('https://'+worker+'.295server.workers.dev'+route,timeout=60) as response:
-                    content=response.read()
-                public[route]={'sha256':hashlib.sha256(content).hexdigest(),'bytes':len(content)}
-                if route.startswith('/api/'):
-                    public[route]['json']=json.loads(content)
+                try:
+                    with urllib.request.urlopen('https://'+worker+'.295server.workers.dev'+route,timeout=60) as response:
+                        content=response.read()
+                    public[route]={'status':200,'sha256':hashlib.sha256(content).hexdigest(),'bytes':len(content)}
+                    if route.startswith('/api/'):
+                        public[route]['json']=json.loads(content)
+                except urllib.error.HTTPError as error:
+                    public[route]={'status':error.code}
+                except Exception:
+                    public[route]={'status':None,'request_failed':True}
             metadata['environments'][target]={'settings':settings,'active_versions':versions,'crons':crons,'database_id':dbid,'restored_backup':restored,'public':public}
         PHASE='evidence encryption'
         (root/'metadata.json').write_text(json.dumps(metadata,ensure_ascii=False))
@@ -95,6 +100,7 @@ def main():
         output=Path('encrypted-evidence');output.mkdir(exist_ok=True)
         subprocess.run(['openssl','cms','-encrypt','-binary','-aes-256-gcm','-in',str(archive),'-out',str(output/'recovery.cms'),'-outform','DER','scripts/vip-backup-recipient.pem'],check=True,capture_output=True)
     print('Cloudflare configuration and full D1 backup/isolated restore checks: PASS')
+    print('Public deployment baseline read checks: '+('PASS' if all(row.get('status')==200 for environment in metadata['environments'].values() for row in environment['public'].values()) else 'FAIL; deployment remains blocked pending baseline verification'))
 
 if __name__=='__main__':
     try:
