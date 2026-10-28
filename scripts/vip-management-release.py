@@ -209,6 +209,18 @@ class Release:
     def wrangler(self,args,label):
         result=subprocess.run(['node','--import','./scripts/sites-env.mjs','./node_modules/wrangler/bin/wrangler.js',*args],capture_output=True)
         (self.root/(label+'.log')).write_bytes(result.stdout+result.stderr)
+        if result.returncode and label=='dry-run':
+            # Report schema paths/keywords only. Never print configuration values
+            # or raw Wrangler diagnostics, which may echo environment variables.
+            check="const fs=require('fs'),Ajv=require('ajv');const a=new Ajv({allErrors:true,strict:false});const ok=a.validate(require('./node_modules/wrangler/config-schema.json'),JSON.parse(fs.readFileSync(process.argv[1],'utf8')));console.log(JSON.stringify(ok?[]:a.errors.map(e=>({path:e.instancePath||e.dataPath||'root',keyword:e.keyword}))));"
+            diagnostic=subprocess.run(['node','-e',check,str(self.config)],capture_output=True)
+            if diagnostic.returncode==0:
+                for error in json.loads(diagnostic.stdout):
+                    print('Wrangler config '+str(error['path'])[:150]+' '+str(error['keyword'])+': FAIL')
+            text=(result.stdout+result.stderr).decode(errors='replace').lower()
+            categories={'missing_file':'enoent','missing_asset_directory':'does not exist','invalid_configuration':'configuration','strict_check':'strict','source_module':'could not resolve','invalid_cpu_limit':'cpu_ms'}
+            for name,needle in categories.items():
+                if needle in text:print('Wrangler packaging '+name+': FAIL')
         return result.returncode
 
     def deploy(self):
