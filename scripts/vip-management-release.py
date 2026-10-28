@@ -65,6 +65,8 @@ class Release:
         return versions[0]['version_id']
 
     def approved_active(self):
+        global PHASE
+        PHASE='approved active backend'
         version=self.active()
         if version==BASE_VERSIONS[self.target]:return version
         annotations=self.worker_api('/versions/'+version).get('annotations',{})
@@ -77,6 +79,7 @@ class Release:
         return version
 
     def settings(self):
+        global PHASE
         settings=self.worker_api('/settings');bindings=settings['bindings']
         assert all(b['type'] in ['d1','assets','plain_text','secret_text'] for b in bindings),'Unknown binding requires preservation review'
         db=[b for b in bindings if b['type']=='d1']
@@ -85,9 +88,13 @@ class Release:
         variables={b['name']:b['text'] for b in bindings if b['type']=='plain_text'}
         assert variables.get('GROWTH_AUTO_MODE')==('fixture' if self.target=='staging' else 'production')
         supported={'bindings','compatibility_date','compatibility_flags','assets','observability','logpush','limits','placement','tail_consumers','streaming_tail_consumers'}
-        assert all(k in supported or v in [None,False,{},[],'',0] for k,v in settings.items()),'Unsupported nondefault Worker setting requires review'
+        unsupported=[k for k,v in settings.items() if k not in supported and v not in [None,False,{},[],'',0]]
+        if unsupported:PHASE='unsupported Worker fields '+','.join(k for k in unsupported if re.fullmatch('[A-Za-z0-9_]{1,60}',k))
+        assert not unsupported,'Unsupported nondefault Worker setting requires review'
         if isinstance(settings.get('assets'),dict):
-            assert all(k in ['html_handling','not_found_handling','run_worker_first'] or v in [None,False,{},[],'',0] for k,v in settings['assets'].items())
+            unsupported=[k for k,v in settings['assets'].items() if k not in ['html_handling','not_found_handling','run_worker_first'] and v not in [None,False,{},[],'',0]]
+            if unsupported:PHASE='unsupported asset fields '+','.join(k for k in unsupported if re.fullmatch('[A-Za-z0-9_]{1,60}',k))
+            assert not unsupported
         return settings
 
     def preserved_settings(self,cfg):
@@ -156,7 +163,10 @@ class Release:
     def before(self):
         global PHASE
         PHASE='existing source and settings'
-        initial_version=self.approved_active();cfg=self.settings();schedule=self.crons()
+        initial_version=self.approved_active()
+        PHASE='current Worker settings';cfg=self.settings()
+        PHASE='current Worker Cron';schedule=self.crons()
+        PHASE='existing frontend artifact'
         with tempfile.TemporaryDirectory() as directory:
             path=Path(directory)/'legacy.html';path.write_bytes(subprocess.check_output(['git','show',BASE+':public/legacy.html']))
             patch=Path(directory)/'patch.mjs';patch.write_bytes(subprocess.check_output(['git','show',BASE+':scripts/growth-auto-ui.mjs']))
