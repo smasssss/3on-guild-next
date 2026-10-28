@@ -1,5 +1,5 @@
 name: Verify Staging then deploy preserved VIP management to Production
-# Version upload and traffic activation preserve API-only logging privacy settings.
+# Failed upload diagnostics redact token, account ID and every existing setting value.
 on:
   push:
     branches: [feat/vip-management-v2]

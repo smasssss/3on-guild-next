@@ -216,6 +216,21 @@ class Release:
     def wrangler(self,args,label):
         result=subprocess.run(['node','--import','./scripts/sites-env.mjs','./node_modules/wrangler/bin/wrangler.js',*args],capture_output=True)
         (self.root/(label+'.log')).write_bytes(result.stdout+result.stderr)
+        if result.returncode:
+            text=re.sub(r'\x1b\[[0-9;]*m','',(result.stdout+result.stderr).decode(errors='replace'))
+            def strings(value):
+                if isinstance(value,str):return [value]
+                if isinstance(value,list):return [s for v in value for s in strings(v)]
+                if isinstance(value,dict):return [s for v in value.values() for s in strings(v)]
+                return []
+            hidden=[self.token,self.account]
+            if (self.root/'settings-before.json').exists():hidden+=strings(self.load('settings-before.json'))
+            for value in sorted(set(v for v in hidden if len(v)>=3),key=len,reverse=True):text=text.replace(value,'[redacted]')
+            text=re.sub(r'\b[a-fA-F0-9]{32}\b|\b[a-fA-F0-9-]{36}\b','[id]',text)
+            lines=text.splitlines();start=next((i for i,line in enumerate(lines) if '[ERROR]' in line),None)
+            if start is not None:
+                notes=[line.strip() for line in lines[start:] if line.strip() and not line.strip().startswith(('{','}','"','│','┌','└'))][:3]
+                for line in notes:print('Wrangler redacted error check '+line[:250]+': FAIL')
         if result.returncode and label=='dry-run':
             # Report schema paths/keywords only. Never print configuration values
             # or raw Wrangler diagnostics, which may echo environment variables.
@@ -239,12 +254,14 @@ class Release:
         args=['versions','upload','--config',str(self.config),'--tag',self.sha[:32],'--message','3ON VIP '+self.sha]
         assert self.wrangler(args+['--dry-run'],'dry-run')==0
         assert self.invariant()==before['invariant'] and self.active()==before['version']
-        PHASE='code version upload'
+        PHASE='code version upload command'
         assert self.wrangler(args,'upload')==0,'Version upload failed'
+        PHASE='uploaded version identifier'
         output=re.sub(r'\x1b\[[0-9;]*m','',(self.root/'upload.log').read_text())
         uploaded=re.findall(r'Worker Version ID:\s*([a-f0-9-]{36})',output)
         assert len(uploaded)==1 and uploaded[0]!=before['version']
         version=uploaded[0]
+        PHASE='uploaded source annotation'
         assert self.worker_api('/versions/'+version).get('annotations',{}).get('workers/tag')==self.sha[:32]
         self.save('uploaded.json',{'version':version,'source_sha':self.sha})
         assert self.invariant()==before['invariant'] and self.active()==before['version'],'State changed during version upload'
