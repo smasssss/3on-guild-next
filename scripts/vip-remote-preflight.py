@@ -1,5 +1,5 @@
 """Read existing Workers and export D1; publish only encrypted recovery evidence."""
-import hashlib,json,os,sqlite3,subprocess,tarfile,tempfile,time,urllib.request,urllib.error,socket,ssl
+import hashlib,json,os,sqlite3,subprocess,tarfile,tempfile,time,urllib.request,urllib.error,socket,ssl,sys
 from datetime import datetime,timezone
 from pathlib import Path
 
@@ -112,8 +112,47 @@ def main():
     print('Cloudflare configuration and full D1 backup/isolated restore checks: PASS')
     print('Public deployment baseline read checks: '+('PASS' if all(row.get('status')==200 for environment in metadata['environments'].values() for row in environment['public'].values()) else 'FAIL; deployment remains blocked pending baseline verification'))
 
+def diagnose_connection():
+    assert api('/user/tokens/verify').get('status')=='active'
+    subdomain=api('/accounts/'+ACCOUNT+'/workers/subdomain')['subdomain']
+    assert isinstance(subdomain,str) and subdomain and all(c.isalnum() or c=='-' for c in subdomain)
+    failed=False
+    for target in EXPECTED:
+        worker='3on-guild-'+target
+        route=api('/accounts/'+ACCOUNT+'/workers/scripts/'+worker+'/subdomain')
+        print('Configured '+target+' workers.dev route: '+('PASS' if route.get('enabled') else 'FAIL'))
+        origin='https://'+worker+'.'+subdomain+'.workers.dev'
+        try:
+            with urllib.request.urlopen(origin+'/api/session',timeout=30) as response:
+                assert response.status==200 and json.load(response)=={'admin':False}
+            print('Public '+target+' session endpoint: PASS')
+        except urllib.error.HTTPError as error:
+            body=error.read(32768).decode(errors='replace').lower()
+            if error.headers.get('cf-mitigated')=='challenge':
+                category='CLOUDFLARE_CHALLENGE'
+            elif 'robots_denied' in body:
+                category='ROBOTS_POLICY_DENIAL'
+            elif 'egress' in body or 'proxy policy' in body:
+                category='NETWORK_POLICY_DENIAL'
+            elif 'cloudflare access' in body:
+                category='CLOUDFLARE_ACCESS'
+            elif 'error code: 1020' in body or 'error 1020' in body:
+                category='CLOUDFLARE_FIREWALL'
+            elif error.headers.get('server','').lower()=='cloudflare':
+                category='CLOUDFLARE_HTTP_'+str(error.code)
+            else:
+                category='HTTP_'+str(error.code)
+            print('Public '+target+' '+category+': FAIL')
+            failed=True
+        except Exception:
+            print('Public '+target+' network or response validation: FAIL')
+            failed=True
+    return 1 if failed else 0
+
 if __name__=='__main__':
     try:
+        if len(sys.argv)>1 and sys.argv[1]=='connection':
+            raise SystemExit(diagnose_connection())
         main()
     except Exception:
         print('Cloudflare preflight check '+PHASE+': FAIL; remote details withheld')
