@@ -54,6 +54,13 @@ class Guards(unittest.TestCase):
         cfg={'bindings':[{'type':'d1','name':'DB','id':release.database},{'type':'secret_text','name':'ADMIN_PASSWORD_HASH'},{'type':'plain_text','name':'GROWTH_AUTO_MODE','text':'production'}],'unreviewed_setting':{'enabled':True}}
         release.worker_api=lambda _:cfg
         with self.assertRaises(AssertionError):release.settings()
+    def test_release_metadata_does_not_hide_custom_setting_changes(self):
+        release=Fake()
+        before={'bindings':[],'usage_model':'unbound','annotations':{'workers/tag':'old','workers/message':'old','custom-label':'preserve'}}
+        after={**before,'annotations':{**before['annotations'],'workers/tag':'new','workers/message':'new'}}
+        self.assertEqual(release.preserved_settings(before),release.preserved_settings(after))
+        after['annotations']['custom-label']='changed'
+        self.assertNotEqual(release.preserved_settings(before),release.preserved_settings(after))
     def test_unrelated_active_deployment_is_not_rolled_back(self):
         release=Fake()
         with tempfile.TemporaryDirectory() as directory:

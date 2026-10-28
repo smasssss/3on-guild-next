@@ -87,10 +87,12 @@ class Release:
         assert 'ADMIN_PASSWORD_HASH' in [b['name'] for b in bindings if b['type']=='secret_text']
         variables={b['name']:b['text'] for b in bindings if b['type']=='plain_text'}
         assert variables.get('GROWTH_AUTO_MODE')==('fixture' if self.target=='staging' else 'production')
-        supported={'bindings','compatibility_date','compatibility_flags','assets','observability','logpush','limits','placement','tail_consumers','streaming_tail_consumers'}
+        supported={'bindings','compatibility_date','compatibility_flags','assets','observability','logpush','limits','placement','tail_consumers','streaming_tail_consumers','usage_model','annotations'}
         unsupported=[k for k,v in settings.items() if k not in supported and v not in [None,False,{},[],'',0]]
         if unsupported:PHASE='unsupported Worker fields '+','.join(k for k in unsupported if re.fullmatch('[A-Za-z0-9_]{1,60}',k))
         assert not unsupported,'Unsupported nondefault Worker setting requires review'
+        assert settings.get('usage_model') is None or settings['usage_model'] in ['bundled','unbound','standard']
+        assert settings.get('annotations') is None or isinstance(settings['annotations'],dict)
         if isinstance(settings.get('assets'),dict):
             unsupported=[k for k,v in settings['assets'].items() if k not in ['html_handling','not_found_handling','run_worker_first'] and v not in [None,False,{},[],'',0]]
             if unsupported:PHASE='unsupported asset fields '+','.join(k for k in unsupported if re.fullmatch('[A-Za-z0-9_]{1,60}',k))
@@ -100,6 +102,7 @@ class Release:
     def preserved_settings(self,cfg):
         assets=cfg.get('assets') or {}
         return {'observability':cfg.get('observability') or {},'logpush':bool(cfg.get('logpush')),
+            'usage_model':cfg.get('usage_model'),'annotations':{k:v for k,v in (cfg.get('annotations') or {}).items() if k not in ['workers/tag','workers/message']},
             'limits':cfg.get('limits') or {},'placement':cfg.get('placement') or {},
             'tail_consumers':cfg.get('tail_consumers') or [],'streaming_tail_consumers':cfg.get('streaming_tail_consumers') or [],
             'assets':{'html_handling':assets.get('html_handling','auto-trailing-slash'),'not_found_handling':assets.get('not_found_handling','none'),'run_worker_first':assets.get('run_worker_first',False)},
@@ -193,6 +196,13 @@ class Release:
         generated={'name':self.worker,'main':'dist/server/index.js','no_bundle':True,'compatibility_date':cfg['compatibility_date'],'compatibility_flags':cfg.get('compatibility_flags',[]),'rules':[{'type':'ESModule','globs':['**/*.js','**/*.mjs']}],'assets':assets,'d1_databases':[{'binding':'DB','database_id':self.database}],'vars':{b['name']:b['text'] for b in cfg['bindings'] if b['type']=='plain_text'},'triggers':{'crons':schedule},'workers_dev':route['enabled'],'preview_urls':route['previews_enabled']}
         for key in ['limits','placement','logpush','tail_consumers','streaming_tail_consumers','observability']:
             if cfg.get(key) is not None:generated[key]=cfg[key]
+        # Wrangler4.92 intentionally no longer has a usage_model config field.
+        # Its documented raw upload metadata preserves that legacy API value
+        # and existing custom annotations; only this release's tag/message change.
+        metadata={}
+        if cfg.get('usage_model') is not None:metadata['usage_model']=cfg['usage_model']
+        if cfg.get('annotations') is not None:metadata['annotations']={**cfg['annotations'],'workers/tag':self.sha[:32],'workers/message':'3ON VIP '+self.sha}
+        if metadata:generated['unsafe']={'metadata':metadata}
         self.config.write_text(json.dumps(generated));self.config.chmod(0o600)
         self.encrypt('before')
 

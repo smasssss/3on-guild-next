@@ -1,5 +1,5 @@
 name: Verify Staging then deploy preserved VIP management to Production
-# Source and setting checks report only the failing check name, never values.
+# Preserve legacy API usage metadata and custom annotations as well as runtime settings.
 on:
   push:
     branches: [feat/vip-management-v2]
