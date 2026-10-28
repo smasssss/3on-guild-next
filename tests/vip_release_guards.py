@@ -70,6 +70,13 @@ class Guards(unittest.TestCase):
         self.assertTrue(cfg['observability']['redact_query_string'])
         self.assertEqual(generated['unsafe']['metadata']['usage_model'],'unbound')
         self.assertEqual(generated['unsafe']['metadata']['annotations']['custom-label'],'preserve')
+    def test_cloudflare_readonly_audit_annotation_is_never_uploaded(self):
+        release=Fake();release.worker='3on-guild-production';release.database=module.DATABASES['production']
+        cfg={'bindings':[],'compatibility_date':'2026-05-15','annotations':{'workers/triggered_by':'cli','custom-label':'preserve'}}
+        generated=release.upload_config(cfg,[],{'enabled':True,'previews_enabled':False})
+        self.assertNotIn('workers/triggered_by',generated['unsafe']['metadata']['annotations'])
+        after={**cfg,'annotations':{**cfg['annotations'],'workers/triggered_by':'version-upload'}}
+        self.assertEqual(release.preserved_settings(cfg),release.preserved_settings(after))
     def test_version_upload_race_cannot_activate_traffic(self):
         release=Fake();release.worker_api=lambda _: {'annotations':{'workers/tag':release.sha[:32]}}
         with tempfile.TemporaryDirectory() as directory:

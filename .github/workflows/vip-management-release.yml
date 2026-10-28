@@ -1,5 +1,5 @@
 name: Verify Staging then deploy preserved VIP management to Production
-# Failed upload diagnostics redact token, account ID and every existing setting value.
+# Cloudflare-owned audit annotations are read-only; custom settings remain preserved.
 on:
   push:
     branches: [feat/vip-management-v2]
