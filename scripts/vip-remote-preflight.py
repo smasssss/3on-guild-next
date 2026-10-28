@@ -50,10 +50,14 @@ def main():
     assert ACCOUNT and TOKEN
     assert api('/user/tokens/verify').get('status')=='active'
     metadata={'created_at':datetime.now(timezone.utc).isoformat(),'source_sha':os.environ.get('GITHUB_SHA'),'environments':{}}
+    PHASE='current official Workers hostname'
+    subdomain=api('/accounts/'+ACCOUNT+'/workers/subdomain')['subdomain']
+    assert isinstance(subdomain,str) and subdomain and all(c.isalnum() or c=='-' for c in subdomain)
     with tempfile.TemporaryDirectory(prefix='3on-vip-private-') as directory:
         root=Path(directory)
         for target,dbid in EXPECTED.items():
             worker='3on-guild-'+target
+            origin='https://'+worker+'.'+subdomain+'.workers.dev'
             base='/accounts/'+ACCOUNT+'/workers/scripts/'+worker
             PHASE=target+' settings'
             settings=api(base+'/settings')
@@ -81,7 +85,7 @@ def main():
             for route in ['/legacy','/legacy.html','/carriage-rotation.js','/carriage-date.js','/growth-auto.js','/api/state','/api/growth/automation','/api/session']:
                 PHASE=target+' public verification '+route
                 try:
-                    with urllib.request.urlopen('https://'+worker+'.295server.workers.dev'+route,timeout=60) as response:
+                    with urllib.request.urlopen(origin+route,timeout=60) as response:
                         content=response.read()
                     public[route]={'status':200,'sha256':hashlib.sha256(content).hexdigest(),'bytes':len(content)}
                     if route.startswith('/api/'):
@@ -90,7 +94,8 @@ def main():
                     public[route]={'status':error.code}
                 except Exception:
                     public[route]={'status':None,'request_failed':True}
-            metadata['environments'][target]={'settings':settings,'active_versions':versions,'crons':crons,'database_id':dbid,'restored_backup':restored,'public':public}
+                print('Public '+target+' '+route+': '+('PASS' if public[route].get('status')==200 else 'FAIL'))
+            metadata['environments'][target]={'origin':origin,'settings':settings,'active_versions':versions,'crons':crons,'database_id':dbid,'restored_backup':restored,'public':public}
         PHASE='evidence encryption'
         (root/'metadata.json').write_text(json.dumps(metadata,ensure_ascii=False))
         archive=root/'recovery.tar.gz'
