@@ -1,5 +1,5 @@
 """Read existing Workers and export D1; publish only encrypted recovery evidence."""
-import hashlib,json,os,sqlite3,subprocess,tarfile,tempfile,time,urllib.request,urllib.error
+import hashlib,json,os,sqlite3,subprocess,tarfile,tempfile,time,urllib.request,urllib.error,socket,ssl
 from datetime import datetime,timezone
 from pathlib import Path
 
@@ -92,9 +92,14 @@ def main():
                         public[route]['json']=json.loads(content)
                 except urllib.error.HTTPError as error:
                     public[route]={'status':error.code}
+                except urllib.error.URLError as error:
+                    category='TLS' if isinstance(error.reason,ssl.SSLError) else 'DNS' if isinstance(error.reason,socket.gaierror) else 'TIMEOUT' if isinstance(error.reason,TimeoutError) else 'NETWORK'
+                    public[route]={'status':None,'request_failed':True,'category':category}
                 except Exception:
-                    public[route]={'status':None,'request_failed':True}
-                print('Public '+target+' '+route+': '+('PASS' if public[route].get('status')==200 else 'FAIL'))
+                    public[route]={'status':None,'request_failed':True,'category':'RESPONSE'}
+                check=public[route]
+                category=('HTTP_'+str(check['status'])) if check.get('status') else check.get('category','NETWORK')
+                print('Public '+target+' '+route+' '+category+': '+('PASS' if check.get('status')==200 else 'FAIL'))
             metadata['environments'][target]={'origin':origin,'settings':settings,'active_versions':versions,'crons':crons,'database_id':dbid,'restored_backup':restored,'public':public}
         PHASE='evidence encryption'
         (root/'metadata.json').write_text(json.dumps(metadata,ensure_ascii=False))
