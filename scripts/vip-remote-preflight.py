@@ -1,5 +1,5 @@
 """Read existing Workers and export D1; publish only encrypted recovery evidence."""
-import hashlib,json,os,sqlite3,subprocess,tarfile,tempfile,time,urllib.request,urllib.error,socket,ssl,sys
+import hashlib,json,os,sqlite3,subprocess,tarfile,tempfile,time,urllib.request,urllib.error,socket,ssl,sys,re
 from datetime import datetime,timezone
 from pathlib import Path
 
@@ -122,6 +122,8 @@ def diagnose_connection():
         route=api('/accounts/'+ACCOUNT+'/workers/scripts/'+worker+'/subdomain')
         print('Configured '+target+' workers.dev route: '+('PASS' if route.get('enabled') else 'FAIL'))
         origin='https://'+worker+'.'+subdomain+'.workers.dev'
+        if target=='staging':
+            Path(os.environ.get('RUNNER_TEMP','/tmp'),'3on-probe-origin.json').write_text(json.dumps({'origin':origin}))
         try:
             with urllib.request.urlopen(origin+'/api/session',timeout=30) as response:
                 assert response.status==200 and json.load(response)=={'admin':False}
@@ -138,6 +140,8 @@ def diagnose_connection():
                 category='CLOUDFLARE_ACCESS'
             elif 'error code: 1020' in body or 'error 1020' in body:
                 category='CLOUDFLARE_FIREWALL'
+            elif re.search(r'(?:error(?:\s+code)?\s*[:\s]+)(1\d{3})\b',body):
+                category='CLOUDFLARE_ERROR_'+re.search(r'(?:error(?:\s+code)?\s*[:\s]+)(1\d{3})\b',body).group(1)
             elif error.headers.get('server','').lower()=='cloudflare':
                 category='CLOUDFLARE_HTTP_'+str(error.code)
             else:
@@ -147,6 +151,13 @@ def diagnose_connection():
         except Exception:
             print('Public '+target+' network or response validation: FAIL')
             failed=True
+        try:
+            request=urllib.request.Request(origin+'/api/session',headers={'User-Agent':'3ON-release-verification'})
+            with urllib.request.urlopen(request,timeout=30) as response:
+                assert response.status==200 and json.load(response)=={'admin':False}
+            print('Identified release client '+target+': PASS')
+        except Exception:
+            print('Identified release client '+target+': FAIL')
     return 1 if failed else 0
 
 if __name__=='__main__':

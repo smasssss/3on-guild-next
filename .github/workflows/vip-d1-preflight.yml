@@ -1,18 +1,28 @@
-name: Check existing public Worker access without changing access policy
+name: Compare identified release client with standard browser access
 on:
   push:
     branches: [diag/vip-cloudflare-20261028]
-    paths: ['.github/workflows/vip-d1-preflight.yml', 'scripts/vip-remote-preflight.py', 'scripts/vip-backup-recipient.pem']
+    paths: ['.github/workflows/vip-d1-preflight.yml', 'scripts/vip-remote-preflight.py', 'scripts/vip-public-browser-probe.mjs']
 permissions:
   contents: read
 jobs:
   connection:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v6
-      - name: Classify existing public access failures without logging response bodies
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Compare existing public access with an honestly identified release client
+        continue-on-error: true
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: python scripts/vip-remote-preflight.py connection
+      - name: Install pinned test-only Playwright CLI
+        run: npm install --prefix "$RUNNER_TEMP/3on-pw" --no-audit --no-fund --ignore-scripts @playwright/cli@0.1.22
+      - name: Test existing Staging with standard Chrome without changing access controls
+        run: |
+          export CHROME_BIN="$(command -v google-chrome)"
+          node scripts/vip-public-browser-probe.mjs
