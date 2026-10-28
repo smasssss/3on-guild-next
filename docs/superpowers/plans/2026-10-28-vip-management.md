@@ -83,3 +83,24 @@ Files: `docs/vip-weekly.md`, local-only evidence under `/workspace/3on-vip-evide
 - [x] 초기 점수 미등록 상태에서도 일반 인원 선택 허용, 16명·영구 제외 유지 정책/API/UI 회귀 RED→GREEN.
 - [x] 첫 자료 업로드와 실제 월요일 적용 분리, 기존 VIP·운행·횟수 보존 API 검증.
 - [x] 초기 모드 문서·타입·lint·빌드·보존 회귀 확인.
+
+## Task 5: 인증된 원격 Staging·Production 배포
+
+사용자가 GitHub 인증 확인용 workflow, 암호화 전체 DB 백업의 Actions 14일 보관,
+403 원인 해결 후 Staging 검증을 거친 Production 배포를 승인했다.
+
+- [x] 기존 GitHub Actions 토큰 active 확인. 현재 두 DB 바인딩·mode·Cron 확인.
+- [x] 두 DB 전체 SQL 내보내기·격리 SQLite 복구·암호화 보관 완료.
+- [x] 기본 urllib 요청의 Cloudflare1010 재현. 기존 배포 도구의 정직한 User-Agent와
+  기본 Playwright Chrome은 모두 정상 응답. 접근·보안 설정은 변경하지 않음.
+- [x] 같은 설정·문서·버전의 backup/CAS guard, code-only rollback, 동일 artifact 전달 절차 작성.
+- [x] 새 배포 절차의 실제 로컬 browser/D1 검증 및 독립 리뷰 완료.
+- [ ] Staging 현재 소스·설정 확인, 새 전체 백업과 VIP 횟수 브라우저 기준 보관 후 배포.
+- [ ] 유일한 ID의 검증용 명단으로 16명 버튼·서버422·로그인·미래자료400·날짜·기존 메뉴 검증.
+- [ ] 삽입한 검증 행만 정리하고 문서·백업·성장 이력·설정 불변성 재확인.
+- [ ] 검증한 정확한 build artifact를 Production으로 전달, 새 백업·기준값 후 코드 배포.
+- [ ] 실제 누적 횟수 전체·영구 제외·로테이션·관리자 접근·Cron·화면 검증 및 완료 보고.
+
+기존 `growth_automation_staging.py`는 전체 테이블 복구와 성장 변경을 포함하므로 재사용하지 않는다.
+점수 업로드 거부 시험은 실제 serverTime보다 최소 7일 이후 토요일을 사용해, 나중에 재실행해도
+임의 점수가 저장되지 않도록 한다. 미래 월요일 성공 전환은 기존 시간을 고정한 회귀 시험으로 검증한다.

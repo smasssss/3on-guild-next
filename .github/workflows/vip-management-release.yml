@@ -1,0 +1,228 @@
+name: Verify Staging then deploy preserved VIP management to Production
+on:
+  push:
+    branches: [feat/vip-management-v2]
+    paths: ['.github/workflows/vip-management-release.yml']
+permissions:
+  contents: read
+jobs:
+  staging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: cloudflare-staging
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Require the exact source and existing Staging administrator credential
+        env:
+          STAGING_ADMIN_PASSWORD: ${{ secrets.CLOUDFLARE_STAGING_ADMIN_PASSWORD }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -n "$STAGING_ADMIN_PASSWORD"
+      - name: Install locked application dependencies and pinned test browser CLI
+        run: |
+          npm ci --include=dev --include=optional --no-audit --no-fund
+          npm install --prefix "$RUNNER_TEMP/3on-pw" --no-audit --no-fund --ignore-scripts @playwright/cli@0.1.22
+          command -v google-chrome
+      - name: Verify weekly rules, preservation, deployment guards and existing operations
+        run: |
+          npx --no-install eslint lib/vip-weekly.ts lib/validate.ts app/api/state/route.ts app/api/carriage/vip/route.ts public/carriage-vip.js scripts/growth-auto-ui.mjs scripts/vip-management-browser.mjs tests/vip-fixture.cjs tests/vip_*regression.cjs
+          npx --no-install tsc --noEmit
+          python tests/vip_release_guards.py
+          node tests/vip_weekly_regression.cjs
+          node tests/vip_initial_mode_regression.cjs
+          node tests/vip_api_regression.cjs
+          node tests/vip_ui_regression.cjs
+          node tests/vip_save_regression.cjs
+          node tests/carriage_date_regression.cjs
+          node tests/carriage_rotation_regression.cjs
+          node tests/growth_automation_regression.cjs
+          node tests/d1_latest_lookup.cjs
+          node tests/growth_changes_regression.cjs
+          node tests/production_growth_regression.cjs
+          node tests/canyon_latest_regression.cjs
+          python tests/vip_scope_preserved.py
+          npm run build
+          python tests/automation_operations_preserved.py
+          python tests/vip_exclusions_regression.py
+      - name: Verify current Staging source and settings and restore its complete backup in isolation
+        id: before
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: python scripts/vip-management-release.py before staging
+      - name: Capture all existing VIP totals and rotation identities in the real pre-deploy browser
+        run: |
+          export CHROME_BIN="$(command -v google-chrome)"
+          node scripts/vip-management-browser.mjs staging baseline
+      - name: Encrypt complete backup with pre-deploy browser evidence
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: python scripts/vip-management-release.py encrypt-before staging
+      - name: Durably retain encrypted Staging backup before deployment
+        uses: actions/upload-artifact@v4
+        with:
+          name: vip-staging-before-${{ github.run_id }}
+          path: vip-encrypted-evidence/staging-before.cms
+          if-no-files-found: error
+          retention-days: 14
+      - name: Dry-run then deploy only the reviewed code to existing Staging
+        id: deploy
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          WRANGLER_SEND_METRICS: 'false'
+        run: python scripts/vip-management-release.py deploy staging
+      - name: Verify exact deployed assets, unchanged documents, auth and disabled automation
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: python scripts/vip-management-release.py verify staging
+      - name: Add uniquely identified temporary Staging roster rows for the live selection test
+        id: fixture
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: python scripts/vip-management-release.py fixture-setup staging
+      - name: Playwright login, 16 disabled buttons, API rejection, date, menus and mobile checks
+        env:
+          STAGING_ADMIN_PASSWORD: ${{ secrets.CLOUDFLARE_STAGING_ADMIN_PASSWORD }}
+        run: |
+          export CHROME_BIN="$(command -v google-chrome)"
+          node scripts/vip-management-browser.mjs staging
+      - name: Remove only this run's temporary fixture rows and verify all protected data
+        if: ${{ always() && steps.fixture.outcome != 'skipped' && steps.fixture.outcome != '' }}
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: python scripts/vip-management-release.py fixture-cleanup staging
+      - name: Recheck Staging after fixture cleanup
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: python scripts/vip-management-release.py verify staging
+      - name: Retain the exact Staging-tested build for Production
+        uses: actions/upload-artifact@v4
+        with:
+          name: vip-tested-build-${{ github.sha }}
+          path: dist/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
+      - name: Roll back only this run's deployed code if verification fails
+        if: failure()
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: python scripts/vip-management-release.py rollback staging
+      - name: Encrypt Staging verification and recovery evidence
+        if: always()
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: python scripts/vip-management-release.py encrypt staging
+      - name: Retain encrypted Staging evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vip-staging-after-${{ github.run_id }}
+          path: vip-encrypted-evidence/staging-after.cms
+          if-no-files-found: warn
+          retention-days: 14
+  production:
+    needs: staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    concurrency:
+      group: cloudflare-production-growth-repair
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Require identical source and install locked deployment and browser tools
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          npm ci --include=dev --include=optional --no-audit --no-fund
+          npm install --prefix "$RUNNER_TEMP/3on-pw" --no-audit --no-fund --ignore-scripts @playwright/cli@0.1.22
+          command -v google-chrome
+      - name: Download the exact build that passed this run's Staging verification
+        uses: actions/download-artifact@v4
+        with:
+          name: vip-tested-build-${{ github.sha }}
+          path: dist/
+      - name: Verify current Production source and restore a fresh complete backup in isolation
+        id: before
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: python scripts/vip-management-release.py before production
+      - name: Capture actual Production VIP totals and rotation before deployment
+        run: |
+          export CHROME_BIN="$(command -v google-chrome)"
+          node scripts/vip-management-browser.mjs production baseline
+      - name: Encrypt complete Production backup and browser baseline
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: python scripts/vip-management-release.py encrypt-before production
+      - name: Durably retain encrypted Production backup before deployment
+        uses: actions/upload-artifact@v4
+        with:
+          name: vip-production-before-${{ github.run_id }}
+          path: vip-encrypted-evidence/production-before.cms
+          if-no-files-found: error
+          retention-days: 14
+      - name: Deploy the identical Staging-tested build without migrations or secret changes
+        id: deploy
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          WRANGLER_SEND_METRICS: 'false'
+        run: python scripts/vip-management-release.py deploy production
+      - name: Verify Production documents, weekly mode, exclusions, exact assets, auth and Cron
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: python scripts/vip-management-release.py verify production
+      - name: Playwright read-only Production totals, restrictions, menus and mobile date selection
+        run: |
+          export CHROME_BIN="$(command -v google-chrome)"
+          node scripts/vip-management-browser.mjs production
+      - name: Verify Production data again after read-only browser checks
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: python scripts/vip-management-release.py verify production
+      - name: Roll back only this run's Production code if verification fails
+        if: failure()
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: python scripts/vip-management-release.py rollback production
+      - name: Encrypt Production verification and recovery evidence
+        if: always()
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: python scripts/vip-management-release.py encrypt production
+      - name: Retain encrypted Production evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vip-production-after-${{ github.run_id }}
+          path: vip-encrypted-evidence/production-after.cms
+          if-no-files-found: warn
+          retention-days: 14
