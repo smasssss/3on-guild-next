@@ -151,3 +151,42 @@ Cloudflare `/user/tokens/verify`를 읽기 전용으로 재조회한 결과
 초기 운영 모드의 실제 route+SQLite 시험으로 일반 VIP 저장 성공, 16명·영구 제외 서버 거부,
 업로드 후 월요일 전 상태 유지, 첫 월요일 점수 전환 및 기존 VIP 기록 보존을 확인했다.
 원격 배포 상태와 인증 경계는 변하지 않았다.
+
+## 2026-10-28 원격 연결·백업 검증 후속 결과
+
+사용자가 새 Cloudflare 토큰을 개발환경에 저장했다. 새 대화에서는 active이나,
+기존 실행 인스턴스는 여전히 이전 설정의 expired 토큰으로 응답했다.
+기존 GitHub Actions 인증을 이용한 공식 `/user/tokens/verify` 검증은 성공했다.
+
+- 인증 확인 실행: https://github.com/smasssss/3on-guild-next/actions/runs/40620791740
+- 전체 백업·복구 검증 실행: https://github.com/smasssss/3on-guild-next/actions/runs/40631349912
+- 웹 연결 진단 실행: https://github.com/smasssss/3on-guild-next/actions/runs/40631626671
+
+사용자는 공개 저장소의 GitHub Actions에 **암호화한 Production·Staging 전체 D1 백업을
+14일 보관하는 작업**을 별도로 승인했다. 실제 두 DB 전체 SQL을 내보내고 각각 격리된
+in-memory SQLite에 복구하여 integrity_check=ok와 보호 테이블 존재를 검증했다.
+실제 원격 D1로의 복원·쓰기 시험은 수행하지 않았다.
+현재 DB 바인딩, 단일 100% 배포 버전, 기존 Cron, Production/fixture 모드도 확인했다.
+설정 원문과 복구 검증 정보는 SQL과 함께 암호화한 증거에 포함했다.
+
+백업은 RSA 3072 수신자 인증서와 AES-256-GCM CMS 형식으로 암호화했다.
+개인키는 GitHub에 업로드하지 않고 현재 작업 공간의 별도 증거 경로에만 저장했다.
+동일 암호화·해독 방식의 로컬 왕복 검증도 통과했다.
+
+- artifact: `3on-vip-encrypted-recovery-40631349912`, ID `12791458550`.
+- 만료: 2026-11-11 13:16 KST (14일).
+- ZIP SHA256: `6fee0149887722420564359b6481b4795f121ea1ebccce9384abd6db6dafe67d`.
+- 백업·설정 원문이나 토큰을 Actions 로그에 출력하지 않았다.
+- 웹 연결 문제의 후속 진단은 DB 내보내기를 반복하지 않는 읽기 전용 모드로 분리했다.
+
+**남은 배포 차단 요인:** 계정의 공식 현재 Workers 하위 도메인으로 확인해도
+Production·Staging의 HTML, 정적 자산과 API 요청이 모두 HTTP 403이다.
+각 Worker의 workers.dev 경로가 활성화된 것은 확인했다.
+Cloudflare 응답이라는 근거는 있지만, challenge 헤더 또는 명시적인 봇 검사 근거는
+확인하지 못했다. 보안 정책·관리자 인증·접근 권한을 변경하거나 차단을 우회하지 않았다.
+사용자 PC의 정상 브라우저에서도 해당 사이트가 열리는지 확인을 요청한 상태다.
+
+애플리케이션 수정 SHA `841543397794132312f11970530be275052f51cc`를
+GitHub `feat/vip-management-v2` 브랜치에 업로드했다. 원격 Staging·Production의
+코드 배포, 주간 자료 입력, VIP 기록 변경, DB migration은 아직 수행하지 않았다.
+따라서 현재 실제 서비스에 명단 개편·16명 제한이 적용되었다고 보고하지 않는다.
