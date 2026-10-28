@@ -61,6 +61,34 @@ class Guards(unittest.TestCase):
         self.assertEqual(release.preserved_settings(before),release.preserved_settings(after))
         after['annotations']['custom-label']='changed'
         self.assertNotEqual(release.preserved_settings(before),release.preserved_settings(after))
+    def test_api_only_log_privacy_is_preserved_without_invalid_config_rewrite(self):
+        release=Fake();release.worker='3on-guild-production';release.database=module.DATABASES['production']
+        cfg={'bindings':[],'compatibility_date':'2026-05-15','placement':{},'observability':{'enabled':True,'redact_query_string':True},'usage_model':'unbound','annotations':{'custom-label':'preserve'}}
+        generated=release.upload_config(cfg,['0,10 * * * *'],{'enabled':True,'previews_enabled':False})
+        self.assertNotIn('observability',generated)
+        self.assertNotIn('placement',generated)
+        self.assertTrue(cfg['observability']['redact_query_string'])
+        self.assertEqual(generated['unsafe']['metadata']['usage_model'],'unbound')
+        self.assertEqual(generated['unsafe']['metadata']['annotations']['custom-label'],'preserve')
+    def test_version_upload_race_cannot_activate_traffic(self):
+        release=Fake();release.worker_api=lambda _: {'annotations':{'workers/tag':release.sha[:32]}}
+        with tempfile.TemporaryDirectory() as directory:
+            release.root=Path(directory)
+            def wrangler(args,label):
+                release.calls.append((label,args))
+                if label=='upload':
+                    (release.root/'upload.log').write_text('Worker Version ID: 11111111-1111-4111-8111-111111111111')
+                    release.live={'documents':'changed'}
+                return 0
+            release.wrangler=wrangler
+            release.activate=lambda *_:self.fail('Must never activate changed data')
+            with self.assertRaises(AssertionError):release.deploy()
+        self.assertEqual([c[0] for c in release.calls if c[0]!='save'],['dry-run','upload'])
+    def test_activation_only_changes_version_traffic(self):
+        release=Fake();release.worker='3on-guild-production';calls=[]
+        release.api=lambda method,path,body:calls.append((method,path,body))
+        release.activate('reviewed-version','reviewed source')
+        self.assertEqual(calls,[('POST','/workers/scripts/3on-guild-production/deployments',{'strategy':'percentage','versions':[{'version_id':'reviewed-version','percentage':100}],'annotations':{'workers/message':'reviewed source'}})])
     def test_unrelated_active_deployment_is_not_rolled_back(self):
         release=Fake()
         with tempfile.TemporaryDirectory() as directory:

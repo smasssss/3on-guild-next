@@ -1,5 +1,5 @@
 name: Verify Staging then deploy preserved VIP management to Production
-# Failed package checks expose only schema paths and fixed diagnostic categories.
+# Version upload and traffic activation preserve API-only logging privacy settings.
 on:
   push:
     branches: [feat/vip-management-v2]
@@ -75,7 +75,7 @@ jobs:
           path: vip-encrypted-evidence/staging-before.cms
           if-no-files-found: error
           retention-days: 14
-      - name: Dry-run then deploy only the reviewed code to existing Staging
+      - name: Dry-run and upload the code version then activate existing Staging traffic
         id: deploy
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -186,7 +186,7 @@ jobs:
           path: vip-encrypted-evidence/production-before.cms
           if-no-files-found: error
           retention-days: 14
-      - name: Deploy the identical Staging-tested build without migrations or secret changes
+      - name: Upload the identical Staging-tested version and activate Production traffic
         id: deploy
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

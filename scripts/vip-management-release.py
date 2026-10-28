@@ -185,6 +185,11 @@ class Release:
         self.save('before.json',{'source_sha':self.sha,'version':initial_version,'invariant':self.invariant(),'origin':self.origin})
         assert self.load('restore.json')['documents_digest']==self.load('before.json')['invariant']['documents'],'Operations changed during backup; capture a fresh backup'
         assert digest(cfg)==digest(self.settings()) and schedule==self.crons(),'Worker settings changed during backup'
+        generated=self.upload_config(cfg,schedule,self.load('before.json')['invariant']['public_route'])
+        self.config.write_text(json.dumps(generated));self.config.chmod(0o600)
+        self.encrypt('before')
+
+    def upload_config(self,cfg,schedule,route):
         assets={'directory':'dist/client'}
         asset_bindings=[b for b in cfg['bindings'] if b['type']=='assets']
         assert len(asset_bindings)<=1
@@ -192,10 +197,13 @@ class Release:
         if isinstance(cfg.get('assets'),dict):
             for key in ['html_handling','not_found_handling','run_worker_first']:
                 if key in cfg['assets']:assets[key]=cfg['assets'][key]
-        route=self.load('before.json')['invariant']['public_route']
         generated={'name':self.worker,'main':'dist/server/index.js','no_bundle':True,'compatibility_date':cfg['compatibility_date'],'compatibility_flags':cfg.get('compatibility_flags',[]),'rules':[{'type':'ESModule','globs':['**/*.js','**/*.mjs']}],'assets':assets,'d1_databases':[{'binding':'DB','database_id':self.database}],'vars':{b['name']:b['text'] for b in cfg['bindings'] if b['type']=='plain_text'},'triggers':{'crons':schedule},'workers_dev':route['enabled'],'preview_urls':route['previews_enabled']}
-        for key in ['limits','placement','logpush','tail_consumers','streaming_tail_consumers','observability']:
-            if cfg.get(key) is not None:generated[key]=cfg[key]
+        for key in ['limits','placement','logpush','tail_consumers','streaming_tail_consumers']:
+            if cfg.get(key) is not None and cfg[key] not in [{},[]]:generated[key]=cfg[key]
+        # Observability is non-versioned. versions upload + the deployments API
+        # leave it untouched, including API-only privacy/redaction settings.
+        # A regular "wrangler deploy" would try to rewrite it from its older
+        # config schema, which cannot represent redact_query_string.
         # Wrangler4.92 intentionally no longer has a usage_model config field.
         # Its documented raw upload metadata preserves that legacy API value
         # and existing custom annotations; only this release's tag/message change.
@@ -203,8 +211,7 @@ class Release:
         if cfg.get('usage_model') is not None:metadata['usage_model']=cfg['usage_model']
         if cfg.get('annotations') is not None:metadata['annotations']={**cfg['annotations'],'workers/tag':self.sha[:32],'workers/message':'3ON VIP '+self.sha}
         if metadata:generated['unsafe']={'metadata':metadata}
-        self.config.write_text(json.dumps(generated));self.config.chmod(0o600)
-        self.encrypt('before')
+        return generated
 
     def wrangler(self,args,label):
         result=subprocess.run(['node','--import','./scripts/sites-env.mjs','./node_modules/wrangler/bin/wrangler.js',*args],capture_output=True)
@@ -228,15 +235,28 @@ class Release:
         PHASE='pre-deploy state guard'
         before=self.load('before.json');assert before['source_sha']==self.sha
         assert self.invariant()==before['invariant'] and self.active()==before['version'],'State changed after backup'
-        PHASE='Wrangler dry run'
-        args=['deploy','--config',str(self.config),'--strict','--tag',self.sha[:32],'--message','3ON VIP '+self.sha]
+        PHASE='Wrangler version dry run'
+        args=['versions','upload','--config',str(self.config),'--tag',self.sha[:32],'--message','3ON VIP '+self.sha]
         assert self.wrangler(args+['--dry-run'],'dry-run')==0
         assert self.invariant()==before['invariant'] and self.active()==before['version']
-        PHASE='code deployment';self.save('deployment-started.json',{'source_sha':self.sha})
-        code=self.wrangler(args,'deployment')
-        active=self.active()
-        if active!=before['version']:self.save('deployed.json',{'version':active,'source_sha':self.sha})
-        assert code==0 and active!=before['version'],'Code deployment did not complete'
+        PHASE='code version upload'
+        assert self.wrangler(args,'upload')==0,'Version upload failed'
+        output=re.sub(r'\x1b\[[0-9;]*m','',(self.root/'upload.log').read_text())
+        uploaded=re.findall(r'Worker Version ID:\s*([a-f0-9-]{36})',output)
+        assert len(uploaded)==1 and uploaded[0]!=before['version']
+        version=uploaded[0]
+        assert self.worker_api('/versions/'+version).get('annotations',{}).get('workers/tag')==self.sha[:32]
+        self.save('uploaded.json',{'version':version,'source_sha':self.sha})
+        assert self.invariant()==before['invariant'] and self.active()==before['version'],'State changed during version upload'
+        PHASE='code traffic activation';self.save('deployment-started.json',{'source_sha':self.sha})
+        self.activate(version,'3ON VIP '+self.sha)
+        assert self.active()==version,'Code traffic activation did not complete'
+        self.save('deployed.json',{'version':version,'source_sha':self.sha})
+
+    def activate(self,version,message):
+        # Only traffic changes. No script-settings PATCH, Cron update, migration,
+        # authentication change, observability rewrite, or database writes.
+        self.api('POST','/workers/scripts/'+self.worker+'/deployments',{'strategy':'percentage','versions':[{'version_id':version,'percentage':100}],'annotations':{'workers/message':message}})
 
     def verify(self):
         global PHASE
@@ -304,10 +324,11 @@ class Release:
         before=self.load('before.json');active=self.active()
         if active==before['version']:return
         if (self.root/'deployed.json').exists():assert active==self.load('deployed.json')['version'],'Another deployment is active; refusing rollback'
+        elif (self.root/'uploaded.json').exists():assert active==self.load('uploaded.json')['version'],'Another deployment is active; refusing rollback'
         else:
             version=self.worker_api('/versions/'+active)
             assert version.get('annotations',{}).get('workers/tag')==self.sha[:32],'Unknown deployed version; refusing rollback'
-        assert self.wrangler(['rollback',before['version'],'--name',self.worker,'--yes'],'rollback')==0
+        self.activate(before['version'],'Rollback VIP release '+self.sha)
         assert self.active()==before['version'] and self.invariant()==before['invariant']
 
 def main():
