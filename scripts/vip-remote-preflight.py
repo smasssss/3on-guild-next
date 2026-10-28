@@ -6,6 +6,7 @@ from pathlib import Path
 ACCOUNT=os.environ['CLOUDFLARE_ACCOUNT_ID']
 TOKEN=os.environ['CLOUDFLARE_API_TOKEN']
 EXPECTED={'production':'31e3bbb6-2860-40cb-9390-d989d37f11c2','staging':'9c3667a6-e510-40a6-b4e6-4852515fdb3a'}
+PHASE='authorization'
 
 def api(path,body=None):
     request=urllib.request.Request('https://api.cloudflare.com/client/v4'+path,
@@ -45,6 +46,7 @@ def restore_check(path):
     return result
 
 def main():
+    global PHASE
     assert ACCOUNT and TOKEN
     assert api('/user/tokens/verify').get('status')=='active'
     metadata={'created_at':datetime.now(timezone.utc).isoformat(),'source_sha':os.environ.get('GITHUB_SHA'),'environments':{}}
@@ -53,29 +55,38 @@ def main():
         for target,dbid in EXPECTED.items():
             worker='3on-guild-'+target
             base='/accounts/'+ACCOUNT+'/workers/scripts/'+worker
+            PHASE=target+' settings'
             settings=api(base+'/settings')
+            PHASE=target+' binding'
             databases=[b for b in settings.get('bindings',[]) if b.get('type')=='d1']
             assert len(databases)==1 and databases[0].get('name')=='DB' and databases[0].get('id')==dbid
+            PHASE=target+' active deployment'
             versions=api(base+'/deployments')['deployments'][0]['versions']
             assert len(versions)==1 and versions[0].get('percentage')==100
+            PHASE=target+' schedule'
             schedule=api(base+'/schedules')
             if isinstance(schedule,dict):
                 schedule=schedule.get('schedules',[])
             crons=sorted(row['cron'] for row in schedule)
             assert crons==(['0,10 * * * *'] if target=='production' else [])
+            PHASE=target+' collector mode'
             variables={b['name']:b['text'] for b in settings.get('bindings',[]) if b.get('type')=='plain_text'}
             assert variables.get('GROWTH_AUTO_MODE')==('production' if target=='production' else 'fixture')
             path=root/(target+'.sql')
+            PHASE=target+' backup export'
             export_d1(dbid,path)
+            PHASE=target+' isolated restore'
             restored=restore_check(path)
             public={}
             for route in ['/legacy','/carriage-rotation.js','/carriage-date.js','/growth-auto.js','/api/state','/api/growth/automation','/api/session']:
+                PHASE=target+' public verification '+route
                 with urllib.request.urlopen('https://'+worker+'.295server.workers.dev'+route,timeout=60) as response:
                     content=response.read()
                 public[route]={'sha256':hashlib.sha256(content).hexdigest(),'bytes':len(content)}
                 if route.startswith('/api/'):
                     public[route]['json']=json.loads(content)
             metadata['environments'][target]={'settings':settings,'active_versions':versions,'crons':crons,'database_id':dbid,'restored_backup':restored,'public':public}
+        PHASE='evidence encryption'
         (root/'metadata.json').write_text(json.dumps(metadata,ensure_ascii=False))
         archive=root/'recovery.tar.gz'
         with tarfile.open(archive,'w:gz') as bundle:
@@ -89,5 +100,5 @@ if __name__=='__main__':
     try:
         main()
     except Exception:
-        print('Cloudflare preflight: FAIL; remote details withheld')
+        print('Cloudflare preflight check '+PHASE+': FAIL; remote details withheld')
         raise SystemExit(1)
