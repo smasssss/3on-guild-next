@@ -4,7 +4,8 @@ export const THRESHOLD = 21_720_000;
 const DAY = 86_400_000;
 const TEMPORARY = new Set(['언데드킬러','Fallwarrior','Natasha21','호야호야','백구김구','Bogui','MJ2012','레녹스','lina12bwina','수영민트','DrBillX','디디뽀','파츠','봉근대','반달gh','СкульпторДуш']);
 export type Member = { memberId:string; gameId:string; canonical:string; nickname:string; rank:string|null; level:number|null; current:boolean; temporary:boolean };
-export type ScoreRow = {memberId:string; nickname:string; points:number};
+export type ScoreMember = Pick<Member,'memberId'|'gameId'|'nickname'|'current'>;
+export type ScoreRow = {memberId:string; nickname:string; points:number; participation?:'participated'|'not_participated'; evidence?:'user_screenshot'|'user_confirmation'};
 export type Weekly = {providedOn:string; appliesOn:string; coverage:'full'|'partial'; rows:ScoreRow[]; updatedAt:string};
 export type WeeklyData = {current:Weekly|null; pending:Weekly|null};
 type Carriage = {vipExcludedMembers?:Record<string,number>};
@@ -18,20 +19,26 @@ export function weeklyView(data:WeeklyData,now=Date.now()){
 }
 function invalid(message:string):never{throw Error(message);}
 function date(value:unknown):value is string{return typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&Number.isFinite(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value;}
-export function prepareWeekly(input:unknown,members:Member[],now=Date.now(),retainedWeek?:string):Weekly{
+export function prepareWeekly(input:unknown,members:Member[],now=Date.now(),retainedWeek?:string,scoreMembers:ScoreMember[]=members):Weekly{
  if(!input||typeof input!=='object')return invalid('주간 자료 형식을 확인해 주세요.');
  const b=input as Record<string,unknown>;
- if(!date(b.providedOn)||!date(b.appliesOn)||new Date(b.providedOn).getUTCDay()!==6||new Date(Date.parse(b.providedOn)+2*DAY).toISOString().slice(0,10)!==b.appliesOn||b.providedOn>kstDay(now)||b.appliesOn<'2026-11-02'||(b.appliesOn<weekOf(now)&&b.appliesOn!==retainedWeek))return invalid('자료 제공일은 토요일, 적용일은 다음 월요일로 지정해 주세요. 미래 제공일과 현재 사용하지 않는 과거 주차는 저장할 수 없습니다.');
+ if(!date(b.providedOn)||!date(b.appliesOn))return invalid('자료 제공일과 적용일을 확인해 주세요.');
+ const day=new Date(b.providedOn).getUTCDay(),daysUntilMonday=day===6?2:day===0?1:0;
+ if(!daysUntilMonday||new Date(Date.parse(b.providedOn)+daysUntilMonday*DAY).toISOString().slice(0,10)!==b.appliesOn||b.providedOn>kstDay(now)||b.appliesOn<'2026-11-02'||(b.appliesOn<weekOf(now)&&b.appliesOn!==retainedWeek))return invalid('자료 제공일은 실제 토요일 또는 일요일, 적용일은 바로 다음 월요일로 지정해 주세요. 미래 제공일과 현재 사용하지 않는 과거 주차는 저장할 수 없습니다.');
  if(!['full','partial'].includes(String(b.coverage))||!Array.isArray(b.rows)||b.rows.length<1||b.rows.length>500)return invalid('전체/일부 명단 여부와 점수 행을 확인해 주세요.');
- const byId=new Map(members.filter(m=>m.current).map(m=>[m.memberId,m])),ids=new Set<string>(),names=new Set<string>();
+ const byId=new Map(scoreMembers.map(m=>[m.memberId,m])),ids=new Set<string>(),names=new Set<string>();
  const rows:ScoreRow[]=b.rows.map((value:unknown)=>{
   if(!value||typeof value!=='object')return invalid('점수 행 형식을 확인해 주세요.');
   const r=value as ScoreRow,m=byId.get(r.memberId);
   if(!m||r.nickname!==m.nickname||ids.has(r.memberId)||names.has(r.nickname))return invalid('회원 ID·닉네임·현재 소속·중복을 확인해 주세요. 이름은 자동 보정하지 않습니다.');
   if(!Number.isSafeInteger(r.points)||r.points<0)return invalid('점수는 0 이상의 정확한 정수로 입력해 주세요.');
-  ids.add(r.memberId);names.add(r.nickname);return {memberId:r.memberId,nickname:r.nickname,points:r.points};
+  if(r.participation!==undefined||r.evidence!==undefined){
+   if(typeof r.participation!=='string'||typeof r.evidence!=='string'||!['participated','not_participated'].includes(r.participation)||!['user_screenshot','user_confirmation'].includes(r.evidence)||(r.participation==='not_participated'&&(r.points!==0||r.evidence!=='user_confirmation')))return invalid('미참여는 관리자 확인 근거와 0점을 함께 입력해 주세요.');
+  }
+  if(!m.current&&(r.points!==0||r.participation!=='not_participated'||r.evidence!=='user_confirmation'))return invalid('현재 미관측 회원은 관리자 확인 미참여 0점만 기록할 수 있습니다.');
+  ids.add(r.memberId);names.add(r.nickname);return {memberId:r.memberId,nickname:r.nickname,points:r.points,...(r.participation?{participation:r.participation,evidence:r.evidence}:{})};
  }).sort((a,b)=>a.memberId.localeCompare(b.memberId));
- if(b.coverage==='full'&&ids.size!==byId.size)return invalid('전체 명단에 누락된 회원이 있습니다. 일부 명단으로 확인하거나 자료를 보완해 주세요.');
+ if(b.coverage==='full'&&members.some(m=>m.current&&!ids.has(m.memberId)))return invalid('전체 명단에 누락된 회원이 있습니다. 일부 명단으로 확인하거나 자료를 보완해 주세요.');
  return {providedOn:b.providedOn,appliesOn:b.appliesOn,coverage:b.coverage as Weekly['coverage'],rows,updatedAt:new Date(now).toISOString()};
 }
 export function replaceWeekly(data:WeeklyData,next:Weekly,now=Date.now()):WeeklyData{
@@ -62,6 +69,21 @@ export const ROSTER_GUARD_SQL = `(SELECT COUNT(*) FROM json_each(?) j
  JOIN growth_hourly_observations o ON o.game_id=e.game_id AND o.snapshot_id=?
  WHERE e.status='confirmed' AND e.departed_at IS NULL AND o.status='valid'
  AND COALESCE(m.display_name,o.source_name)=json_extract(j.value,'$.nickname'))=?`;
+// Score references preserve confirmed history only; they never grant selection membership.
+export const SCORE_REFERENCE_GUARD_SQL = `(SELECT COUNT(*) FROM json_each(?) j
+ JOIN growth_external_ids e ON e.member_id=json_extract(j.value,'$.memberId') AND e.game_id=json_extract(j.value,'$.gameId')
+ JOIN growth_members m ON m.member_id=e.member_id
+ WHERE e.status='confirmed' AND e.departed_at IS NULL
+ AND COALESCE(m.display_name,e.source_name)=json_extract(j.value,'$.nickname')
+ AND EXISTS(SELECT 1 FROM growth_hourly_observations o WHERE o.game_id=e.game_id AND o.status='valid'))=?`;
+export async function readScoreRoster(db:D1Database,members:Member[]):Promise<ScoreMember[]>{
+ const rows=await db.prepare(`SELECT e.member_id,e.game_id,COALESCE(m.display_name,e.source_name) nickname
+ FROM growth_external_ids e JOIN growth_members m ON m.member_id=e.member_id
+ WHERE e.status='confirmed' AND e.departed_at IS NULL AND EXISTS(
+ SELECT 1 FROM growth_hourly_observations o WHERE o.game_id=e.game_id AND o.status='valid')`).all<{member_id:string;game_id:string;nickname:string}>();
+ const current=new Set(members.filter(m=>m.current).map(m=>m.memberId));
+ return rows.results.map(r=>({memberId:r.member_id,gameId:r.game_id,nickname:r.nickname,current:current.has(r.member_id)}));
+}
 export async function readRoster(db:D1Database){
  const latest=await db.prepare("SELECT snapshot_id,source_as_of,received_at,(SELECT value FROM growth_meta WHERE key='identity_revision') identity_revision FROM growth_auto_snapshots ORDER BY source_as_of DESC LIMIT 1").first<{snapshot_id:string;source_as_of:number;received_at:number;identity_revision:string}>();
  if(!latest)return {snapshotId:null,sourceAsOf:null,receivedAt:null,identityRevision:null,members:[] as Member[]};

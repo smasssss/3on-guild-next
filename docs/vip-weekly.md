@@ -6,13 +6,13 @@
 ## 관리자 입력
 
 관리설정 → **길드전 주간 포인트**에서 입력 양식을 내려받는다.
-사용자가 제공한 토요일 스크린샷의 정확한 숫자를 JSON에 입력하고 파일을 선택한다.
+사용자가 제공한 주간 스크린샷의 정확한 숫자를 JSON에 입력하고 파일을 선택한다.
 기존 성장자료 업로드처럼 AI가 파일을 준비하고 관리자가 검토하는 방식이다.
 서버가 스크린샷을 자동 인식하거나 LastAsylum에서 길드전 점수를 수집하지 않는다.
 현재 API 계약의 `activity`는 길드전 주간 포인트로 해석하지 않는다.
 
-- `providedOn`: 실제 자료 제공 토요일, `YYYY-MM-DD`.
-- `appliesOn`: 그 다음 월요일. 첫 적용일은 `2026-11-02`.
+- `providedOn`: 실제 자료 제공 토요일 또는 일요일, `YYYY-MM-DD`.
+- `appliesOn`: 바로 다음 월요일. 첫 적용일은 `2026-11-02`.
 - `coverage`: 전체 명단 `full` 또는 일부 `partial`.
 - `rows`: `memberId`, 정확한 `nickname`, 숫자 `points`.
 - 양식의 `points: null`은 미입력 표시다. 모르는 점수는 추정하지 말고 해당 행을
@@ -113,3 +113,7 @@ Wrangler versions upload 후 공식 deployments API로 코드 트래픽만 전�
 비버전 Worker 설정·Cron·접근 정책을 다시 쓰지 않는다. 백업·원문 검증은 암호화해 보관한다.
 
 현재 Production의 INCOMPLETE_ROSTER 및 delayed 마감은 이번 범위에서 수정하지 않는다.
+
+## 2026-11-01 입력 보완
+
+현재 선택 명단은 바꾸지 않고 `scoreMembers`에 확정된 보존 회원 연결을 별도로 제공한다. 현재 미관측 회원은 `points:0`, `participation:"not_participated"`, `evidence:"user_confirmation"`을 함께 지정한 경우에만 기록할 수 있다. 탈퇴 확정·동일인 검토 중인 회원과 미확인 ID는 허용하지 않는다. 양수 점수로 소속 제한을 우회할 수 없다. 사진 점수의 근거는 `user_screenshot`으로 보존할 수 있다. 원래 토요일 입력과 함께 실제 일요일 제공일도 바로 다음 월요일로 적용한다. 저장된 결과 보기에서 현재·예정 결과와 관리자 확인 미참여를 확인한다.
