@@ -1,4 +1,5 @@
 name: Verify weekly input on Staging then promote to Production
+# Live import diagnostics identify the exact UI boundary without logging data.
 # Cloudflare-owned audit annotations are read-only; custom settings remain preserved.
 on:
   push:

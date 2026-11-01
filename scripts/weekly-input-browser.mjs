@@ -96,7 +96,7 @@ const actions=async(page,input,password)=>{
   require(result.futureDenied&&result.weeklyPreserved,'Future weekly file is not applied');
   require(result.documentPreserved,'Existing VIP counts and records preserved');
   const editor=await page.locator('#rotationEditor').count();require(editor===1,'Rotation editor retained');
-  phase='WEEKLY_INPUT';
+  phase='WEEKLY_PREVIEW';
   const server=await page.evaluate(async()=>await (await fetch('/api/carriage/vip')).json());
   const providedOn=new Date(Date.parse(server.serverTime)+9*3600000).toISOString().slice(0,10);
   require([0,6].includes(new Date(providedOn).getUTCDay()),'Live positive fixture runs only on a weekend');
@@ -105,17 +105,21 @@ const actions=async(page,input,password)=>{
   await page.locator('#vipWeeklyFile').setInputFiles(input.weeklyFile);
   await page.locator('#vipWeeklySave:not([disabled])').waitFor();
   require((await page.locator('#vipWeeklyPreview').innerText()).includes('미참여(관리자 확인)'),'Historical zero preview');
+  phase='WEEKLY_SAVE';
   await page.locator('#vipWeeklySave').click();await page.locator('#confirmYes').click();
   await page.waitForFunction(()=>document.getElementById('vipWeeklyPreview').textContent.includes('주간 점수를 저장했습니다.'),{timeout:30000});
+  phase='WEEKLY_STORED';
   const stored=await page.evaluate(async()=>await (await fetch('/api/carriage/vip')).json());
   require(stored.revision===1&&JSON.stringify(stored.pending.rows.slice().sort((a,b)=>a.memberId.localeCompare(b.memberId)))===JSON.stringify(expectedSnapshot.rows.slice().sort((a,b)=>a.memberId.localeCompare(b.memberId)))&&stored.pending.rows.length===18&&stored.pending.providedOn===providedOn&&stored.pending.appliesOn===appliesOn&&stored.awaitingFirstSnapshot,'Stored weekend date, 18 rows and Monday activation');
   require(stored.pending.rows.filter(r=>r.participation==='not_participated'&&r.points===0&&r.evidence==='user_confirmation').length===1,'Stored nonparticipation evidence');
   require(!stored.members.some(m=>m.memberId===input.historical.memberId),'Historical reference never added to selection roster');
   // Re-upload through the actual UI: no extra revision/backup.
+  phase='WEEKLY_DUPLICATE';
   await page.locator('#vipWeeklyFile').setInputFiles(input.weeklyFile);
   await page.locator('#vipWeeklySave:not([disabled])').waitFor();await page.locator('#vipWeeklySave').click();await page.locator('#confirmYes').click();
   await page.waitForFunction(()=>document.getElementById('vipWeeklyPreview').textContent.includes('주간 점수를 저장했습니다.'),{timeout:30000});
   require((await page.evaluate(async()=>await (await fetch('/api/carriage/vip')).json())).revision===1,'Live duplicate upload remains revision 1');
+  phase='WEEKLY_RELOAD';
   await page.reload({waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>typeof shared!=='undefined'&&shared.ready&&adminOK(),{timeout:60000});
   await page.locator('.tabs [data-tab="settings"]').click();
