@@ -115,6 +115,9 @@ const actions=async(page,input,password)=>{
   require(!stored.members.some(m=>m.memberId===input.historical.memberId),'Historical reference never added to selection roster');
   // Re-upload through the actual UI: no extra revision/backup.
   phase='WEEKLY_DUPLICATE';
+  // A deliberate second chooser selection must start with an empty file input.
+  // Browsers do not fire change when the selected file list is unchanged.
+  await page.locator('#vipWeeklyFile').setInputFiles([]);
   await page.locator('#vipWeeklyFile').setInputFiles(input.weeklyFile);
   await page.locator('#vipWeeklySave:not([disabled])').waitFor();await page.locator('#vipWeeklySave').click();await page.locator('#confirmYes').click();
   await page.waitForFunction(()=>document.getElementById('vipWeeklyPreview').textContent.includes('주간 점수를 저장했습니다.'),{timeout:30000});

@@ -1,5 +1,5 @@
 """Narrow, source-pinned promotion using the established encrypted VIP release."""
-import datetime,importlib.util,json,os,re,subprocess,sys
+import datetime,importlib.util,json,os,re,subprocess,sys,tarfile
 from pathlib import Path
 
 spec=importlib.util.spec_from_file_location('vip_release',Path(__file__).with_name('vip-management-release.py'))
@@ -18,6 +18,17 @@ class Release(base.Release):
         assert subprocess.run(['git','diff','--quiet',resolved,base.BASE,'--',*RUNTIME],capture_output=True).returncode==0,'Live runtime differs from the reviewed baseline'
         assert base.digest(self.public('/carriage-vip.js'))==base.digest(subprocess.check_output(['git','show',base.BASE+':public/carriage-vip.js']))
         return version
+
+    def encrypt(self,label):
+        # Use the existing user-owned recipient with a verified durable recovery key.
+        # The private key is never part of source, CI, artifacts or deployment.
+        archive=self.root/(label+'.tar.gz')
+        with tarfile.open(archive,'w:gz') as bundle:
+            for p in self.root.iterdir():
+                if p.is_file() and p.suffix not in ['.gz','.cms']:bundle.add(p,arcname=p.name)
+        output=Path('vip-encrypted-evidence');output.mkdir(exist_ok=True)
+        result=subprocess.run(['openssl','cms','-encrypt','-binary','-aes-256-gcm','-in',str(archive),'-out',str(output/(self.target+'-'+label+'.cms')),'-outform','DER','scripts/weekly-backup-recipient.crt'],capture_output=True)
+        assert result.returncode==0,'Recovery evidence encryption failed'
 
     def fixture_setup(self):
         assert self.target=='staging'
