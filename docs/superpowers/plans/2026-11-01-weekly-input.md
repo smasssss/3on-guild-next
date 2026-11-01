@@ -25,15 +25,19 @@
 
 Files: lib/vip-weekly.ts, app/api/carriage/vip/route.ts, public/carriage-vip.js, tests/weekly_input_regression.cjs.
 
-- [ ] Add real SQLite/API and renderer tests; run and observe Sunday/reference failures.
-- [ ] Implement scoreMembers, narrow reference guards, evidence preservation and weekend validation; update upload preview/result display.
-- [ ] Run all VIP, data preservation, date, rotation, automation and growth regressions, typecheck, lint and build.
+- [x] Add real SQLite/API and renderer tests; run and observe Sunday/reference failures.
+- [x] Implement scoreMembers, narrow reference guards, evidence preservation and weekend validation; update upload preview/result display.
+- [x] Run all VIP, data preservation, date, rotation, automation and growth regressions, typecheck, lint and build.
 
 ### Task 2: Verified promotion and actual result
 
 Files: a new workflow and a release subclass scoped to this release, docs/vip-weekly.md.
 
-- [ ] Reuse encrypted full backup/isolated restore/code-only deployment, pinned baseline 0cb547c, settings preservation and rollback guards.
-- [ ] Staging live import test covers actual storage/reload/cleanup without external API calls; preserve its prior weekly document.
-- [ ] Promote identical tested artifact to Production; verify code/data invariants.
-- [ ] Through the authenticated UI back up, upload all 99 rows, confirm exact stored results and Monday activation logic, and retain recovery evidence.
+- [x] Reuse encrypted full backup/isolated restore/code-only deployment, pinned baseline 0cb547c, settings preservation and rollback guards.
+- [x] Staging live import test covers actual storage/reload/cleanup without external API calls; preserve its prior weekly document.
+- [x] Promote identical tested artifact to Production; verify code/data invariants.
+- [x] Through the authenticated UI back up, upload all 99 rows, confirm exact stored results and Monday activation logic, and retain recovery evidence.
+
+## Verified result
+
+Final release41268033263 passed both Staging and Production with source7e673497f57dec063ad41fe824bd90b81ffc91c7. The authorized UI import is revision1:89 photographed rows and10 explicit nonparticipation zeros, pending for2026-11-02. Exact row comparison, reload display, unchanged operational documents and actual CMS decryption/isolated SQL restore passed. Details: docs/weekly-input-validation.md.
