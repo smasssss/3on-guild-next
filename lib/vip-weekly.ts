@@ -12,10 +12,13 @@ type Carriage = {vipExcludedMembers?:Record<string,number>};
 export const emptyWeekly = ():WeeklyData => ({current:null,pending:null});
 export const kstDay = (now:number) => new Date(now+9*3_600_000).toISOString().slice(0,10);
 export function weekOf(now:number){const d=new Date(kstDay(now)+'T00:00:00Z');d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7));return d.toISOString().slice(0,10);}
+// appliesOn remains the Monday cycle key; VIP eligibility starts the preceding Sunday.
+export const effectiveOn = (weekly:Weekly) => new Date(Date.parse(weekly.appliesOn)-DAY).toISOString().slice(0,10);
 export function weeklyView(data:WeeklyData,now=Date.now()){
- const week=weekOf(now);
- const active=[data.pending,data.current].filter((w):w is Weekly=>!!w&&w.appliesOn<=week).sort((a,b)=>b.appliesOn.localeCompare(a.appliesOn))[0]||null;
- return {week,active,awaitingFirstSnapshot:!active,carriedForward:!!active&&active.appliesOn<week,pending:data.pending&&data.pending.appliesOn>week?data.pending:null};
+ const week=weekOf(now),scoreWeek=weekOf(now+DAY),today=kstDay(now);
+ const active=[data.pending,data.current].filter((w):w is Weekly=>!!w&&effectiveOn(w)<=today).sort((a,b)=>b.appliesOn.localeCompare(a.appliesOn))[0]||null;
+ const pending=data.pending&&effectiveOn(data.pending)>today?data.pending:null;
+ return {week,scoreWeek,active,effectiveOn:active?effectiveOn(active):null,awaitingFirstSnapshot:!active,carriedForward:!!active&&active.appliesOn<scoreWeek,pending,pendingEffectiveOn:pending?effectiveOn(pending):null};
 }
 function invalid(message:string):never{throw Error(message);}
 function date(value:unknown):value is string{return typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value)&&Number.isFinite(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value;}
@@ -24,7 +27,7 @@ export function prepareWeekly(input:unknown,members:Member[],now=Date.now(),reta
  const b=input as Record<string,unknown>;
  if(!date(b.providedOn)||!date(b.appliesOn))return invalid('자료 제공일과 적용일을 확인해 주세요.');
  const day=new Date(b.providedOn).getUTCDay(),daysUntilMonday=day===6?2:day===0?1:0;
- if(!daysUntilMonday||new Date(Date.parse(b.providedOn)+daysUntilMonday*DAY).toISOString().slice(0,10)!==b.appliesOn||b.providedOn>kstDay(now)||b.appliesOn<'2026-11-02'||(b.appliesOn<weekOf(now)&&b.appliesOn!==retainedWeek))return invalid('자료 제공일은 실제 토요일 또는 일요일, 적용일은 바로 다음 월요일로 지정해 주세요. 미래 제공일과 현재 사용하지 않는 과거 주차는 저장할 수 없습니다.');
+ if(!daysUntilMonday||new Date(Date.parse(b.providedOn)+daysUntilMonday*DAY).toISOString().slice(0,10)!==b.appliesOn||b.providedOn>kstDay(now)||b.appliesOn<'2026-11-02'||(b.appliesOn<weekOf(now+DAY)&&b.appliesOn!==retainedWeek))return invalid('자료 제공일은 실제 토요일 또는 일요일, 주차 기준일은 바로 다음 월요일로 지정해 주세요. VIP 자격은 해당 일요일부터 적용합니다. 미래 제공일과 현재 사용하지 않는 과거 주차는 저장할 수 없습니다.');
  if(!['full','partial'].includes(String(b.coverage))||!Array.isArray(b.rows)||b.rows.length<1||b.rows.length>500)return invalid('전체/일부 명단 여부와 점수 행을 확인해 주세요.');
  const byId=new Map(scoreMembers.map(m=>[m.memberId,m])),ids=new Set<string>(),names=new Set<string>();
  const rows:ScoreRow[]=b.rows.map((value:unknown)=>{
@@ -43,19 +46,18 @@ export function prepareWeekly(input:unknown,members:Member[],now=Date.now(),reta
 }
 export function replaceWeekly(data:WeeklyData,next:Weekly,now=Date.now()):WeeklyData{
  const view=weeklyView(data,now);
- return next.appliesOn<=view.week?{current:next,pending:view.pending}:{current:view.active,pending:next};
+ return next.appliesOn<=view.scoreWeek?{current:next,pending:view.pending}:{current:view.active,pending:next};
 }
 export function sameSnapshot(a:Weekly|null,b:Weekly){return !!a&&JSON.stringify({...a,updatedAt:''})===JSON.stringify({...b,updatedAt:''});}
 export function eligibility(member:Member|undefined,carriage:Carriage,weekly:Weekly|null,now=Date.now()){
  // Permanent exclusion always wins, including when membership/weekly data are missing.
  if(member&&carriage.vipExcludedMembers?.[member.memberId]===1)return {eligible:false,reason:'permanent'};
  if(!member?.current)return {eligible:false,reason:'membership'};
- const week=weekOf(now);
- const awaitingFirstSnapshot=!weekly||weekly.appliesOn>week;
- if(member.temporary&&(week==='2026-10-26'||awaitingFirstSnapshot))return {eligible:false,reason:'temporary'};
+ const awaitingFirstSnapshot=!weekly||effectiveOn(weekly)>kstDay(now);
+ if(member.temporary&&awaitingFirstSnapshot)return {eligible:false,reason:'temporary'};
  // Until the first snapshot actually takes effect, keep the existing selection rules.
- // Uploading the first future snapshot must not change eligibility ahead of Monday.
- if(week<'2026-11-02'||awaitingFirstSnapshot)return {eligible:true,reason:'eligible'};
+ // Uploading the first future snapshot must not change eligibility ahead of Sunday.
+ if(awaitingFirstSnapshot)return {eligible:true,reason:'eligible'};
  const row=weekly.rows.find(r=>r.memberId===member.memberId);
  if(!row)return {eligible:false,reason:'score_missing'};
  return row.points>=THRESHOLD?{eligible:true,reason:'eligible'}:{eligible:false,reason:'score_low'};

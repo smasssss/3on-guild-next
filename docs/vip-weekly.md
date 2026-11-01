@@ -1,3 +1,7 @@
+# Current rule update — 2026-11-01
+
+VIP score restrictions now start on the Sunday preceding the stored Monday `appliesOn` cycle key. `effectiveOn` and `scoreWeek` in the read API expose this without changing operational Monday weeks or existing stored data. Existing pending99 rows therefore become active on2026-11-01. Saturday uploads wait for Sunday; Sunday uploads apply when saved; missing weeks retain prior scores. The VIP picker places eligible people first and restricted people last, keeping its prior ordering inside each group. Permanent exclusions remain omitted. Earlier Monday-only timing in the historical notes below is superseded by this update.
+
 # 마차 명단과 주간 VIP 자격
 
 운영 기준 소스: `8caefa5c8b0259f847ab72180016d045d8566f60`.

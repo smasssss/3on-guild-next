@@ -31,8 +31,8 @@ async function run(){
  assert.equal(v.eligibility(eligible,carriage,view.active,at('2026-11-01T15:00:00Z')).reason,'permanent');
  assert.equal(v.eligibility(blocked,{},view.active,at('2026-11-01T15:00:00Z')).reason,'score_missing');
  const released={...weekly,rows:[{memberId:'blocked',nickname:'언데드킬러',points:21720000}]};
- assert.equal(v.eligibility(blocked,{},released,at('2026-11-01T15:00:00Z')).eligible,true,'temporary restriction expires on Monday');
- assert.equal(v.eligibility(blocked,{vipExcludedMembers:{blocked:1}},released,at('2026-11-01T15:00:00Z')).reason,'permanent','Monday never lifts permanent exclusion');
+ assert.equal(v.eligibility(blocked,{},released,at('2026-11-01T15:00:00Z')).eligible,true,'temporary restriction expires on Sunday');
+ assert.equal(v.eligibility(blocked,{vipExcludedMembers:{blocked:1}},released,at('2026-11-01T15:00:00Z')).reason,'permanent','Sunday never lifts permanent exclusion');
  const carried=v.weeklyView(doc,at('2026-11-08T15:00:00Z'));
  assert.equal(carried.week,'2026-11-09');assert(carried.active,'missing snapshot must retain previous applied scores');assert.equal(carried.active.appliesOn,'2026-11-02','missing snapshot retains last applied scores');assert.equal(carried.carriedForward,true);
  assert.equal(carried.active.updatedAt,weekly.updatedAt,'carry-forward must not fabricate an update timestamp');
@@ -45,7 +45,7 @@ async function run(){
  for(const points of [21719999,15000000]){const w={...weekly,rows:[{...weekly.rows[0],points}]};assert.equal(v.eligibility(eligible,{},w,at('2026-11-02T01:00Z')).reason,'score_low');}
  const second=v.prepareWeekly({...input,providedOn:'2026-11-07',appliesOn:'2026-11-09',rows:[{...input.rows[0],points:15000000}]},roster.members,at('2026-11-07T13:00Z'));
  const replaced=v.replaceWeekly(doc,second,at('2026-11-07T13:00Z'));assert.equal(v.weeklyView(replaced,at('2026-11-08T15:00Z')).active.rows[0].points,15000000);
- assert.equal(v.weeklyView(replaced,at('2026-11-08T14:59:59Z')).active.rows[0].points,21720000,'new pending upload keeps previous score until Monday');
+ assert.equal(v.weeklyView(replaced,at('2026-11-07T14:59:59Z')).active.rows[0].points,21720000,'new pending upload keeps previous score until Sunday');
  assert.equal(v.weeklyView(replaced,at('2026-11-08T15:00Z')).carriedForward,false);
  assert.equal(v.eligibility(eligible,{},v.weeklyView(replaced,at('2026-11-15T15:00Z')).active,at('2026-11-16T00:00Z')).reason,'score_low','retained low scores stay ineligible');
  const third=v.prepareWeekly({...input,providedOn:'2026-11-14',appliesOn:'2026-11-16',rows:[{...input.rows[0],points:23000000}]},roster.members,at('2026-11-14T13:00Z'));

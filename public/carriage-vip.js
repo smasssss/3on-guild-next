@@ -12,9 +12,10 @@ function carriageVipStatus(m){
 }
 function carriagePoints(m){return carriageVip.view?.active?.rows.find(r=>r.memberId===m?.member_id)?.points??null;}
 function carriageTime(value){return value?new Date(value).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+' KST':'미확인';}
+function carriageEffectiveDate(w){return new Date(Date.parse(w.appliesOn)-86_400_000).toISOString().slice(0,10);}
 function carriageWeekText(){
  const v=carriageVip.view;if(!v)return carriageVip.error||'마차 명단·주간 점수 확인 중';
- return `${v.week} 주차 · ${v.active?`${v.active.appliesOn} 점수 기준${v.carriedForward?' · 새 자료 없음, 이전 점수·자격 유지':''} · 점수 갱신 ${carriageTime(v.active.updatedAt)}`:'첫 점수 적용 전 · 기존 자격 유지 · 지정 16명 제한'} · 명단 관측 ${carriageTime(v.roster.sourceAsOf)}`;
+ return `${v.scoreWeek||v.week} 주차 · ${v.active?`${v.active.appliesOn} 점수 기준 · VIP 제한 ${v.effectiveOn||carriageEffectiveDate(v.active)}부터${v.carriedForward?' · 새 자료 없음, 이전 점수·자격 유지':''} · 점수 갱신 ${carriageTime(v.active.updatedAt)}`:'첫 점수 적용 전 · 기존 자격 유지 · 지정 16명 제한'} · 명단 관측 ${carriageTime(v.roster.sourceAsOf)}`;
 }
 function carriageInfo(label){
  const m=memberByLabel(label);if(!m)return '길드원 정보 미확인';const score=carriagePoints(m);
@@ -22,7 +23,7 @@ function carriageInfo(label){
 }
 function renderCarriageVipResults(){
  const q=(document.getElementById('vipSearch').value||'').toLowerCase();
- const arr=carriageMembers().filter(m=>m.observedToday===true&&state.vipExcludedMembers?.[m.member_id]!==1&&(m.name+' '+labelOfMember(m)).toLowerCase().includes(q)).map(m=>({m,count:vipTotalCount(m.name)})).sort((a,b)=>a.count-b.count||(b.m.level||0)-(a.m.level||0)||(carriagePoints(b.m)??-1)-(carriagePoints(a.m)??-1)||labelOfMember(a.m).localeCompare(labelOfMember(b.m),'ko')).slice(0,100);
+ const arr=carriageMembers().filter(m=>m.observedToday===true&&state.vipExcludedMembers?.[m.member_id]!==1&&(m.name+' '+labelOfMember(m)).toLowerCase().includes(q)).map(m=>({m,count:vipTotalCount(m.name)})).sort((a,b)=>Number(!carriageVipStatus(a.m).eligible)-Number(!carriageVipStatus(b.m).eligible)||a.count-b.count||(b.m.level||0)-(a.m.level||0)||(carriagePoints(b.m)??-1)-(carriagePoints(a.m)??-1)||labelOfMember(a.m).localeCompare(labelOfMember(b.m),'ko')).slice(0,100);
  document.getElementById('vipResults').innerHTML=`<div class="sub" role="status">${escapeLabel(carriageWeekText())}</div>`+arr.map(({m,count})=>{
   const status=carriageVipStatus(m),reason=vipReason[status.reason]||'';
   return `<div class="viprow"><div class="vip-main"><b>${escapeLabel(labelOfMember(m))}</b><br><span>${carriageInfo(m.name)}</span>${!status.eligible?'<br><span class="pill warn">'+reason+'</span>':''}</div><div class="vip-actions"><span class="vip-count ${count===0?'zero':''}">VIP ${count}회${carryConflict(m.name)?' · 확인 필요':''}</span><div class="vip-pick-buttons"><button class="smallbtn" data-leader="${escapeLabel(m.member_id)}">마차장</button><button class="smallbtn" data-vip="${escapeLabel(m.member_id)}" ${status.eligible?'':'disabled aria-disabled="true"'} title="${reason}">VIP</button></div></div></div>`;
@@ -41,7 +42,7 @@ async function refreshCarriageVip(force=false){
  finally{carriageVip.loading=null;}
  if(document.getElementById('vipWeeklyStatus'))document.getElementById('vipWeeklyStatus').textContent=carriageWeekText();
  if(document.getElementById('vipWeeklyResults'))document.getElementById('vipWeeklyResults').textContent=weeklyResultsText(carriageVip.view);
- if(document.getElementById('vipWeeklyPending'))document.getElementById('vipWeeklyPending').textContent=carriageVip.view?.pending?`${carriageVip.view.pending.appliesOn} 적용 예정 · ${carriageVip.view.pending.rows.length}명 · 제공일 ${carriageVip.view.pending.providedOn}`:'다음 주 적용 예정 자료 없음';
+ if(document.getElementById('vipWeeklyPending'))document.getElementById('vipWeeklyPending').textContent=carriageVip.view?.pending?`${carriageVip.view.pendingEffectiveOn||carriageEffectiveDate(carriageVip.view.pending)} VIP 적용 예정 · ${carriageVip.view.pending.rows.length}명 · 제공일 ${carriageVip.view.pending.providedOn}`:'다음 주 적용 예정 자료 없음';
  if(document.getElementById('vipSearch'))renderCarriageVipResults();
  })();return carriageVip.loading;
 }
@@ -65,26 +66,26 @@ async function reviewVipSnapshot(event){
   const ids=new Set(),names=new Set();
   for(const row of input.rows){const m=byId.get(row.memberId);if(!m||m.nickname!==row.nickname||ids.has(row.memberId)||names.has(row.nickname)||!Number.isSafeInteger(row.points)||row.points<0||(!m.current&&(row.points!==0||row.participation!=='not_participated'||row.evidence!=='user_confirmation')))throw Error('회원 ID·정확한 닉네임·중복·점수 숫자를 확인해 주세요. 미확인 점수는 행을 제외하고 일부 명단으로 표시하세요.');ids.add(row.memberId);names.add(row.nickname);}
   if(input.coverage==='full'&&current.some(m=>!ids.has(m.memberId)))throw Error('전체 명단에 누락이 있습니다.');
-  preview.textContent=`제공일 ${input.providedOn} → 적용일 ${input.appliesOn}\n${input.coverage==='full'?'전체':'일부'} ${ids.size}명 · 누락 ${current.filter(m=>!ids.has(m.memberId)).length}명(0점 처리 안 함)\n`+input.rows.map(r=>`${r.nickname}: ${fmt(r.points)}점${r.participation==='not_participated'?' · 미참여(관리자 확인)':''}`).join('\n');
+  preview.textContent=`제공일 ${input.providedOn} → VIP 적용일 ${carriageEffectiveDate(input)} · 주차 ${input.appliesOn}\n${input.coverage==='full'?'전체':'일부'} ${ids.size}명 · 누락 ${current.filter(m=>!ids.has(m.memberId)).length}명(0점 처리 안 함)\n`+input.rows.map(r=>`${r.nickname}: ${fmt(r.points)}점${r.participation==='not_participated'?' · 미참여(관리자 확인)':''}`).join('\n');
   carriageVip.draft={snapshot:input,revision:carriageVip.view.revision,mutation:crypto.randomUUID()};save.disabled=false;
  }catch(e){preview.textContent=e.message;}
 }
 async function saveVipSnapshot(){
  if(!ensureAdmin()||!carriageVip.draft)return;
  const b=carriageVip.draft;
- if(!await askConfirm(`${b.snapshot.appliesOn} 주간 점수를 저장할까요? 월요일부터 이전 점수를 대체하며 VIP 누적 횟수는 유지됩니다.`))return;
+ if(!await askConfirm(`${carriageEffectiveDate(b.snapshot)}부터 적용할 주간 점수를 저장할까요? 일요일부터 이전 점수를 대체하며 VIP 누적 횟수는 유지됩니다.`))return;
  const button=document.getElementById('vipWeeklySave');button.disabled=true;
  try{await sharedRequest('/api/carriage/vip',{method:'POST',body:JSON.stringify(b)});carriageVip.draft=null;await refreshCarriageVip(true);document.getElementById('vipWeeklyPreview').textContent='주간 점수를 저장했습니다. 적용 주차는 서버 KST 기준입니다.';}
  catch(e){document.getElementById('vipWeeklyPreview').textContent=e.message;button.disabled=false;}
 }
 function weeklyResultsText(view){
  if(!view)return '주간 결과 확인 중';
- return [view.active,view.pending].filter(Boolean).map(w=>`제공일 ${w.providedOn} · ${w.appliesOn} 적용 · ${w.rows.length}명 · 미참여 ${w.rows.filter(r=>r.participation==='not_participated').length}명\n`+w.rows.slice().sort((a,b)=>b.points-a.points||a.nickname.localeCompare(b.nickname,'ko')).map(r=>`${r.nickname}: ${fmt(r.points)}점${r.participation==='not_participated'?' · 미참여(관리자 확인)':''}`).join('\n')).join('\n\n')||'저장된 주간 결과 없음';
+ return [view.active,view.pending].filter(Boolean).map(w=>`제공일 ${w.providedOn} · VIP 적용 ${carriageEffectiveDate(w)} · 주차 ${w.appliesOn} · ${w.rows.length}명 · 미참여 ${w.rows.filter(r=>r.participation==='not_participated').length}명\n`+w.rows.slice().sort((a,b)=>b.points-a.points||a.nickname.localeCompare(b.nickname,'ko')).map(r=>`${r.nickname}: ${fmt(r.points)}점${r.participation==='not_participated'?' · 미참여(관리자 확인)':''}`).join('\n')).join('\n\n')||'저장된 주간 결과 없음';
 }
 function initCarriageVip(){
  const section=document.getElementById('settings');if(!section||document.getElementById('vipWeeklyPanel'))return;
  const panel=document.createElement('div');panel.className='card';panel.id='vipWeeklyPanel';
- panel.innerHTML='<h2>길드전 주간 포인트</h2><p class="sub" id="vipWeeklyStatus"></p><p class="sub" id="vipWeeklyPending"></p><details><summary>저장된 주간 결과 보기</summary><pre id="vipWeeklyResults" style="white-space:pre-wrap;max-height:360px;overflow:auto"></pre></details><p class="sub">토·일요일에 제공한 주간 자료를 검토해 다음 월요일에 적용합니다. 미관측 회원의 미참여는 관리자 확인 0점으로 별도 보존합니다. 새 자료가 없는 주에는 이전 점수와 자격을 유지합니다. 기준 21,720,000점 · 새 자료로 대체 · VIP 누적 횟수 유지. 새 자료에서 누락된 개인 점수는 미확인으로 남습니다.</p><div class="actions"><button type="button" class="btn ghost" id="vipWeeklyTemplate">입력 양식 받기</button><label class="btn ghost">JSON 자료 선택<input type="file" accept="application/json,.json" id="vipWeeklyFile" hidden></label><button type="button" class="btn primary" id="vipWeeklySave" disabled>검토한 점수 저장</button><button type="button" class="btn ghost" id="vipWeeklyReload">최신 자료 확인</button><button type="button" class="btn ghost" id="vipWeeklyBackup">점수 복구 사본 받기</button></div><pre id="vipWeeklyPreview" style="white-space:pre-wrap;max-height:320px;overflow:auto"></pre>';
+ panel.innerHTML='<h2>길드전 주간 포인트</h2><p class="sub" id="vipWeeklyStatus"></p><p class="sub" id="vipWeeklyPending"></p><details><summary>저장된 주간 결과 보기</summary><pre id="vipWeeklyResults" style="white-space:pre-wrap;max-height:360px;overflow:auto"></pre></details><p class="sub">토·일요일에 제공한 주간 자료는 해당 일요일부터 VIP 자격에 적용합니다. 주차 기준일은 기존 월요일을 유지합니다. 미관측 회원의 미참여는 관리자 확인 0점으로 별도 보존합니다. 새 자료가 없는 주에는 이전 점수와 자격을 유지합니다. 기준 21,720,000점 · 새 자료로 대체 · VIP 누적 횟수 유지. 새 자료에서 누락된 개인 점수는 미확인으로 남습니다.</p><div class="actions"><button type="button" class="btn ghost" id="vipWeeklyTemplate">입력 양식 받기</button><label class="btn ghost">JSON 자료 선택<input type="file" accept="application/json,.json" id="vipWeeklyFile" hidden></label><button type="button" class="btn primary" id="vipWeeklySave" disabled>검토한 점수 저장</button><button type="button" class="btn ghost" id="vipWeeklyReload">최신 자료 확인</button><button type="button" class="btn ghost" id="vipWeeklyBackup">점수 복구 사본 받기</button></div><pre id="vipWeeklyPreview" style="white-space:pre-wrap;max-height:320px;overflow:auto"></pre>';
  section.prepend(panel);document.getElementById('vipWeeklyTemplate').onclick=vipTemplate;document.getElementById('vipWeeklyFile').onchange=reviewVipSnapshot;document.getElementById('vipWeeklySave').onclick=saveVipSnapshot;document.getElementById('vipWeeklyReload').onclick=()=>refreshCarriageVip(true);
  document.getElementById('vipWeeklyBackup').onclick=async()=>{if(!ensureAdmin())return;try{downloadJSON(await sharedRequest('/api/carriage/vip?backups=1'),'3ON_주간점수_복구사본.json');}catch(e){showNotice(e.message);}};
  refreshCarriageVip();

@@ -28,7 +28,7 @@ await check('Participation evidence uses strict scalar enum values',async()=>{
 await check('Known unobserved member accepts only explicit confirmed nonparticipation without rejoining',async()=>{
  const f=setup(),before=f.sql.prepare('SELECT kind,revision,payload FROM documents ORDER BY kind').all();
  let response=await request(f,snapshot('2026-10-31'));assert.equal(response.status,200,await response.clone().text());
- const saved=(await response.json()).data.pending;assert.equal(saved.rows.length,2);assert.equal(saved.rows.find(r=>r.memberId==='h').evidence,'user_confirmation');
+ const savedData=(await response.json()).data;const saved=savedData.current||savedData.pending;assert.equal(saved.rows.length,2);assert.equal(saved.rows.find(r=>r.memberId==='h').evidence,'user_confirmation');
  const api=f.load('app/api/carriage/vip/route.ts'),view=await (await api.GET(new Request('http://localhost/api/carriage/vip'))).json();
  assert(!view.members.some(m=>m.memberId==='h'),'reference must not enter the actual observed roster');
  assert.equal(view.scoreMembers.find(m=>m.memberId==='h').current,false);
