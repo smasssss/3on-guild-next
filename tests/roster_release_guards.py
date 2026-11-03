@@ -1,5 +1,6 @@
 """Exercise exact Staging fixture SQL and prove it cannot run on Production."""
-import importlib.util,json,os,sqlite3,tempfile,unittest
+import importlib.util,io,json,os,sqlite3,tempfile,unittest,urllib.error
+from unittest.mock import patch
 from pathlib import Path
 spec=importlib.util.spec_from_file_location('roster_release',Path(__file__).resolve().parents[1]/'scripts/growth-roster-release.py');module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
 class Local(module.Release):
@@ -31,4 +32,30 @@ class Guards(unittest.TestCase):
    for action in [r.fixture_setup,r.fixture_rejoin,r.fixture_cleanup]:
     with self.assertRaises(AssertionError):action()
    with self.assertRaises(AssertionError):r.fixture_batch([{'sql':'INSERT INTO growth_members VALUES(?)','params':['x']}])
+class Transport(unittest.TestCase):
+ def error(self):return urllib.error.HTTPError('https://example.invalid',500,'transient',{},io.BytesIO(b'{}'))
+ def release(self):return object.__new__(module.Release)
+ def test_transient_read_is_bounded_and_retried(self):
+  r=self.release()
+  with patch.object(module.base.Release,'api',side_effect=[self.error(),{'ok':True}]) as call,patch.object(module.time,'sleep'):
+   self.assertEqual(r.api('GET','/workers/x/settings'),{'ok':True});self.assertEqual(call.call_count,2)
+ def test_mutation_is_never_retried(self):
+  r=self.release()
+  with patch.object(module.base.Release,'api',side_effect=self.error()) as call:
+   with self.assertRaises(urllib.error.HTTPError):r.api('POST','/workers/x/deployments',{})
+   self.assertEqual(call.call_count,1)
+ def test_failed_response_with_observed_version_does_not_repeat_write(self):
+  r=self.release();r.active=lambda:'reviewed'
+  with patch.object(module.base.Release,'activate',side_effect=self.error()) as call:
+   r.activate('reviewed','message');self.assertEqual(call.call_count,1)
+ def test_unapplied_failed_write_is_not_treated_as_success(self):
+  r=self.release();r.active=lambda:'old'
+  with patch.object(module.base.Release,'activate',side_effect=self.error()) as call,patch.object(module.time,'sleep'):
+   with self.assertRaises(urllib.error.HTTPError):r.activate('reviewed','message')
+   self.assertEqual(call.call_count,1)
+ def test_read_failure_stops_after_three_attempts(self):
+  r=self.release()
+  with patch.object(module.base.Release,'api',side_effect=[self.error(),self.error(),self.error()]) as call,patch.object(module.time,'sleep'):
+   with self.assertRaises(urllib.error.HTTPError):r.api('GET','/workers/x/settings')
+   self.assertEqual(call.call_count,3)
 if __name__=='__main__':unittest.main()

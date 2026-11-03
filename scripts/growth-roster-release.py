@@ -1,10 +1,34 @@
 """Code-only current-roster repair with complete backup and guarded Staging fixtures."""
-import datetime,importlib.util,json,os,sys,time
+import datetime,importlib.util,json,os,sys,time,urllib.error
 from pathlib import Path
 spec=importlib.util.spec_from_file_location('weekly',Path(__file__).with_name('weekly-input-release.py'));weekly=importlib.util.module_from_spec(spec);spec.loader.exec_module(weekly)
 base=weekly.base;base.BASE='af25ab2b8b6ea09c942d4393defa8c479236d62e'
 
 class Release(weekly.Release):
+    def api(self,method,path,body=None):
+        readonly=method=='GET' or (method=='POST' and path.endswith('/query') and isinstance(body,dict) and str(body.get('sql','')).lstrip().upper().startswith('SELECT '))
+        operation='d1-query' if '/d1/' in path else path.rsplit('/',1)[-1]
+        for attempt in range(3):
+            try:return super().api(method,path,body)
+            except urllib.error.HTTPError as error:
+                self.last_api_failure={'operation':operation,'method':method,'status':error.code,'body':error.read(8192).decode(errors='replace')}
+                if readonly and error.code in [500,502,503,504] and attempt<2:
+                    print('Transient Cloudflare management read '+operation+': retry '+str(attempt+1)+'/2');time.sleep(attempt+1)
+                else:raise
+
+    def activate(self,version,message):
+        failure=None
+        try:super().activate(version,message)
+        except urllib.error.HTTPError as error:
+            if error.code not in [500,502,503,504]:raise
+            failure=error
+        # A failed response may follow a successful write. Reconcile by reads;
+        # never repeat a traffic-changing POST on an ambiguous response.
+        for attempt in range(4):
+            if self.active()==version:return
+            if attempt<3:time.sleep(1)
+        if failure:raise failure
+        raise AssertionError('Code traffic activation did not complete')
     def before(self):
         super().before()
         self.save('roster-before.json',{'current':json.loads(self.public('/api/growth/current')),'legacy':json.loads(self.public('/api/growth/legacy')),'vip':json.loads(self.public('/api/carriage/vip'))})
@@ -90,7 +114,7 @@ if __name__=='__main__':
         else:getattr(r,action.replace('-','_'))()
         print('Roster repair '+target+' '+action+': PASS')
     except Exception as error:
-        if 'r' in locals():r.save('failure.json',{'phase':base.PHASE,'type':type(error).__name__,'message':str(error),'http_status':getattr(error,'code',None)})
+        if 'r' in locals():r.save('failure.json',{'phase':base.PHASE,'type':type(error).__name__,'message':str(error),'http_status':getattr(error,'code',None),'management_api':getattr(r,'last_api_failure',None)})
         print('Failure category: '+type(error).__name__+(' HTTP '+str(error.code) if hasattr(error,'code') else ''))
         if str(error)=='Code traffic activation did not complete':print('Traffic verification returned the previous version immediately after activation')
         print('Roster repair '+base.PHASE+': FAIL; private details withheld');raise SystemExit(1)

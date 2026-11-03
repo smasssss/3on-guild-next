@@ -1,4 +1,5 @@
 name: Verify current roster repair and preserve all existing operations
+# Retry only transient management reads; reconcile traffic writes without resubmission.
 # Record safe activation failure categories; never emit request credentials.
 # Duplicate chooser test clears the previous selection; recovery uses a verified user-owned recipient.
 # Live import diagnostics identify the exact UI boundary without logging data.
