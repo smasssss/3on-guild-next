@@ -1,10 +1,11 @@
+import { completeRoster } from '../../../../lib/growth-roster';
 import { db, response } from '../../../../lib/store';
 import { GROWTH_API, GROWTH_SCHEMA, meta } from '../../../../lib/growth';
 import { growthChanges } from '../../../../lib/growth-changes';
 export const dynamic='force-dynamic';
 
 export async function GET(req:Request){try{
-  const latest=await db().prepare("SELECT batch_id,observed_date FROM growth_batches WHERE state='published' ORDER BY observed_date DESC,published_revision DESC LIMIT 1").first<{batch_id:string;observed_date:string}>();if(!latest)throw Error();
+  const latest=await db().prepare("SELECT batch_id,observed_date,slot FROM growth_batches WHERE state='published' ORDER BY observed_date DESC,published_revision DESC LIMIT 1").first<{batch_id:string;observed_date:string;slot:string}>();if(!latest)throw Error();
   const lineage=`WITH RECURSIVE valid_lineage(batch_id,lineage_depth) AS (
     SELECT batch_id,0 FROM growth_batches WHERE batch_id=? AND state='published'
     UNION ALL SELECT parent.batch_id,lineage.lineage_depth+1 FROM valid_lineage lineage
@@ -37,7 +38,7 @@ export async function GET(req:Request){try{
   const effective=(observationResult.results as any[]).filter((o:any)=>o.source_type==='legacy'||o.lineage_depth===correctionDepth.get(`${o.member_id}\0${o.observed_date}\0${o.slot}`));
   const observations=new Map<string,any[]>();for(const o of effective){if(!observations.has(o.member_id))observations.set(o.member_id,[]);observations.get(o.member_id)!.push(o);}
   const makeMember=(memberId:string)=>{
-    const info:any=memberInfo.get(memberId),env:any=envelopes.get(memberId);const item=env?structuredClone(env.data):{name:info.legacy_canonical||memberId,displayName:info.display_name,history:[],isNew:true};
+    const info:any=memberInfo.get(memberId),env:any=envelopes.get(memberId);const item=env?structuredClone(env.data):{name:info.legacy_canonical||memberId,displayName:info.display_name,history:[],power:null,prevPower:null,rank:null,level:null,isNew:true};
     item.name=info.legacy_canonical||item.name||memberId;item.displayName=info.display_name;item.member_id=memberId;
     const all=observations.get(memberId)||[];const newer=all.filter(o=>o.source_type!=='legacy');
     for(const o of newer)item.history.push({label:o.label||o.observed_date,date:o.observed_date,slot:o.slot,power:o.power,...(o.source_type==='automatic'?{source_as_of:o.auto_source_as_of,received_at:o.auto_received_at,stale:!!o.auto_stale,source_type:'automatic',individual_timestamp:false}:{})});
@@ -49,6 +50,11 @@ export async function GET(req:Request){try{
   };
   const activeStates=new Set(['current','observed','unobserved','new']);const current:any[]=[];const currentIds=new Set<string>();
   for(const s of snapshotResult.results as any[]){if(activeStates.has(s.membership_state)){const m=makeMember(s.member_id);m.observedToday=s.membership_state!=='unobserved';current.push(m);currentIds.add(s.member_id);}}
+  const roster=latest.slot==='auto_close'?await completeRoster(db()):null;
+  if(roster){
+    const previous=new Map(current.map(m=>[m.member_id,m]));current.length=0;currentIds.clear();
+    for(const r of roster.members){const m=previous.get(r.member_id)||makeMember(r.member_id);if(!previous.has(r.member_id))m.observedToday=false;if(!observations.has(r.member_id)){m.rank=r.rank;m.level=r.level;m.observedToday=false;}current.push(m);currentIds.add(r.member_id);}
+  }
   const archived:any[]=[];for(const memberId of new Set([...envelopes.keys(),...observations.keys()]))if(!currentIds.has(memberId))archived.push(makeMember(memberId));
   const metadata=Object.fromEntries(metadataResult.results.map((r:any)=>[r.key,JSON.parse(r.payload)]));
   const changes=growthChanges({metadata,members:current,archived,envelopes,observations:effective,batches:batchResult.results,rows:rowResult.results,mutations:mutationResult.results,snapshots:snapshotResult.results});
@@ -60,6 +66,6 @@ export async function GET(req:Request){try{
     if(!changes.changeHistory.some((x:any)=>x.kind==='nickname'&&x.member_id===row.member_id&&x.date===date&&x.from===from&&x.to===to)){changes.changeHistory.push(row);changes.nicknameChanges.push(row);}
   }
   changes.changeHistory.sort((a:any,b:any)=>b.date.localeCompare(a.date));
-  const data={...metadata,...changes,date:latest.observed_date,guildCount:current.length,members:current,archivedMembers:archived};
+  const data={...metadata,...changes,date:latest.observed_date,guildCount:current.length,members:current,archivedMembers:archived,...(roster?{roster:{snapshot_id:roster.snapshot_id,source_as_of:roster.source_as_of,source_member_count:roster.member_count}}:{})};
   const revision=await meta();return response(req,{schema:GROWTH_SCHEMA,api:GROWTH_API,revision:revision.growthRevision,identity_revision:revision.identityRevision,data});
 }catch{return response(req,{error:'호환 성장자료를 만들지 못했습니다.'},503);}}

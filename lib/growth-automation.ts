@@ -1,3 +1,4 @@
+import { completeRoster } from './growth-roster';
 // Deterministic Workers/D1 pipeline. No AI service or connector is used here.
 export const ALLIANCE_URL='https://lastasylum.gg/api/alliance/50373046';
 export const COLLECT_CRON='0 * * * *';
@@ -160,9 +161,11 @@ export async function closeDay(db:D1Database,date:string,now=Date.now()){
   const control=await first(db,'SELECT * FROM growth_auto_control WHERE id=1');if(!control||date<control.start_date)throw Error('BEFORE_AUTOMATION_START');
   const cutoff=cutoffFor(date),latest=await first(db,"SELECT * FROM growth_batches WHERE state='published' ORDER BY observed_date DESC,published_revision DESC LIMIT 1");if(!latest)throw Error('PUBLICATION_UNAVAILABLE');
   if(latest.observed_date>=date){await stmt(db,"INSERT OR IGNORE INTO growth_daily_closes VALUES(?,?,?,'manual_preserved',0,0,?,?)",date,cutoff,latest.batch_id,now,json({reason:'기존 확정자료 유지'})).run();return {status:'manual_preserved'};}
+  const roster=await completeRoster(db,cutoff);if(!roster)throw Error('NO_COMPLETE_PREMIDNIGHT_ROSTER');
+  const rosterIds=new Set(roster.members.map(m=>m.member_id));
   const selected=await all(db,`SELECT o.*,e.member_id mapped_member_id FROM growth_external_ids e JOIN growth_hourly_observations o ON o.game_id=e.game_id AND o.snapshot_id=(
     SELECT n.snapshot_id FROM growth_hourly_observations n WHERE n.game_id=e.game_id AND n.status='valid' AND n.source_as_of<? AND n.received_at<? AND n.accepted_at<? AND (n.joined_at IS NULL OR n.joined_at<?) ORDER BY n.source_as_of DESC,n.accepted_at DESC LIMIT 1)
-    WHERE e.status='confirmed' AND (e.departed_at IS NULL OR e.departed_at>=?)`,cutoff,cutoff,cutoff,cutoff,cutoff);
+    WHERE e.status='confirmed' AND (e.departed_at IS NULL OR e.departed_at>=?) AND e.game_id IN(SELECT game_id FROM growth_hourly_observations WHERE snapshot_id=?)`,cutoff,cutoff,cutoff,cutoff,cutoff,roster.snapshot_id);
   if(!selected.length)throw Error('NO_ELIGIBLE_PREMIDNIGHT_DATA');
   const previous=await all(db,'SELECT * FROM growth_membership_snapshots WHERE batch_id=? ORDER BY row_order',latest.batch_id);
   const ids=new Set(selected.map(r=>r.mapped_member_id));if(ids.size!==selected.length)throw Error('IDENTITY_COLLISION');
@@ -172,20 +175,21 @@ export async function closeDay(db:D1Database,date:string,now=Date.now()){
   const priorPower=await all(db,`WITH RECURSIVE lineage(batch_id) AS(SELECT ? UNION ALL SELECT b.supersedes_batch_id FROM growth_batches b JOIN lineage l ON l.batch_id=b.batch_id WHERE b.supersedes_batch_id IS NOT NULL) SELECT o.* FROM growth_observations o JOIN lineage USING(batch_id) WHERE o.status='active' ORDER BY observed_date,original_order`,latest.batch_id);
   const membershipInfo=await all(db,'SELECT e.member_id,e.departed_at,m.display_name FROM growth_external_ids e JOIN growth_members m USING(member_id)');
   const memberInfo=new Map(membershipInfo.map(m=>[m.member_id,m]));
-  const departed=previous.filter(p=>['current','observed','unobserved','new'].includes(p.membership_state)&&memberInfo.get(p.member_id)?.departed_at&&memberInfo.get(p.member_id).departed_at<cutoff).map(p=>({member_id:p.member_id,display_name:memberInfo.get(p.member_id).display_name,before:p.membership_state,after:'missing'}));
+  const departed=previous.filter(p=>['current','observed','unobserved','new'].includes(p.membership_state)&&(!rosterIds.has(p.member_id)||(memberInfo.get(p.member_id)?.departed_at&&memberInfo.get(p.member_id).departed_at<cutoff))).map(p=>({member_id:p.member_id,display_name:memberInfo.get(p.member_id)?.display_name||p.member_id,before:p.membership_state,after:'missing'}));
   const returned=previous.filter(p=>['missing','archived'].includes(p.membership_state)&&ids.has(p.member_id)).map(p=>({member_id:p.member_id,display_name:memberInfo.get(p.member_id)?.display_name||p.member_id,before:p.membership_state,after:'observed'}));
   const previousDate=kstDate(cutoff-2*DAY);
   const powers=new Map<string,number>();for(const p of priorPower)if(p.observed_date===previousDate)powers.set(p.member_id,p.power);
   const daily=rows.map(r=>({...r,previous_power:powers.get(r.member_id)??null,delta:powers.has(r.member_id)?r.power-powers.get(r.member_id)!:null}));
   const stale=rows.filter(r=>r.stale).length;
-  const details={timezone:'Asia/Seoul',cutoff_at:cutoff,previous_date:previousDate,selection:'source_as_of,received_at,accepted_at strictly before cutoff',source:'lastasylum-alliance-asOf',individual_timestamp:false,stale_count:stale,unobserved:previous.filter(p=>['current','observed','unobserved','new'].includes(p.membership_state)&&!ids.has(p.member_id)&&!departed.some(d=>d.member_id===p.member_id)).length};
+  const details={timezone:'Asia/Seoul',cutoff_at:cutoff,previous_date:previousDate,selection:'source_as_of,received_at,accepted_at strictly before cutoff',source:'lastasylum-alliance-asOf',individual_timestamp:false,stale_count:stale,unobserved:roster.members.filter(m=>!ids.has(m.member_id)).length,roster_snapshot_id:roster.snapshot_id,roster_source_as_of:roster.source_as_of,roster_source_count:roster.member_count};
   const hash=await digest(json({date,rows:daily.map(r=>[r.member_id,r.snapshot_id,r.power])}));
   const statements=[
     stmt(db,`INSERT INTO growth_tx_guards VALUES(?,CASE WHEN NOT EXISTS(SELECT 1 FROM growth_daily_closes WHERE date=?) AND (SELECT value FROM growth_meta WHERE key='growth_revision')=? AND (SELECT value FROM growth_meta WHERE key='identity_revision')=? AND EXISTS(SELECT 1 FROM growth_batches WHERE batch_id=? AND state='published') THEN 1 ELSE NULL END,?)`,guard,date,String(revisions.growth_revision),String(revisions.identity_revision),latest.batch_id,iso),
     stmt(db,`INSERT INTO growth_batches(batch_id,package_hash,semantic_hash,operation_id,observed_date,slot,expected_count,source_hashes_json,state,identity_revision,base_growth_revision,draft_revision,validation_json,supersedes_batch_id,created_at,updated_at,published_revision) VALUES(?,?,?,?,?,'auto_close',?,?,'published',?,?,1,?,?,?,?,?)`,batchId,hash,hash,guard,date,rows.length,json([...new Set(rows.map(r=>r.snapshot_id.slice(5)))]),revisions.identity_revision,revisions.growth_revision,json(details),latest.batch_id,iso,iso,growthNext),
     stmt(db,`INSERT INTO growth_batch_rows(row_id,batch_id,row_index,raw_name,resolution_status,resolved_member_id,power,level,rank,source_position_json,membership_state) SELECT json_extract(value,'$.row_id'),?,json_extract(value,'$.row_index'),json_extract(value,'$.source_name'),'resolved',json_extract(value,'$.member_id'),json_extract(value,'$.power'),json_extract(value,'$.level'),json_extract(value,'$.rank'),value,'observed' FROM json_each(?)`,batchId,json(daily)),
     stmt(db,`INSERT INTO growth_observations(observation_id,member_id,batch_id,observed_date,slot,power,level,rank,label,source_type,original_order,status,created_at) SELECT 'obs_'||json_extract(value,'$.row_id'),json_extract(value,'$.member_id'),?,?,'auto_close',json_extract(value,'$.power'),json_extract(value,'$.level'),json_extract(value,'$.rank'),?,'automatic',?+json_extract(value,'$.row_index'),'active',? FROM json_each(?)`,batchId,date,Number(date.slice(5,7))+'/'+Number(date.slice(8)),growthNext*1000,iso,json(daily)),
-    stmt(db,`INSERT INTO growth_membership_snapshots SELECT ?,member_id,CASE WHEN EXISTS(SELECT 1 FROM growth_external_ids e WHERE e.member_id=growth_membership_snapshots.member_id AND e.departed_at<?) THEN 'missing' WHEN membership_state IN ('current','observed','unobserved','new') THEN 'unobserved' ELSE membership_state END,row_order+500 FROM growth_membership_snapshots WHERE batch_id=? AND member_id NOT IN(SELECT json_extract(value,'$.member_id') FROM json_each(?))`,batchId,cutoff,latest.batch_id,json(daily)),
+    stmt(db,`INSERT INTO growth_membership_snapshots SELECT ?,member_id,CASE WHEN EXISTS(SELECT 1 FROM growth_external_ids e WHERE e.member_id=growth_membership_snapshots.member_id AND e.departed_at<?) OR member_id NOT IN(SELECT json_extract(value,'$.member_id') FROM json_each(?)) THEN 'missing' WHEN membership_state IN ('current','observed','unobserved','new') THEN 'unobserved' ELSE membership_state END,row_order+500 FROM growth_membership_snapshots WHERE batch_id=? AND member_id NOT IN(SELECT json_extract(value,'$.member_id') FROM json_each(?))`,batchId,cutoff,json(roster.members),latest.batch_id,json(daily)),
+    stmt(db,`INSERT INTO growth_membership_snapshots SELECT ?,json_extract(value,'$.member_id'),'unobserved',500+CAST(key AS INTEGER) FROM json_each(?) WHERE json_extract(value,'$.member_id') NOT IN(SELECT member_id FROM growth_membership_snapshots WHERE batch_id=?) AND json_extract(value,'$.member_id') NOT IN(SELECT json_extract(value,'$.member_id') FROM json_each(?))`,batchId,json(roster.members),batchId,json(daily)),
     stmt(db,`INSERT INTO growth_membership_snapshots SELECT ?,json_extract(value,'$.member_id'),'observed',json_extract(value,'$.row_index') FROM json_each(?)`,batchId,json(daily)),
     stmt(db,"UPDATE growth_batches SET state='superseded',updated_at=? WHERE batch_id=?",iso,latest.batch_id),
     stmt(db,"UPDATE growth_publications SET status='inactive' WHERE batch_id=? AND status='active'",latest.batch_id),
@@ -196,7 +200,7 @@ export async function closeDay(db:D1Database,date:string,now=Date.now()){
     stmt(db,'INSERT INTO growth_mutations VALUES(?,?,?,?)',guard,'automatic_close',json({date,batch_id:batchId,growth_revision:growthNext,...details}),iso),
   ];
   statements.push(stmt(db,`INSERT INTO growth_batch_sources(batch_id,source_hash) SELECT DISTINCT ?,substr(json_extract(value,'$.snapshot_id'),6) FROM json_each(?)`,batchId,json(daily)));
-  if(departed.length||returned.length)statements.push(stmt(db,'INSERT INTO growth_mutations VALUES(?,?,?,?)',guard+'_membership','membership_correction',json({batch_id:batchId,observed_date:date,departed,returned,source:'confirmed-game-id-membership'}),iso));
+  if(departed.length||returned.length)statements.push(stmt(db,'INSERT INTO growth_mutations VALUES(?,?,?,?)',guard+'_membership','membership_correction',json({batch_id:batchId,observed_date:date,departed,returned,source:'complete-roster-game-id-membership'}),iso));
   await db.batch(statements);return {status:stale||details.unobserved?'delayed':'closed',date,batch_id:batchId,members:rows.length,stale};
 }
 
@@ -244,12 +248,13 @@ export async function automaticStatus(db:D1Database,admin=false){
     first(db,'SELECT * FROM growth_daily_closes ORDER BY date DESC LIMIT 1'),
     first(db,"SELECT COUNT(*) n FROM growth_auto_events WHERE status='pending'"),
   ]);
+  const roster=await completeRoster(db);
   const members=await all(db,`SELECT e.game_id,e.member_id,m.display_name,e.source_name,e.status identity_status,e.departed_at,o.*,p.power closed_power,p.date closed_date,
     CASE WHEN p.power IS NULL THEN NULL ELSE o.power-p.power END delta
     FROM growth_external_ids e LEFT JOIN growth_members m USING(member_id)
     LEFT JOIN growth_hourly_observations o ON o.game_id=e.game_id AND o.snapshot_id=(SELECT snapshot_id FROM growth_hourly_observations x WHERE x.game_id=e.game_id AND x.status='valid' ORDER BY x.source_as_of DESC LIMIT 1)
     LEFT JOIN growth_daily_sources p ON p.member_id=e.member_id AND p.date=(SELECT MAX(date) FROM growth_daily_sources x WHERE x.member_id=e.member_id)
-    WHERE e.departed_at IS NULL ORDER BY o.power DESC`);
+    WHERE e.departed_at IS NULL${roster?' AND e.game_id IN(SELECT game_id FROM growth_hourly_observations WHERE snapshot_id=?)':''} ORDER BY o.power DESC`,...(roster?[roster.snapshot_id]:[]));
   // The first day uses the existing approved daily observation as its baseline.
   const baseline=await approvedLatest(db);
   const powers=new Map<string,any>();for(const r of baseline)powers.set(r.member_id,r);

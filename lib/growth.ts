@@ -1,3 +1,4 @@
+import { completeRoster } from './growth-roster';
 import { db, hash } from './store';
 
 export const GROWTH_SCHEMA='3on-growth-v1.1';
@@ -74,7 +75,7 @@ export function parsePackage(raw:string):GrowthPackage{
 }
 
 export async function currentMembers(){
-  const latest=await db().prepare("SELECT batch_id,observed_date,published_revision FROM growth_batches WHERE state='published' ORDER BY observed_date DESC,published_revision DESC LIMIT 1").first<{batch_id:string;observed_date:string;published_revision:number}>();
+  const latest=await db().prepare("SELECT batch_id,observed_date,published_revision,slot FROM growth_batches WHERE state='published' ORDER BY observed_date DESC,published_revision DESC LIMIT 1").first<{batch_id:string;observed_date:string;published_revision:number;slot:string}>();
   if(!latest)throw Error('growth publication unavailable');
   const rows=await db().prepare(`WITH RECURSIVE lineage(batch_id) AS (
     SELECT ? UNION ALL SELECT b.supersedes_batch_id FROM growth_batches b JOIN lineage l USING(batch_id)
@@ -89,12 +90,16 @@ export async function currentMembers(){
       WHERE x.member_id=s.member_id AND x.status='active' AND x.observed_date<=?
       ORDER BY x.observed_date DESC,x.original_order DESC LIMIT 1)
     WHERE s.batch_id=? ORDER BY s.row_order`).bind(latest.batch_id,latest.observed_date,latest.batch_id).all<any>();
-  const members=rows.results.filter(r=>!['archived','missing'].includes(r.membership_state)).map(r=>{
+  const knownMembers=rows.results.map(r=>{
     const legacy=r.payload?JSON.parse(r.payload):{};
     return {member_id:r.member_id,canonical:r.legacy_canonical,display_name:r.display_name,rank:r.rank??legacy.rank??null,level:r.level??legacy.level??null,power:r.power??legacy.power??null,observed_date:r.observed_date??null,slot:r.slot??null,membership_state:r.membership_state};
   });
+  const members=knownMembers.filter(r=>!['archived','missing'].includes(r.membership_state));
+  const byId=new Map(knownMembers.map(m=>[m.member_id,m]));
+  const roster=latest.slot==='auto_close'?await completeRoster(db()):null;
+  const current=roster?roster.members.map(r=>byId.has(r.member_id)?{...byId.get(r.member_id)!,membership_state:['archived','missing'].includes(byId.get(r.member_id)!.membership_state)?'unobserved':byId.get(r.member_id)!.membership_state}:{member_id:r.member_id,canonical:r.legacy_canonical,display_name:r.display_name,rank:r.rank,level:r.level,power:null,observed_date:null,slot:null,membership_state:'unobserved'}):members;
   const m=await meta();
-  return {schema:GROWTH_SCHEMA,api:GROWTH_API,revision:m.growthRevision,identity_revision:m.identityRevision,observed_date:latest.observed_date,batch_id:latest.batch_id,members};
+  return {schema:GROWTH_SCHEMA,api:GROWTH_API,revision:m.growthRevision,identity_revision:m.identityRevision,observed_date:latest.observed_date,batch_id:latest.batch_id,members:current,...(roster?{roster:{snapshot_id:roster.snapshot_id,source_as_of:roster.source_as_of,source_member_count:roster.member_count}}:{})};
 }
 
 export async function memberHistory(memberId:string,limit=200,before?:string|null){

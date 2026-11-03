@@ -4,7 +4,9 @@ const {DatabaseSync}=require('node:sqlite'),{stripTypeScriptTypes}=require('node
 const oldSql="SELECT o.* FROM growth_external_ids e JOIN growth_hourly_observations o ON o.game_id=e.game_id AND o.snapshot_id=(SELECT x.snapshot_id FROM growth_hourly_observations x WHERE x.game_id=e.game_id AND x.status='valid' ORDER BY x.source_as_of DESC LIMIT 1)";
 (async()=>{
  const source=fs.readFileSync(path.join(__dirname,'../lib/growth-automation.ts'),'utf8');
- const auto=await import('data:text/javascript;base64,'+Buffer.from(stripTypeScriptTypes(source)).toString('base64'));
+ const rosterSource=fs.readFileSync(path.join(__dirname,'../lib/growth-roster.ts'),'utf8');
+ const rosterUrl='data:text/javascript;base64,'+Buffer.from(stripTypeScriptTypes(rosterSource)).toString('base64');
+ const auto=await import('data:text/javascript;base64,'+Buffer.from(stripTypeScriptTypes(source).replaceAll("'./growth-roster'",JSON.stringify(rosterUrl))).toString('base64'));
  assert(source.includes('await all(db,LATEST_VALID_HOURLY_SQL)'),'ingest must use the tested lookup');
  const db=new DatabaseSync(':memory:');
  db.exec(`CREATE TABLE growth_external_ids(game_id TEXT PRIMARY KEY,member_id TEXT UNIQUE);
