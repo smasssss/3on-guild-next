@@ -89,5 +89,8 @@ if __name__=='__main__':
         elif action=='encrypt-before':r.encrypt('before')
         else:getattr(r,action.replace('-','_'))()
         print('Roster repair '+target+' '+action+': PASS')
-    except Exception:
+    except Exception as error:
+        if 'r' in locals():r.save('failure.json',{'phase':base.PHASE,'type':type(error).__name__,'message':str(error),'http_status':getattr(error,'code',None)})
+        print('Failure category: '+type(error).__name__+(' HTTP '+str(error.code) if hasattr(error,'code') else ''))
+        if str(error)=='Code traffic activation did not complete':print('Traffic verification returned the previous version immediately after activation')
         print('Roster repair '+base.PHASE+': FAIL; private details withheld');raise SystemExit(1)
