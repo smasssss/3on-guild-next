@@ -1,4 +1,4 @@
-name: Read-only roster repair access and deployment preflight
+name: Read-only roster diagnosis and recoverable encrypted backups
 on:
   push:
     branches: [diag/growth-roster-20261103]
@@ -8,11 +8,19 @@ permissions:
 jobs:
   inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
-      - name: Check existing Cloudflare access and deployed versions without changes
+      - name: Read current roster and preserve full D1 backups without changes
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: python scripts/growth-roster-preflight.py
+          GITHUB_SHA: ${{ github.sha }}
+        run: python scripts/growth-roster-diagnose.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: growth-roster-private-diagnostics-${{ github.run_id }}
+          path: vip-encrypted-evidence/*-diagnostics.cms
+          if-no-files-found: warn
+          retention-days: 14
