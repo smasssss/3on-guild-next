@@ -91,6 +91,40 @@ class Release(roster.Release):
             if statements:self.fixture_batch(statements)
         super().fixture_cleanup()
 
+# User-approved permanent VIP exclusions (sub-accounts), added only after the code is verified.
+# Each entry: member ID, game ID, nickname. 야생야옹찌 is not registered yet; its member ID is the
+# deterministic automatic ID for its game ID, so the exclusion applies from its first registration.
+NEW_EXCLUSIONS=[('game_50373046_481129718055','481129718055','꧁두리꧂'),('game_50373046_480502743335','480502743335','꿀보맘'),('game_50373046_443174928679','443174928679','야생야옹찌')]
+def add_exclusions(self):
+    import datetime,uuid
+    base.PHASE='permanent exclusion update'
+    assert self.target=='production'
+    for member_id,game_id,name in NEW_EXCLUSIONS:
+        mapped=self.query('SELECT member_id FROM growth_external_ids WHERE game_id=?',[game_id])
+        assert not mapped or mapped[0]['member_id']==member_id,'Exclusion target identity changed: '+game_id
+    row=self.query("SELECT revision,payload FROM documents WHERE kind='carriage'")[0]
+    data=json.loads(row['payload']);before=dict(data.get('vipExcludedMembers') or {})
+    added=[m for m,_,_ in NEW_EXCLUSIONS if before.get(m)!=1]
+    self.save('exclusions-before.json',{'revision':row['revision'],'excluded':before})
+    if added:
+        data['vipExcludedMembers']={**before,**{m:1 for m in added}}
+        payload=json.dumps(data,ensure_ascii=False,separators=(',',':'));stamp=datetime.datetime.now(datetime.timezone.utc).isoformat().replace('+00:00','Z');mutation=uuid.uuid4().hex
+        result=self.api('POST','/d1/database/'+self.database+'/query',{'batch':[
+            {'sql':"INSERT INTO backups(mutation,kind,revision,payload,saved_at,actor) SELECT ?,kind,revision,payload,?,? FROM documents WHERE kind='carriage' AND revision=?",'params':[mutation,stamp,'roster-sync-release',row['revision']]},
+            {'sql':"UPDATE documents SET payload=?,revision=revision+1,updated_at=?,actor=?,last_mutation=? WHERE kind='carriage' AND revision=? AND payload=?",'params':[payload,stamp,'roster-sync-release',mutation,row['revision'],row['payload']]}]})
+        assert all(r.get('success',True) for r in result)
+    after=self.query("SELECT revision,payload FROM documents WHERE kind='carriage'")[0];saved=json.loads(after['payload'])
+    assert after['revision']==row['revision']+(1 if added else 0),'Carriage changed concurrently; nothing else was written'
+    assert all(saved['vipExcludedMembers'].get(k)==v for k,v in before.items()),'Existing exclusions preserved'
+    assert all(saved['vipExcludedMembers'].get(m)==1 for m,_,_ in NEW_EXCLUSIONS)
+    assert {k:v for k,v in saved.items() if k!='vipExcludedMembers'}=={k:v for k,v in data.items() if k!='vipExcludedMembers'},'Only exclusions changed'
+    vip=json.loads(self.public('/api/carriage/vip'))
+    for m in vip['members']:
+        if m['memberId'] in saved['vipExcludedMembers']:assert m['eligibility']['reason']=='permanent',m['memberId']
+    self.save('exclusions-after.json',{'revision':after['revision'],'added':added,'excluded':saved['vipExcludedMembers']})
+    print('Permanent exclusions: '+str(len(before))+' kept, '+str(len(added))+' added')
+Release.add_exclusions=add_exclusions
+
 if __name__=='__main__':
     try:
         action,target=sys.argv[1:3];base.PHASE=action;r=Release(target)
