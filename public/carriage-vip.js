@@ -15,7 +15,13 @@ function carriageTime(value){return value?new Date(value).toLocaleString('ko-KR'
 function carriageEffectiveDate(w){return new Date(Date.parse(w.appliesOn)-86_400_000).toISOString().slice(0,10);}
 function carriageWeekText(){
  const v=carriageVip.view;if(!v)return carriageVip.error||'마차 명단·주간 점수 확인 중';
- return `${v.scoreWeek||v.week} 주차 · ${v.active?`${v.active.appliesOn} 점수 기준 · VIP 제한 ${v.effectiveOn||carriageEffectiveDate(v.active)}부터${v.carriedForward?' · 새 자료 없음, 이전 점수·자격 유지':''} · 점수 갱신 ${carriageTime(v.active.updatedAt)}`:'첫 점수 적용 전 · 기존 자격 유지 · 지정 16명 제한'} · 명단 관측 ${carriageTime(v.roster.sourceAsOf)}`;
+ return `${v.scoreWeek||v.week} 주차 · ${v.active?`${v.active.appliesOn} 점수 기준 · VIP 제한 ${v.effectiveOn||carriageEffectiveDate(v.active)}부터${v.carriedForward?' · 새 자료 없음, 이전 점수·자격 유지':''} · 점수 갱신 ${carriageTime(v.active.updatedAt)}`:'첫 점수 적용 전 · 기존 자격 유지 · 지정 16명 제한'} · 명단 관측 ${carriageTime(v.roster.sourceAsOf)}${carriagePendingText(v)}`;
+}
+// Roster changes wait for 3 consecutive hourly collections; Sunday snapshot participants join at once.
+function carriagePendingText(v){
+ const p=v.rosterPending||[],join=p.filter(x=>x.change==='join'),leave=p.filter(x=>x.change==='leave'),added=(v.snapshotAdded||[]).length;
+ const list=xs=>xs.map(x=>`${x.name} ${x.confirmations}/${x.required}`).join(', ');
+ return (join.length?` · 가입 변동 대기 ${join.length}명(${list(join)})`:'')+(leave.length?` · 탈퇴 변동 대기 ${leave.length}명(${list(leave)})`:'')+(added?` · 일요일 스냅샷 반영 ${added}명`:'');
 }
 function carriageInfo(label){
  const m=memberByLabel(label);if(!m)return '길드원 정보 미확인';const score=carriagePoints(m);

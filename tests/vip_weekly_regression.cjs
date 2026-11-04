@@ -12,7 +12,8 @@ const carriage={pointer:3,records:[{id:'old',vip:'공 주'}],vipCarry:{'공 주'
 const original=JSON.stringify(carriage);
 async function run(){
  assert.equal(v.weekOf(at('2026-11-01T14:59:59Z')),'2026-10-26');assert.equal(v.weekOf(at('2026-11-01T15:00:00Z')),'2026-11-02');
- let roster=await v.readRoster(f.db);assert.equal(roster.members.length,2);assert(!roster.members.some(m=>m.memberId==='left'));
+ let roster=await v.readRoster(f.db);assert.equal(roster.members.find(m=>m.memberId==='left').current,true,'one absent collection keeps the member until 3 confirmations');assert.deepEqual(roster.pending.map(p=>[p.game_id,p.change,p.confirmations]),[['game-left','leave',1]]);
+ f.confirm('new');roster=await v.readRoster(f.db);assert.equal(roster.members.length,2);assert(!roster.members.some(m=>m.memberId==='left'));assert.deepEqual(roster.pending,[]);
  const eligible=roster.members.find(m=>m.memberId==='eligible'),blocked=roster.members.find(m=>m.memberId==='blocked');
  assert.equal(eligible.rank,'R4');assert.equal(eligible.level,30);
  assert.equal(v.eligibility(blocked,{},null,now).reason,'temporary');assert.equal(v.eligibility(eligible,carriage,null,now).reason,'permanent');

@@ -14,6 +14,11 @@ module.exports=function fixture(){
  }
  const seedMember=(id,name,canonical=name)=>{sql.prepare("INSERT INTO growth_members VALUES(?,?,?,'fixture','2026-10-28')").run(id,canonical,name);sql.prepare("INSERT INTO growth_external_ids VALUES(?,?,?,'confirmed','fixture',NULL,1,1)").run('game-'+id,id,name);};
  const observe=(snapshot,id,name='Eligible',pointsPower=12345)=>sql.prepare("INSERT INTO growth_hourly_observations VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").run(snapshot,'game-'+id,id,Date.parse('2026-10-28T00:00:00Z'),1,1,name,pointsPower,30,'R4',null,null,null,'valid',null);
+ // Hand-built fixture snapshots keep a truthful stored member count as rows are observed,
+ // matching real ingestion; the complete-roster integrity check stays strict.
+ sql.exec("CREATE TRIGGER fixture_snapshot_count AFTER INSERT ON growth_hourly_observations WHEN NEW.snapshot_id IN(SELECT snapshot_id FROM growth_auto_snapshots WHERE run_id='fixture') BEGIN UPDATE growth_auto_snapshots SET member_count=(SELECT COUNT(*) FROM growth_hourly_observations WHERE snapshot_id=NEW.snapshot_id) WHERE snapshot_id=NEW.snapshot_id; END");
  const addSnapshot=id=>sql.prepare('INSERT INTO growth_auto_snapshots VALUES(?,?,?,?,?,?,?,?)').run(id,Date.parse('2026-10-28T00:00:00Z')+(id==='new'?1:0),id,'fixture',1,1,2,12345);
- return {sql,db,env,load,seedMember,observe,addSnapshot};
+ // The same stored roster seen again in later hourly collections (duplicate runs).
+ let repeats=0;const confirm=(id,times=2)=>{for(let i=0;i<times;i++)sql.prepare("INSERT INTO growth_auto_runs(run_id,trigger_kind,called_at,completed_at,snapshot_id,status) VALUES(?,'fixture',2,2,?,'duplicate')").run('fixture_repeat_'+(++repeats),id);};
+ return {sql,db,env,load,seedMember,observe,addSnapshot,confirm};
 };

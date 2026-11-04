@@ -9,9 +9,9 @@ export async function GET(req:Request){try{
   const rows=await database.prepare('SELECT revision,payload,saved_at FROM backups WHERE kind=? ORDER BY revision DESC LIMIT 2').bind(VIP_KIND).all<{revision:number;payload:string;saved_at:string}>();
   return response(req,{backups:rows.results.map(r=>({revision:r.revision,data:JSON.parse(r.payload),savedAt:r.saved_at}))});
  }
- const [roster,document,carriage]=await Promise.all([readRoster(database),readWeekly(database),read('carriage')]);
+ const [document,carriage]=await Promise.all([readWeekly(database),read('carriage')]),roster=await readRoster(database,document.data);
  const now=Date.now(),view=weeklyView(document.data,now),scoreMembers=await readScoreRoster(database,roster.members);
- return response(req,{schema:'3on-vip-weekly-v1',threshold:THRESHOLD,timezone:'Asia/Seoul',serverTime:new Date(now).toISOString(),revision:document.revision,...view,scoreMembers,roster:{snapshotId:roster.snapshotId,sourceAsOf:roster.sourceAsOf,receivedAt:roster.receivedAt},members:roster.members.map(m=>({...m,eligibility:eligibility(m,carriage.data as {vipExcludedMembers?:Record<string,number>},view.active,now)}))});
+ return response(req,{schema:'3on-vip-weekly-v1',threshold:THRESHOLD,timezone:'Asia/Seoul',serverTime:new Date(now).toISOString(),revision:document.revision,...view,scoreMembers,roster:{snapshotId:roster.snapshotId,sourceAsOf:roster.sourceAsOf,receivedAt:roster.receivedAt},rosterPending:roster.pending,snapshotAdded:roster.snapshotAdded,members:roster.members.map(m=>({...m,eligibility:eligibility(m,carriage.data as {vipExcludedMembers?:Record<string,number>},view.active,now)}))});
  }catch{return response(req,{error:'마차 명단·주간 점수를 확인하지 못했습니다. VIP 선택을 보류합니다.'},503);}}
 export async function POST(req:Request){try{
  if(!validOrigin(req))return response(req,{error:'허용되지 않은 주소입니다.'},403);
@@ -22,7 +22,7 @@ export async function POST(req:Request){try{
  if(!Number.isSafeInteger(b.revision)||b.revision<0||typeof b.mutation!=='string'||!/^[a-f0-9-]{32,64}$/.test(b.mutation))return response(req,{error:'주간 저장 요청을 확인해 주세요.'},400);
  const database=db(),duplicate=await database.prepare('SELECT kind FROM backups WHERE mutation=?').bind(b.mutation).first<{kind:string}>();
  if(duplicate)return duplicate.kind===VIP_KIND?response(req,{...await readWeekly(database),duplicate:true}):response(req,{error:'저장 요청 식별자가 중복되었습니다.'},409);
- const [roster,current]=await Promise.all([readRoster(database),readWeekly(database)]),now=Date.now();
+ const current=await readWeekly(database),roster=await readRoster(database,current.data),now=Date.now();
  if(current.revision!==b.revision)return response(req,{error:'다른 기기에서 점수가 변경되었습니다. 최신 자료를 다시 확인해 주세요.',revision:current.revision},409);
  const scoreMembers=await readScoreRoster(database,roster.members);
  const next=prepareWeekly(b.snapshot,roster.members,now,weeklyView(current.data,now).active?.appliesOn,scoreMembers);

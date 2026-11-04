@@ -32,10 +32,13 @@ async function approvedLatest(db:D1Database){return all(db,`WITH RECURSIVE l(bat
   UNION ALL SELECT parent.batch_id FROM growth_batches b JOIN l USING(batch_id) JOIN growth_batches parent ON parent.batch_id=b.supersedes_batch_id WHERE parent.state IN ('published','superseded'))
   SELECT e.member_id,o.power,o.level,o.rank,o.observed_date FROM growth_external_ids e JOIN growth_observations o ON o.observation_id=(SELECT x.observation_id FROM growth_observations x JOIN l USING(batch_id) WHERE x.member_id=e.member_id AND x.status='active' ORDER BY x.observed_date DESC,x.original_order DESC LIMIT 1)`);}
 
+// The source's member counter and roster list refresh at different moments. The roster
+// list is authoritative; only this count comparison has a tolerance. Every other check is unchanged.
+export const ROSTER_COUNT_TOLERANCE=2;
 export function validateSnapshot(input:any,calledAt:number):Snapshot {
   if(!input||String(input.id)!=='50373046'||input.server!==295||input.tag!=='3ON')throw Error('WRONG_ALLIANCE');
   if(!number(input.asOf,9_999_999_999)||input.asOf*1000>calledAt+300_000||input.asOf*1000<Date.parse('2026-01-01'))throw Error('INVALID_ASOF');
-  if(!number(input.power)||!number(input.members,500)||input.members<1||!Array.isArray(input.roster)||input.roster.length!==input.members)throw Error('INCOMPLETE_ROSTER');
+  if(!number(input.power)||!number(input.members,500)||input.members<1||!Array.isArray(input.roster)||input.roster.length<1||Math.abs(input.roster.length-input.members)>ROSTER_COUNT_TOLERANCE)throw Error('INCOMPLETE_ROSTER');
   const ids=new Set<string>();
   for(const r of input.roster){
     if(typeof r.id!=='string'||!/^\d{1,24}$/.test(r.id)||ids.has(r.id))throw Error('DUPLICATE_OR_INVALID_ID');ids.add(r.id);
@@ -46,6 +49,11 @@ export function validateSnapshot(input:any,calledAt:number):Snapshot {
   }
   return input;
 }
+// Since 2026-11-04 the source has sent a whole-UTC-day asOf on every hourly response.
+// A day-aligned asOf is not an observation time, so the stored receipt time is used instead
+// (never later than the actual receipt and never in the future); the raw value is kept as evidence.
+export const dayAlignedAsOf=(asOf:number)=>asOf%86_400===0;
+export function sourceTimeOf(source:{asOf:number},receivedAt:number){return dayAlignedAsOf(source.asOf)?receivedAt:source.asOf*1000;}
 
 // Compare against the last accepted raw observation, never against a guild total.
 export function anomaly(r:Row,previous:any):string|null {
@@ -63,8 +71,8 @@ export async function ingestStored(db:D1Database,runId:string,acceptedAt=Date.no
   try{source=validateSnapshot(JSON.parse(run.raw_json),run.called_at)}catch(e){
     await stmt(db,"UPDATE growth_auto_runs SET status='invalid',error=?,completed_at=? WHERE run_id=?",String((e as Error).message),acceptedAt,runId).run();return {status:'invalid',run_id:runId};
   }
-  const sourceTime=source.asOf*1000;
-  const contentHash=await digest(canonical({id:source.id,asOf:source.asOf,members:source.members,power:source.power,roster:[...source.roster].sort((a,b)=>a.id.localeCompare(b.id))}));
+  const sourceTime=sourceTimeOf(source,run.received_at??run.called_at);
+  const contentHash=await digest(canonical({id:source.id,asOf:sourceTime/1000,members:source.members,power:source.power,roster:[...source.roster].sort((a,b)=>a.id.localeCompare(b.id))}));
   const existing=await first(db,'SELECT s.snapshot_id,r.raw_hash FROM growth_auto_snapshots s JOIN growth_auto_runs r ON r.run_id=s.run_id WHERE s.source_as_of=? AND s.content_hash=?',sourceTime,contentHash);
   if(existing){await stmt(db,"UPDATE growth_auto_runs SET status='duplicate',snapshot_id=?,source_as_of=?,content_hash=?,completed_at=?,raw_json=CASE WHEN raw_hash=? THEN NULL ELSE raw_json END WHERE run_id=?",existing.snapshot_id,sourceTime,contentHash,acceptedAt,existing.raw_hash,runId).run();return {status:'duplicate',run_id:runId};}
   const last=await first(db,'SELECT MAX(source_as_of) t FROM growth_auto_snapshots');
@@ -105,7 +113,7 @@ export async function ingestStored(db:D1Database,runId:string,acceptedAt=Date.no
   const guard='auto-ingest-'+runId;
   const statements=[
     stmt(db,"INSERT INTO growth_tx_guards VALUES(?,CASE WHEN NOT EXISTS(SELECT 1 FROM growth_auto_snapshots WHERE source_as_of=? ) AND EXISTS(SELECT 1 FROM growth_auto_runs WHERE run_id=? AND status IN ('received','db_error')) AND (SELECT value FROM growth_meta WHERE key='identity_revision')=? THEN 1 ELSE NULL END,?)",guard,sourceTime,runId,revision.value,new Date(acceptedAt).toISOString()),
-    stmt(db,'INSERT INTO growth_auto_snapshots(snapshot_id,source_as_of,content_hash,run_id,received_at,accepted_at,member_count,guild_power) VALUES(?,?,?,?,?,?,?,?)',snapshotId,sourceTime,contentHash,runId,run.received_at,acceptedAt,source.members,source.power),
+    stmt(db,'INSERT INTO growth_auto_snapshots(snapshot_id,source_as_of,content_hash,run_id,received_at,accepted_at,member_count,guild_power) VALUES(?,?,?,?,?,?,?,?)',snapshotId,sourceTime,contentHash,runId,run.received_at,acceptedAt,source.roster.length,source.power),
   ];
   // The explicit column list deliberately keeps all writes out of unrelated tables.
   if(newMembers.length)statements.push(stmt(db,`INSERT INTO growth_members(member_id,legacy_canonical,display_name,source,created_at) SELECT json_extract(value,'$.member_id'),NULL,json_extract(value,'$.display_name'),'lastasylum-game-id',? FROM json_each(?)`,new Date(acceptedAt).toISOString(),json(newMembers)));
@@ -122,7 +130,7 @@ export async function ingestStored(db:D1Database,runId:string,acceptedAt=Date.no
   // A later complete roster resolves only absence candidates; it never confirms a departure.
   statements.push(stmt(db,`UPDATE growth_auto_events SET status='resolved' WHERE kind='departure_candidate' AND status='pending' AND game_id IN(SELECT json_extract(value,'$.id') FROM json_each(?))`,json(source.roster)));
   const reviewCount=rows.filter(r=>r.status!=='valid').length;
-  statements.push(stmt(db,'UPDATE growth_auto_runs SET status=?,source_as_of=?,content_hash=?,snapshot_id=?,completed_at=?,validation_json=? WHERE run_id=?',reviewCount?'partial':'accepted',sourceTime,contentHash,snapshotId,acceptedAt,json({members:source.members,valid:rows.length-reviewCount,review:reviewCount}),runId));
+  statements.push(stmt(db,'UPDATE growth_auto_runs SET status=?,source_as_of=?,content_hash=?,snapshot_id=?,completed_at=?,validation_json=? WHERE run_id=?',reviewCount?'partial':'accepted',sourceTime,contentHash,snapshotId,acceptedAt,json({members:source.members,roster:source.roster.length,count_gap:source.roster.length-source.members,source_as_of_raw:source.asOf,source_time_basis:dayAlignedAsOf(source.asOf)?'received_at':'source_as_of',valid:rows.length-reviewCount,review:reviewCount}),runId));
   await db.batch(statements);
   return {status:reviewCount?'partial':'accepted',run_id:runId,snapshot_id:snapshotId,members:rows.length,review:reviewCount};
 }
@@ -165,7 +173,7 @@ export async function closeDay(db:D1Database,date:string,now=Date.now()){
   const rosterIds=new Set(roster.members.map(m=>m.member_id));
   const selected=await all(db,`SELECT o.*,e.member_id mapped_member_id FROM growth_external_ids e JOIN growth_hourly_observations o ON o.game_id=e.game_id AND o.snapshot_id=(
     SELECT n.snapshot_id FROM growth_hourly_observations n WHERE n.game_id=e.game_id AND n.status='valid' AND n.source_as_of<? AND n.received_at<? AND n.accepted_at<? AND (n.joined_at IS NULL OR n.joined_at<?) ORDER BY n.source_as_of DESC,n.accepted_at DESC LIMIT 1)
-    WHERE e.status='confirmed' AND (e.departed_at IS NULL OR e.departed_at>=?) AND e.game_id IN(SELECT game_id FROM growth_hourly_observations WHERE snapshot_id=?)`,cutoff,cutoff,cutoff,cutoff,cutoff,roster.snapshot_id);
+    WHERE e.status='confirmed' AND (e.departed_at IS NULL OR e.departed_at>=?) AND e.game_id IN(SELECT game_id FROM growth_hourly_observations WHERE snapshot_id=?) AND e.game_id IN(SELECT json_extract(value,'$.game_id') FROM json_each(?))`,cutoff,cutoff,cutoff,cutoff,cutoff,roster.snapshot_id,json(roster.members));
   if(!selected.length)throw Error('NO_ELIGIBLE_PREMIDNIGHT_DATA');
   const previous=await all(db,'SELECT * FROM growth_membership_snapshots WHERE batch_id=? ORDER BY row_order',latest.batch_id);
   const ids=new Set(selected.map(r=>r.mapped_member_id));if(ids.size!==selected.length)throw Error('IDENTITY_COLLISION');
@@ -254,7 +262,7 @@ export async function automaticStatus(db:D1Database,admin=false){
     FROM growth_external_ids e LEFT JOIN growth_members m USING(member_id)
     LEFT JOIN growth_hourly_observations o ON o.game_id=e.game_id AND o.snapshot_id=(SELECT snapshot_id FROM growth_hourly_observations x WHERE x.game_id=e.game_id AND x.status='valid' ORDER BY x.source_as_of DESC LIMIT 1)
     LEFT JOIN growth_daily_sources p ON p.member_id=e.member_id AND p.date=(SELECT MAX(date) FROM growth_daily_sources x WHERE x.member_id=e.member_id)
-    WHERE e.departed_at IS NULL${roster?' AND e.game_id IN(SELECT game_id FROM growth_hourly_observations WHERE snapshot_id=?)':''} ORDER BY o.power DESC`,...(roster?[roster.snapshot_id]:[]));
+    WHERE e.departed_at IS NULL${roster?" AND e.game_id IN(SELECT value FROM json_each(?))":''} ORDER BY o.power DESC`,...(roster?[json(roster.gameIds)]:[]));
   // The first day uses the existing approved daily observation as its baseline.
   const baseline=await approvedLatest(db);
   const powers=new Map<string,any>();for(const r of baseline)powers.set(r.member_id,r);
@@ -276,7 +284,7 @@ export async function automaticStatus(db:D1Database,admin=false){
     WHERE e.position=1 AND x.status='confirmed' AND x.departed_at IS NULL
     ORDER BY e.source_as_of DESC,e.game_id`);
   const lastExecution=await first(db,'SELECT cron,scheduled_at,started_at,completed_at,status,result_json,error FROM growth_auto_executions ORDER BY scheduled_at DESC LIMIT 1');
-  const base={schema:'3on-growth-automation-v1',timezone:'Asia/Seoul',collector_cron:COLLECT_CRON,close_cron:CLOSE_CRON,registered_cron:COMBINED_CRON,ai_calls:0,control,last_run:lastRun,last_good:lastGood,last_close:close,last_execution:lastExecution,pending_count:pending?.n||0,external_calls:counts?.calls||0,delayed:!lastGood||Date.now()-lastGood.source_as_of>2*HOUR,members,changes,nickname_changes:nicknameChanges};
+  const base={schema:'3on-growth-automation-v1',timezone:'Asia/Seoul',collector_cron:COLLECT_CRON,close_cron:CLOSE_CRON,registered_cron:COMBINED_CRON,ai_calls:0,control,last_run:lastRun,last_good:lastGood,last_close:close,last_execution:lastExecution,pending_count:pending?.n||0,external_calls:counts?.calls||0,delayed:!lastGood||Date.now()-lastGood.source_as_of>2*HOUR,members,roster_pending:roster?.pending||[],changes,nickname_changes:nicknameChanges};
   if(!admin)return base;
   return {...base,all_members:await all(db,'SELECT member_id,display_name,legacy_canonical FROM growth_members ORDER BY display_name'),runs:await all(db,'SELECT run_id,trigger_kind,called_at,source_as_of,status,error,validation_json,raw_hash FROM growth_auto_runs ORDER BY called_at DESC LIMIT 48'),events:await all(db,'SELECT * FROM growth_auto_events ORDER BY created_at DESC LIMIT 150'),mappings:await all(db,'SELECT e.*,m.display_name FROM growth_external_ids e LEFT JOIN growth_members m USING(member_id)'),closes:await all(db,'SELECT * FROM growth_daily_closes ORDER BY date DESC LIMIT 31')};
 }

@@ -1,4 +1,5 @@
 // VIP policy uses stored observations only. Never fetches or modifies growth data.
+import { completeRoster, rosterHistory, settledPresence, type ObservedRow, type PendingChange } from './growth-roster';
 export const VIP_KIND = 'vip-weekly';
 export const THRESHOLD = 21_720_000;
 const DAY = 86_400_000;
@@ -38,7 +39,8 @@ export function prepareWeekly(input:unknown,members:Member[],now=Date.now(),reta
   if(r.participation!==undefined||r.evidence!==undefined){
    if(typeof r.participation!=='string'||typeof r.evidence!=='string'||!['participated','not_participated'].includes(r.participation)||!['user_screenshot','user_confirmation'].includes(r.evidence)||(r.participation==='not_participated'&&(r.points!==0||r.evidence!=='user_confirmation')))return invalid('미참여는 관리자 확인 근거와 0점을 함께 입력해 주세요.');
   }
-  if(!m.current&&(r.points!==0||r.participation!=='not_participated'||r.evidence!=='user_confirmation'))return invalid('현재 미관측 회원은 관리자 확인 미참여 0점만 기록할 수 있습니다.');
+  // A person listed in the Sunday snapshot joins the VIP roster immediately (readRoster),
+  // so a confirmed, non-departed identity may carry points even before 3 hourly confirmations.
   ids.add(r.memberId);names.add(r.nickname);return {memberId:r.memberId,nickname:r.nickname,points:r.points,...(r.participation?{participation:r.participation,evidence:r.evidence}:{})};
  }).sort((a,b)=>a.memberId.localeCompare(b.memberId));
  if(b.coverage==='full'&&members.some(m=>m.current&&!ids.has(m.memberId)))return invalid('전체 명단에 누락된 회원이 있습니다. 일부 명단으로 확인하거나 자료를 보완해 주세요.');
@@ -62,13 +64,14 @@ export function eligibility(member:Member|undefined,carriage:Carriage,weekly:Wee
  if(!row)return {eligible:false,reason:'score_missing'};
  return row.points>=THRESHOLD?{eligible:true,reason:'eligible'}:{eligible:false,reason:'score_low'};
 }
-type Observed = {member_id:string|null;game_id:string;legacy_canonical:string|null;display_name:string|null;source_name:string;rank:string|null;level:number|null;status:string;identity_status:string;departed_at:number|null;aliases:string|null};
 // Recheck live mapping, membership and observation inside the same D1 transaction.
 // A departure approval need not bump identity_revision, so that revision alone is insufficient.
+// Each member's latest observation up to the roster snapshot is checked; a member awaiting
+// 3-collection removal is no longer in the newest snapshot but is still current.
 export const ROSTER_GUARD_SQL = `(SELECT COUNT(*) FROM json_each(?) j
  JOIN growth_external_ids e ON e.member_id=json_extract(j.value,'$.memberId') AND e.game_id=json_extract(j.value,'$.gameId')
  JOIN growth_members m ON m.member_id=e.member_id
- JOIN growth_hourly_observations o ON o.game_id=e.game_id AND o.snapshot_id=?
+ JOIN growth_hourly_observations o ON o.game_id=e.game_id AND o.rowid=(SELECT x.rowid FROM growth_hourly_observations x JOIN growth_auto_snapshots s ON s.snapshot_id=x.snapshot_id WHERE x.game_id=e.game_id AND s.source_as_of<=(SELECT source_as_of FROM growth_auto_snapshots WHERE snapshot_id=?) ORDER BY s.source_as_of DESC LIMIT 1)
  WHERE e.status='confirmed' AND e.departed_at IS NULL AND o.status='valid'
  AND COALESCE(m.display_name,o.source_name)=json_extract(j.value,'$.nickname'))=?`;
 // Score references preserve confirmed history only; they never grant selection membership.
@@ -86,15 +89,34 @@ export async function readScoreRoster(db:D1Database,members:Member[]):Promise<Sc
  const current=new Set(members.filter(m=>m.current).map(m=>m.memberId));
  return rows.results.map(r=>({memberId:r.member_id,gameId:r.game_id,nickname:r.nickname,current:current.has(r.member_id)}));
 }
-export async function readRoster(db:D1Database){
+// Sunday snapshot members (real point rows) join immediately; they leave only after the
+// hourly API confirms their absence CONFIRMATIONS times after that snapshot was saved.
+export function snapshotMembers(data:WeeklyData){
+ const since=new Map<string,number>();
+ for(const w of [data.current,data.pending])if(w)for(const r of w.rows)if(r.participation!=='not_participated'){const t=Date.parse(w.updatedAt);if(Number.isFinite(t)&&!(since.get(r.memberId)!>t))since.set(r.memberId,t);}
+ return since;
+}
+export async function readRoster(db:D1Database,weekly?:WeeklyData){
  const latest=await db.prepare("SELECT snapshot_id,source_as_of,received_at,(SELECT value FROM growth_meta WHERE key='identity_revision') identity_revision FROM growth_auto_snapshots ORDER BY source_as_of DESC LIMIT 1").first<{snapshot_id:string;source_as_of:number;received_at:number;identity_revision:string}>();
- if(!latest)return {snapshotId:null,sourceAsOf:null,receivedAt:null,identityRevision:null,members:[] as Member[]};
- const result=await db.prepare(`SELECT o.game_id,e.member_id,e.status identity_status,e.departed_at,m.legacy_canonical,m.display_name,o.source_name,o.rank,o.level,o.status,
-   a.aliases
-   FROM growth_hourly_observations o JOIN growth_external_ids e ON e.game_id=o.game_id
-   LEFT JOIN growth_members m ON m.member_id=e.member_id LEFT JOIN (SELECT member_id,json_group_array(raw_value) aliases FROM growth_identity_decisions WHERE status='confirmed' GROUP BY member_id) a ON a.member_id=e.member_id WHERE o.snapshot_id=?`).bind(latest.snapshot_id).all<Observed>();
- const members=result.results.filter(r=>!!r.member_id).map(r=>({memberId:r.member_id!,gameId:r.game_id,canonical:r.legacy_canonical||r.member_id!,nickname:r.display_name||r.source_name,rank:r.rank,level:r.level,current:r.identity_status==='confirmed'&&r.departed_at===null&&r.status==='valid',temporary:[r.legacy_canonical,r.source_name,r.display_name,...JSON.parse(r.aliases||'[]')].some(n=>TEMPORARY.has(n))}));
- return {snapshotId:latest.snapshot_id,sourceAsOf:latest.source_as_of,receivedAt:latest.received_at,identityRevision:latest.identity_revision,members};
+ if(!latest)return {snapshotId:null,sourceAsOf:null,receivedAt:null,identityRevision:null,members:[] as Member[],pending:[] as PendingChange[],snapshotAdded:[] as string[]};
+ const [roster,data]=await Promise.all([completeRoster(db),weekly?Promise.resolve(weekly):readWeekly(db).then(r=>r.data)]);
+ const confirmed=new Set(roster?.gameIds||[]),since=snapshotMembers(data),snapshotAdded:string[]=[];
+ // Rows already loaded for the roster window: each game ID's newest observation.
+ const rows=[...(roster?.latest.values()||[])].filter(r=>r.member_id&&(r.snapshot_id===latest.snapshot_id||confirmed.has(r.game_id)||since.has(r.member_id)));
+ const aliases=new Map((await db.prepare("SELECT member_id,json_group_array(raw_value) aliases FROM growth_identity_decisions WHERE status='confirmed' AND member_id IN(SELECT value FROM json_each(?)) GROUP BY member_id").bind(JSON.stringify(rows.map(r=>r.member_id))).all<{member_id:string;aliases:string}>()).results.map(r=>[r.member_id,JSON.parse(r.aliases) as string[]]));
+ const histories=new Map<number,Awaited<ReturnType<typeof rosterHistory>>>();
+ const keptBySnapshot=async(r:ObservedRow)=>{
+  const t=since.get(r.member_id!);if(t===undefined)return false;
+  if(!histories.has(t))histories.set(t,await rosterHistory(db,undefined,t));
+  const history=histories.get(t),length=history?[...history.sequences.values()][0]?.length||0:0;
+  return settledPresence(history?.sequences.get(r.game_id)||Array(length).fill(false),true);
+ };
+ const members:Member[]=[];
+ for(const r of rows){
+  const listed=confirmed.has(r.game_id)||(await keptBySnapshot(r)&&(snapshotAdded.push(r.member_id!),true));
+  members.push({memberId:r.member_id!,gameId:r.game_id,canonical:r.legacy_canonical||r.member_id!,nickname:r.display_name||r.source_name,rank:r.rank,level:r.level,current:listed&&r.identity_status==='confirmed'&&r.departed_at===null&&r.status==='valid',temporary:[r.legacy_canonical,r.source_name,r.display_name,...(aliases.get(r.member_id!)||[])].some(n=>!!n&&TEMPORARY.has(n))});
+ }
+ return {snapshotId:latest.snapshot_id,sourceAsOf:latest.source_as_of,receivedAt:latest.received_at,identityRevision:latest.identity_revision,members,pending:roster?.pending||[],snapshotAdded};
 }
 export async function readWeekly(db:D1Database){
  const row=await db.prepare('SELECT revision,payload,updated_at FROM documents WHERE kind=?').bind(VIP_KIND).first<{revision:number;payload:string;updated_at:string}>();

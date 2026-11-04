@@ -3,7 +3,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 const fixture=require('./vip-fixture.cjs');
 const failures=[];
 async function check(name,run){try{await run();console.log('PASS: '+name)}catch(e){failures.push(name);console.error('FAIL: '+name+' — '+e.message)}}
-function setup(){const f=fixture();f.seedMember('a','Alice');f.seedMember('h','Historical');f.addSnapshot('old');f.observe('old','a','Alice');f.observe('old','h','Historical');f.addSnapshot('new');f.observe('new','a','Alice');return f;}
+function setup(){const f=fixture();f.seedMember('a','Alice');f.seedMember('h','Historical');f.addSnapshot('old');f.observe('old','a','Alice');f.observe('old','h','Historical');f.addSnapshot('new');f.observe('new','a','Alice');f.confirm('new');return f;}
 const sunday=Date.parse('2026-11-01T02:00:00Z'),saturday=Date.parse('2026-10-31T02:00:00Z');
 const snapshot=(providedOn='2026-11-01')=>({providedOn,appliesOn:'2026-11-02',coverage:'full',rows:[{memberId:'a',nickname:'Alice',points:21720000,participation:'participated',evidence:'user_screenshot'},{memberId:'h',nickname:'Historical',points:0,participation:'not_participated',evidence:'user_confirmation'}]});
 async function request(f,input,revision=0,mut='1'.repeat(32)){
@@ -35,7 +35,8 @@ await check('Known unobserved member accepts only explicit confirmed nonparticip
  assert.deepEqual(f.sql.prepare("SELECT kind,revision,payload FROM documents WHERE kind<>'vip-weekly' ORDER BY kind").all(),before);
  assert.equal((await request(f,snapshot('2026-10-31'),1,'2'.repeat(32))).status,200);
  assert.equal(f.sql.prepare("SELECT revision FROM documents WHERE kind='vip-weekly'").get().revision,1,'semantic duplicate must be a no-op');
- for(const patch of [{points:1},{participation:'participated'},{evidence:'user_screenshot'},{evidence:undefined},{memberId:'unknown'},{nickname:'HISTORICAL'}]){
+ // {participation:'participated'} is now valid: a Sunday snapshot participant joins the VIP roster (tests/roster_sync_regression.cjs).
+ for(const patch of [{points:1},{evidence:'user_screenshot'},{evidence:undefined},{memberId:'unknown'},{nickname:'HISTORICAL'}]){
   const input=snapshot('2026-10-31');Object.assign(input.rows[1],patch);assert.equal((await request(f,input,1,crypto.randomUUID())).status,400,JSON.stringify(patch));
  }
  const changed=snapshot('2026-10-31');changed.rows[0].points=22000000;
