@@ -42,8 +42,8 @@ async function run(){
  const late=snap('2026-10-17T14:59:59Z');await auto.fixture(db,JSON.stringify(late),Date.parse('2026-10-17T15:01:00Z'));assert.equal(sql.prepare('SELECT status FROM growth_auto_runs ORDER BY called_at DESC LIMIT 1').get().status,'stale');
  failBatch=true;await assert.rejects(auto.closeDay(db,'2026-10-17',Date.parse('2026-10-17T15:10:00Z')));failBatch=false;
  assert.equal(count('growth_daily_closes'),0);assert.equal(count('growth_observations'),oldObs,'transaction rollback');
- const result=await auto.closeDay(db,'2026-10-17',Date.parse('2026-10-17T15:10:00Z'));assert.equal(result.members,88,'a game ID seen in only 2 pre-midnight collections is still pending, not a member');
- assert.deepEqual((await rosterModule.exports.completeRoster(db,Date.parse('2026-10-17T15:00:00Z'))).pending.map(p=>[p.game_id,p.change,p.confirmations]),[[fixture.roster[88].id,'join',2]]);
+ const result=await auto.closeDay(db,'2026-10-17',Date.parse('2026-10-17T15:10:00Z'));assert.equal(result.members,88,'a game ID seen in only 1 pre-midnight hourly collection (14:01 and 14:31 count once) is still pending, not a member');
+ assert.deepEqual((await rosterModule.exports.completeRoster(db,Date.parse('2026-10-17T15:00:00Z'))).pending.map(p=>[p.game_id,p.change,p.confirmations]),[[fixture.roster[88].id,'join',1]]);
  const selected=sql.prepare('SELECT * FROM growth_daily_sources WHERE game_id=?').get(b.roster[0].id);assert.equal(selected.power,b.roster[0].power);assert(selected.source_as_of<Date.parse('2026-10-17T15:00:00Z'));assert(selected.received_at<Date.parse('2026-10-17T15:00:00Z'));
  assert.equal((await auto.closeDay(db,'2026-10-17',Date.parse('2026-10-17T15:11:00Z'))).duplicate,true);assert.equal(count('growth_observations'),oldObs+88);
  let fetches=0;const fetcher=async(url,options)=>{assert.equal(url,auto.ALLIANCE_URL);assert.equal(options.redirect,'manual','Workers supports manual redirect without following other endpoints');fetches++;throw Error('simulated outage')};
@@ -55,13 +55,13 @@ async function run(){
  await auto.scheduledAutomation({cron:auto.COMBINED_CRON,scheduledTime:Date.parse('2026-10-17T15:10:00Z')},{DB:db,GROWTH_AUTO_MODE:'production'});global.fetch=previousFetch;Date.now=actualNow;assert.equal(fetches,1,'close never fetches');
  assert.equal(digest(),preserved,'carriage VIP canyon memos preserved');assert.equal(count('growth_observations'),oldObs+88);
  // The second close has a real previous-day baseline; new IDs stay distinct.
- const next=snap('2026-10-18T14:00:00Z');next.roster[0].power=b.roster[0].power-100;
+ const next=snap('2026-10-18T12:00:00Z');next.roster[0].power=b.roster[0].power-100;
  next.roster.push({...next.roster[1],id:'900000000998',name:'별도신규테스트'});next.members=90;
  next.roster.push({...next.roster[2],id:'900000000999',name:next.roster[2].name});next.members=91;
- await auto.fixture(db,JSON.stringify(next),Date.parse('2026-10-18T14:01:00Z'));
+ await auto.fixture(db,JSON.stringify(next),Date.parse('2026-10-18T12:01:00Z'));
  assert.equal(sql.prepare('SELECT status FROM growth_external_ids WHERE game_id=?').get('900000000999').status,'review','same nickname cannot merge IDs');
  // New IDs join only after 3 consecutive accepted collections before the cutoff.
- for(const t of ['14:20','14:40'])await auto.fixture(db,JSON.stringify({...next,asOf:Date.parse('2026-10-18T'+t+':00Z')/1000}),Date.parse('2026-10-18T'+t+':30Z'));
+ for(const t of ['13:00','14:00'])await auto.fixture(db,JSON.stringify({...next,asOf:Date.parse('2026-10-18T'+t+':00Z')/1000}),Date.parse('2026-10-18T'+t+':30Z'));
  await auto.closeDay(db,'2026-10-18',Date.parse('2026-10-18T15:10:00Z'));
  assert.equal(sql.prepare('SELECT delta FROM growth_daily_sources WHERE date=? AND game_id=?').get('2026-10-18',b.roster[0].id).delta,-100,'negative daily growth stays unadjusted');
  assert.equal(sql.prepare('SELECT delta FROM growth_daily_sources WHERE date=? AND game_id=?').get('2026-10-18','900000000998').delta,null,'new member has no invented previous-day power');

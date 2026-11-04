@@ -71,12 +71,21 @@ export async function ingestStored(db:D1Database,runId:string,acceptedAt=Date.no
   try{source=validateSnapshot(JSON.parse(run.raw_json),run.called_at)}catch(e){
     await stmt(db,"UPDATE growth_auto_runs SET status='invalid',error=?,completed_at=? WHERE run_id=?",String((e as Error).message),acceptedAt,runId).run();return {status:'invalid',run_id:runId};
   }
-  const sourceTime=sourceTimeOf(source,run.received_at??run.called_at);
-  const contentHash=await digest(canonical({id:source.id,asOf:sourceTime/1000,members:source.members,power:source.power,roster:[...source.roster].sort((a,b)=>a.id.localeCompare(b.id))}));
-  const existing=await first(db,'SELECT s.snapshot_id,r.raw_hash FROM growth_auto_snapshots s JOIN growth_auto_runs r ON r.run_id=s.run_id WHERE s.source_as_of=? AND s.content_hash=?',sourceTime,contentHash);
-  if(existing){await stmt(db,"UPDATE growth_auto_runs SET status='duplicate',snapshot_id=?,source_as_of=?,content_hash=?,completed_at=?,raw_json=CASE WHEN raw_hash=? THEN NULL ELSE raw_json END WHERE run_id=?",existing.snapshot_id,sourceTime,contentHash,acceptedAt,existing.raw_hash,runId).run();return {status:'duplicate',run_id:runId};}
+  const aligned=dayAlignedAsOf(source.asOf),sourceTime=sourceTimeOf(source,run.received_at??run.called_at);
+  // Raw source time and our call/receipt times are kept apart; receipt time is never a measurement time.
+  const timing={source_as_of_raw:source.asOf,source_time_basis:aligned?'received_at':'source_as_of',called_at:run.called_at,received_at:run.received_at??null};
+  const contentHash=await digest(canonical({id:source.id,asOf:source.asOf,members:source.members,power:source.power,roster:[...source.roster].sort((a,b)=>a.id.localeCompare(b.id))}));
+  const rosterBefore=await completeRoster(db).catch(()=>null);
+  // Unchanged data is a duplicate collection (a further hourly confirmation), never new hourly rows.
+  // With a whole-day asOf, "unchanged" means identical to the newest stored snapshot.
+  const existing=await first(db,aligned
+    ?'SELECT s.snapshot_id,r.raw_hash FROM growth_auto_snapshots s JOIN growth_auto_runs r ON r.run_id=s.run_id WHERE s.content_hash=? AND s.source_as_of=(SELECT MAX(source_as_of) FROM growth_auto_snapshots)'
+    :'SELECT s.snapshot_id,r.raw_hash FROM growth_auto_snapshots s JOIN growth_auto_runs r ON r.run_id=s.run_id WHERE s.source_as_of=? AND s.content_hash=?',...(aligned?[contentHash]:[sourceTime,contentHash]));
+  if(existing){await stmt(db,"UPDATE growth_auto_runs SET status='duplicate',snapshot_id=?,source_as_of=?,content_hash=?,completed_at=?,validation_json=?,raw_json=CASE WHEN raw_hash=? THEN NULL ELSE raw_json END WHERE run_id=?",existing.snapshot_id,sourceTime,contentHash,acceptedAt,json({...timing,content:'unchanged',members:source.members,roster:source.roster.length,count_gap:source.roster.length-source.members}),existing.raw_hash,runId).run();await recordRosterChanges(db,rosterBefore,runId,acceptedAt);return {status:'duplicate',run_id:runId};}
+  // The source's own time may not go backwards (an older whole-day asOf is older data).
+  const lastRaw=await first(db,"SELECT MAX(COALESCE(json_extract(validation_json,'$.source_as_of_raw')*1000,source_as_of)) t FROM growth_auto_runs WHERE status IN ('accepted','partial')");
   const last=await first(db,'SELECT MAX(source_as_of) t FROM growth_auto_snapshots');
-  if(last?.t>sourceTime){await stmt(db,"UPDATE growth_auto_runs SET status='stale',source_as_of=?,content_hash=?,completed_at=?,error='SOURCE_TIME_REGRESSED' WHERE run_id=?",sourceTime,contentHash,acceptedAt,runId).run();return {status:'stale',run_id:runId};}
+  if(last?.t>sourceTime||lastRaw?.t>source.asOf*1000){await stmt(db,"UPDATE growth_auto_runs SET status='stale',source_as_of=?,content_hash=?,completed_at=?,error='SOURCE_TIME_REGRESSED' WHERE run_id=?",sourceTime,contentHash,acceptedAt,runId).run();return {status:'stale',run_id:runId};}
   if(await first(db,'SELECT snapshot_id FROM growth_auto_snapshots WHERE source_as_of=?',sourceTime)){
     await stmt(db,"UPDATE growth_auto_runs SET status='invalid',source_as_of=?,completed_at=?,error='CHANGED_DATA_WITH_SAME_ASOF' WHERE run_id=?",sourceTime,acceptedAt,runId).run();return {status:'invalid',run_id:runId};
   }
@@ -130,9 +139,23 @@ export async function ingestStored(db:D1Database,runId:string,acceptedAt=Date.no
   // A later complete roster resolves only absence candidates; it never confirms a departure.
   statements.push(stmt(db,`UPDATE growth_auto_events SET status='resolved' WHERE kind='departure_candidate' AND status='pending' AND game_id IN(SELECT json_extract(value,'$.id') FROM json_each(?))`,json(source.roster)));
   const reviewCount=rows.filter(r=>r.status!=='valid').length;
-  statements.push(stmt(db,'UPDATE growth_auto_runs SET status=?,source_as_of=?,content_hash=?,snapshot_id=?,completed_at=?,validation_json=? WHERE run_id=?',reviewCount?'partial':'accepted',sourceTime,contentHash,snapshotId,acceptedAt,json({members:source.members,roster:source.roster.length,count_gap:source.roster.length-source.members,source_as_of_raw:source.asOf,source_time_basis:dayAlignedAsOf(source.asOf)?'received_at':'source_as_of',valid:rows.length-reviewCount,review:reviewCount}),runId));
+  statements.push(stmt(db,'UPDATE growth_auto_runs SET status=?,source_as_of=?,content_hash=?,snapshot_id=?,completed_at=?,validation_json=? WHERE run_id=?',reviewCount?'partial':'accepted',sourceTime,contentHash,snapshotId,acceptedAt,json({...timing,content:'changed',members:source.members,roster:source.roster.length,count_gap:source.roster.length-source.members,valid:rows.length-reviewCount,review:reviewCount}),runId));
   await db.batch(statements);
+  await recordRosterChanges(db,rosterBefore,runId,acceptedAt);
   return {status:reviewCount?'partial':'accepted',run_id:runId,snapshot_id:snapshotId,members:rows.length,review:reviewCount};
+}
+// Evidence for every settled roster change: the 3 distinct hourly collections that confirmed it.
+// Best effort: evidence never blocks or undoes a stored collection.
+async function recordRosterChanges(db:D1Database,before:Awaited<ReturnType<typeof completeRoster>>,runId:string,at:number){
+  try{
+    const after=await completeRoster(db);if(!before||!after)return;
+    const was=new Set(before.gameIds),now=new Set(after.gameIds),snap=new Set(after.snapshotAdded);
+    const events=[...[...now].filter(id=>!was.has(id)).map(id=>['roster_join',id]),...[...was].filter(id=>!now.has(id)).map(id=>['roster_leave',id])].map(([kind,id])=>{
+      const r=after.latest.get(id)||before.latest.get(id);
+      return {event_id:runId+'_'+kind+'_'+id,kind,game_id:id,member_id:r?.member_id??null,source_as_of:after.source_as_of,created_at:at,status:'recorded',after_json:json({name:r?.display_name||r?.source_name||null,basis:r?.member_id&&snap.has(r.member_id)?'sunday_snapshot':'hourly_collections',collections:r?.member_id&&snap.has(r.member_id)?[]:after.settledEvidence(id)})};
+    });
+    if(events.length)await stmt(db,`INSERT OR IGNORE INTO growth_auto_events SELECT json_extract(value,'$.event_id'),json_extract(value,'$.kind'),json_extract(value,'$.game_id'),json_extract(value,'$.member_id'),json_extract(value,'$.source_as_of'),json_extract(value,'$.created_at'),json_extract(value,'$.status'),NULL,json_extract(value,'$.after_json'),NULL,NULL FROM json_each(?)`,json(events)).run();
+  }catch(e){console.error('Roster change evidence pending:',(e as Error).message);}
 }
 
 export async function collect(env:AutoEnv,triggerKind='cron',now=Date.now(),fetcher:typeof fetch=fetch){
@@ -252,7 +275,7 @@ export async function automaticStatus(db:D1Database,admin=false){
   const [control,lastRun,lastGood,close,pending]=await Promise.all([
     first(db,'SELECT enabled,start_date,last_call_at FROM growth_auto_control WHERE id=1'),
     first(db,'SELECT run_id,trigger_kind,called_at,received_at,source_as_of,status,error,http_status,validation_json FROM growth_auto_runs ORDER BY called_at DESC LIMIT 1'),
-    first(db,'SELECT * FROM growth_auto_snapshots ORDER BY source_as_of DESC LIMIT 1'),
+    first(db,"SELECT s.*,json_extract(r.validation_json,'$.source_time_basis') source_time_basis,json_extract(r.validation_json,'$.source_as_of_raw') source_as_of_raw FROM growth_auto_snapshots s LEFT JOIN growth_auto_runs r ON r.run_id=s.run_id ORDER BY s.source_as_of DESC LIMIT 1"),
     first(db,'SELECT * FROM growth_daily_closes ORDER BY date DESC LIMIT 1'),
     first(db,"SELECT COUNT(*) n FROM growth_auto_events WHERE status='pending'"),
   ]);
@@ -272,7 +295,7 @@ export async function automaticStatus(db:D1Database,admin=false){
     if(m.power==null){m.power=p.power;m.level=p.level;m.rank=p.rank;m.delta=0;m.last_valid_kind='previous_confirmed_record';m.observed_date=p.observed_date;}
   }
   const counts=await first(db,"SELECT COUNT(*) calls FROM growth_auto_runs WHERE trigger_kind<>'fixture' AND status<>'not_dispatched'");
-  const changes=await all(db,`SELECT e.kind,e.game_id,e.member_id,e.source_as_of,e.before_json,e.after_json,e.status,m.display_name FROM growth_auto_events e LEFT JOIN growth_members m USING(member_id) WHERE e.kind IN ('nickname','rank','new','departure_candidate') ORDER BY e.created_at DESC LIMIT 30`);
+  const changes=await all(db,`SELECT e.kind,e.game_id,e.member_id,e.source_as_of,e.before_json,e.after_json,e.status,m.display_name FROM growth_auto_events e LEFT JOIN growth_members m USING(member_id) WHERE e.kind IN ('nickname','rank','new','departure_candidate','roster_join','roster_leave') ORDER BY e.created_at DESC LIMIT 30`);
   // One latest confirmed rename per active game ID, independent of the recent-event limit.
   // Full event history stays intact for auditing and identity recovery.
   const nicknameChanges=await all(db,`WITH latest AS (

@@ -19,6 +19,7 @@ module.exports=function fixture(){
  sql.exec("CREATE TRIGGER fixture_snapshot_count AFTER INSERT ON growth_hourly_observations WHEN NEW.snapshot_id IN(SELECT snapshot_id FROM growth_auto_snapshots WHERE run_id='fixture') BEGIN UPDATE growth_auto_snapshots SET member_count=(SELECT COUNT(*) FROM growth_hourly_observations WHERE snapshot_id=NEW.snapshot_id) WHERE snapshot_id=NEW.snapshot_id; END");
  const addSnapshot=id=>sql.prepare('INSERT INTO growth_auto_snapshots VALUES(?,?,?,?,?,?,?,?)').run(id,Date.parse('2026-10-28T00:00:00Z')+(id==='new'?1:0),id,'fixture',1,1,2,12345);
  // The same stored roster seen again in later hourly collections (duplicate runs).
- let repeats=0;const confirm=(id,times=2)=>{for(let i=0;i<times;i++)sql.prepare("INSERT INTO growth_auto_runs(run_id,trigger_kind,called_at,completed_at,snapshot_id,status) VALUES(?,'fixture',2,2,?,'duplicate')").run('fixture_repeat_'+(++repeats),id);};
+ // Each repeat is a separate hourly collection (one confirmation per UTC hour).
+ let repeats=0;const confirm=(id,times=2)=>{for(let i=0;i<times;i++){const at=Date.parse('2026-10-28T00:00:00Z')+(++repeats)*3_600_000;sql.prepare("INSERT INTO growth_auto_runs(run_id,trigger_kind,called_at,completed_at,snapshot_id,status) VALUES(?,'fixture',?,?,?,'duplicate')").run('fixture_repeat_'+repeats,at,at,id);}};
  return {sql,db,env,load,seedMember,observe,addSnapshot,confirm};
 };

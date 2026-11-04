@@ -1,5 +1,5 @@
 // VIP policy uses stored observations only. Never fetches or modifies growth data.
-import { completeRoster, rosterHistory, settledPresence, type ObservedRow, type PendingChange } from './growth-roster';
+import { completeRoster, type PendingChange } from './growth-roster';
 export const VIP_KIND = 'vip-weekly';
 export const THRESHOLD = 21_720_000;
 const DAY = 86_400_000;
@@ -89,34 +89,18 @@ export async function readScoreRoster(db:D1Database,members:Member[]):Promise<Sc
  const current=new Set(members.filter(m=>m.current).map(m=>m.memberId));
  return rows.results.map(r=>({memberId:r.member_id,gameId:r.game_id,nickname:r.nickname,current:current.has(r.member_id)}));
 }
-// Sunday snapshot members (real point rows) join immediately; they leave only after the
-// hourly API confirms their absence CONFIRMATIONS times after that snapshot was saved.
-export function snapshotMembers(data:WeeklyData){
- const since=new Map<string,number>();
- for(const w of [data.current,data.pending])if(w)for(const r of w.rows)if(r.participation!=='not_participated'){const t=Date.parse(w.updatedAt);if(Number.isFinite(t)&&!(since.get(r.memberId)!>t))since.set(r.memberId,t);}
- return since;
-}
-export async function readRoster(db:D1Database,weekly?:WeeklyData){
+// Same confirmed roster as growth (incl. Sunday snapshot participants, see growth-roster.ts).
+// Eligibility (permanent exclusion, weekly score, temporary restriction) stays separate.
+export async function readRoster(db:D1Database){
  const latest=await db.prepare("SELECT snapshot_id,source_as_of,received_at,(SELECT value FROM growth_meta WHERE key='identity_revision') identity_revision FROM growth_auto_snapshots ORDER BY source_as_of DESC LIMIT 1").first<{snapshot_id:string;source_as_of:number;received_at:number;identity_revision:string}>();
  if(!latest)return {snapshotId:null,sourceAsOf:null,receivedAt:null,identityRevision:null,members:[] as Member[],pending:[] as PendingChange[],snapshotAdded:[] as string[]};
- const [roster,data]=await Promise.all([completeRoster(db),weekly?Promise.resolve(weekly):readWeekly(db).then(r=>r.data)]);
- const confirmed=new Set(roster?.gameIds||[]),since=snapshotMembers(data),snapshotAdded:string[]=[];
+ const roster=await completeRoster(db);
+ const confirmed=new Set(roster?.gameIds||[]);
  // Rows already loaded for the roster window: each game ID's newest observation.
- const rows=[...(roster?.latest.values()||[])].filter(r=>r.member_id&&(r.snapshot_id===latest.snapshot_id||confirmed.has(r.game_id)||since.has(r.member_id)));
+ const rows=[...(roster?.latest.values()||[])].filter(r=>r.member_id&&(r.snapshot_id===latest.snapshot_id||confirmed.has(r.game_id)));
  const aliases=new Map((await db.prepare("SELECT member_id,json_group_array(raw_value) aliases FROM growth_identity_decisions WHERE status='confirmed' AND member_id IN(SELECT value FROM json_each(?)) GROUP BY member_id").bind(JSON.stringify(rows.map(r=>r.member_id))).all<{member_id:string;aliases:string}>()).results.map(r=>[r.member_id,JSON.parse(r.aliases) as string[]]));
- const histories=new Map<number,Awaited<ReturnType<typeof rosterHistory>>>();
- const keptBySnapshot=async(r:ObservedRow)=>{
-  const t=since.get(r.member_id!);if(t===undefined)return false;
-  if(!histories.has(t))histories.set(t,await rosterHistory(db,undefined,t));
-  const history=histories.get(t),length=history?[...history.sequences.values()][0]?.length||0:0;
-  return settledPresence(history?.sequences.get(r.game_id)||Array(length).fill(false),true);
- };
- const members:Member[]=[];
- for(const r of rows){
-  const listed=confirmed.has(r.game_id)||(await keptBySnapshot(r)&&(snapshotAdded.push(r.member_id!),true));
-  members.push({memberId:r.member_id!,gameId:r.game_id,canonical:r.legacy_canonical||r.member_id!,nickname:r.display_name||r.source_name,rank:r.rank,level:r.level,current:listed&&r.identity_status==='confirmed'&&r.departed_at===null&&r.status==='valid',temporary:[r.legacy_canonical,r.source_name,r.display_name,...(aliases.get(r.member_id!)||[])].some(n=>!!n&&TEMPORARY.has(n))});
- }
- return {snapshotId:latest.snapshot_id,sourceAsOf:latest.source_as_of,receivedAt:latest.received_at,identityRevision:latest.identity_revision,members,pending:roster?.pending||[],snapshotAdded};
+ const members:Member[]=rows.map(r=>({memberId:r.member_id!,gameId:r.game_id,canonical:r.legacy_canonical||r.member_id!,nickname:r.display_name||r.source_name,rank:r.rank,level:r.level,current:confirmed.has(r.game_id)&&r.identity_status==='confirmed'&&r.departed_at===null&&r.status==='valid',temporary:[r.legacy_canonical,r.source_name,r.display_name,...(aliases.get(r.member_id!)||[])].some(n=>!!n&&TEMPORARY.has(n))}));
+ return {snapshotId:latest.snapshot_id,sourceAsOf:latest.source_as_of,receivedAt:latest.received_at,identityRevision:latest.identity_revision,members,pending:roster?.pending||[],snapshotAdded:roster?.snapshotAdded||[]};
 }
 export async function readWeekly(db:D1Database){
  const row=await db.prepare('SELECT revision,payload,updated_at FROM documents WHERE kind=?').bind(VIP_KIND).first<{revision:number;payload:string;updated_at:string}>();

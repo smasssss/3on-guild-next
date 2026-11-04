@@ -49,7 +49,8 @@ class Release(roster.Release):
         vip=json.loads(self.public('/api/carriage/vip'));current=json.loads(self.public('/api/growth/current'))
         missing=data['members'][2]
         assert len(current['members'])==2,'One reappearance must not change the roster'
-        assert [p for p in vip['rosterPending'] if p['game_id']==missing['gameId']]==[{'game_id':missing['gameId'],'member_id':missing['memberId'],'name':missing['nickname'],'change':'join','confirmations':1,'required':3}]
+        found=[{k:p[k] for k in ['game_id','member_id','name','change','confirmations','required']} for p in vip['rosterPending'] if p['game_id']==missing['gameId']]
+        assert found==[{'game_id':missing['gameId'],'member_id':missing['memberId'],'name':missing['nickname'],'change':'join','confirmations':1,'required':3}]
         extra=[data['rejoinSnapshot']+'_1',data['rejoinSnapshot']+'_2']
         data['extraSnapshots']=data.get('extraSnapshots',[])+extra;self.save('fixture.json',data)
         self.fixture_batch(self.snapshot_statements(extra[0],data['members'],stamp+1)+self.snapshot_statements(extra[1],data['members'],stamp+2))
