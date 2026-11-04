@@ -2,6 +2,7 @@ name: Verify roster sync on Staging only (Production promotion requires separate
 # Staging-only: this workflow has no Production job. Production promotion is a separate,
 # user-approved change. Retries only transient management reads; never emits credentials.
 # Rerun 2: Sunday participants join growth+VIP at once; raw/receipt times kept apart; one confirmation per hour with evidence.
+# Rerun 3: live Staging may already run an earlier commit of this branch.
 on:
   push:
     branches: [claude/new-session-narazy]
