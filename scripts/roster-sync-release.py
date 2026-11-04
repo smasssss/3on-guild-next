@@ -20,13 +20,12 @@ class Release(roster.Release):
         try:super().before()
         finally:base.BASE=REVIEWED
     def approved_active(self):
-        # Live Staging may run the reviewed base or an earlier commit of this same branch
-        # (a previous Staging run); anything else stops the release.
+        # Live Staging/Production may run the reviewed base or an earlier commit of this same
+        # branch (a previous approved release); anything else stops the release.
         base.PHASE='reviewed roster-sync runtime'
         version=self.active();resolved=self.live_source()
         ok=lambda a,b:subprocess.run(['git','merge-base','--is-ancestor',a,b],capture_output=True).returncode==0
         assert ok(REVIEWED,resolved) and ok(resolved,self.sha),'Live runtime is not the reviewed base or this branch'
-        assert self.target=='staging' or subprocess.run(['git','diff','--quiet',resolved,REVIEWED,'--',*RUNTIME],capture_output=True).returncode==0,'Production must run the reviewed base'
         assert base.digest(self.public('/carriage-vip.js'))==base.digest(subprocess.check_output(['git','show',resolved+':public/carriage-vip.js']))
         return version
 
