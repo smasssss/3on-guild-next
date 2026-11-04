@@ -1,3 +1,5 @@
+// Growth frame uses the shared operations-board theme.
+if(!document.getElementById('opsThemeGrowth')){const l=document.createElement('link');l.id='opsThemeGrowth';l.rel='stylesheet';l.href='/ops-theme-growth.css';document.head.appendChild(l);}
 /* Existing growth view enhancement. Reads only the guild's own Workers API. */
 (()=>{'use strict';
  const box=document.createElement('section');box.id='growthAutomatic';box.style.cssText='display:block;border:1px solid #426b70;border-radius:12px;padding:14px;margin:14px 0;background:#112a30';
