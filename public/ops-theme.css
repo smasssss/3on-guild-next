@@ -1,4 +1,4 @@
-/* 3ON 작전 상황판 테마. 기존 화면 구조·기능은 그대로 두고 겉모습만 덮어씁니다. */
+/* 3ON 작전 상황판 테마. 기능은 그대로 두고 겉모습과 배치만 바꿉니다. */
 @import url('https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap');
 :root{
  --bg:#1b2624;--panel:#233230;--panel2:#2b3b38;--line:#3a4d49;--text:#e9eee6;--muted:#a3b2aa;
@@ -109,3 +109,63 @@ th{background:var(--panel);color:var(--muted);font-size:11px;font-weight:600}
 }
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
 #history select,.week-head select{background:var(--well);border:1px solid var(--line);border-radius:4px;color:var(--text);min-height:44px}
+
+/* ───── 배치 개편: 컴퓨터는 왼쪽 고정 메뉴, 휴대폰은 아래쪽 탭 막대 ───── */
+.ops-side .hero{background:transparent;border:0;padding:0;margin-top:6px}
+.ops-side .hero h1{font-family:var(--display);font-weight:400;font-size:34px;line-height:1.05;letter-spacing:0}
+.ops-side .hero h1::first-letter{color:var(--amber)}
+th{top:0}
+
+/* 큰 숫자판: 상자 대신 한 줄 점수판 */
+.kpis{gap:0;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.kpi{background:transparent;border:0;border-radius:0;border-right:1px solid var(--line);padding:14px 16px}
+.kpi:last-child{border-right:0}
+.kpi b{font-size:34px;line-height:1.1;margin-top:6px}
+.next-base-kpi{box-shadow:none!important;background:#26362c!important}
+.next-base-kpi b{color:#bfe8c7}
+
+/* 오늘의 마차 운영: 화면 폭 전체 상황판 */
+#carriage .split{grid-template-columns:minmax(0,1fr)}
+.today{padding:26px 22px 20px}
+.today h2{font-size:18px;font-family:'IBM Plex Sans KR',sans-serif;font-weight:700;color:var(--amber);letter-spacing:0}
+.today-grid{grid-template-columns:1fr 1fr;gap:0;margin-top:14px;background:var(--well);border:1px solid var(--steel);border-radius:4px}
+.today-box{background:transparent;border:0;border-radius:0;padding:16px 18px}
+.today-box+.today-box{border-left:1px solid var(--steel)}
+.today-box b{font-size:46px;line-height:1.1;margin-top:8px;overflow-wrap:anywhere}
+.nextline{margin-top:14px;font-size:14px}
+.days{grid-template-columns:repeat(7,minmax(0,1fr))}
+.day{min-height:84px}
+
+@media(min-width:1000px){
+ .wrap{max-width:none;margin:0;padding:28px 40px 60px 300px}
+ .ops-side{position:fixed;top:0;left:0;bottom:0;width:260px;padding:26px 22px;background:#16201e;border-right:1px solid var(--line);overflow:auto;display:flex;flex-direction:column}
+ .ops-side .hero p{font-size:13px;margin-top:10px}
+ .ops-side .proto{order:9;font-size:11px;margin-top:16px}
+ .tabs{position:static;display:flex;flex-direction:column;gap:2px;background:transparent;border:0;margin-top:28px;padding:0}
+ .tabs button{text-align:left;border:0;border-left:3px solid transparent;padding:12px 14px;font-size:15px;border-radius:0 4px 4px 0}
+ .tabs button.active{border-left-color:var(--amber);border-bottom:0;background:#233230}
+ .tabs button:hover{background:#1f2b29}
+ .wrap>.page,.wrap>:not(.ops-side){max-width:1100px}
+}
+@media(max-width:999px){
+ body{padding-bottom:76px}
+ .ops-side .brand{margin-bottom:2px}
+ .ops-side .hero{display:flex;flex-direction:column}
+ .ops-side .hero h1{font-size:30px}
+ .ops-side .hero p{display:none}
+ .ops-side .proto{font-size:11px;padding:7px 10px}
+ .tabs{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:60;display:grid;grid-template-columns:repeat(5,1fr);gap:0;padding:0 0 env(safe-area-inset-bottom);background:#16201e;border-top:1px solid var(--line);border-bottom:0;overflow:visible}
+ .tabs button{border-bottom:0;border-top:3px solid transparent;padding:10px 2px 12px;font-size:12px;line-height:1.25;word-break:keep-all;white-space:normal;min-height:60px}
+ .tabs button.active{border-top-color:var(--amber);border-bottom:0;background:#1f2b29}
+ #exitToast{bottom:92px}#appNotice{bottom:86px}
+}
+@media(max-width:700px){
+ .kpis{grid-template-columns:repeat(2,1fr)}
+ .kpi:nth-child(2n){border-right:0}.kpi:nth-child(-n+2){border-bottom:1px solid var(--line)}
+ .kpi b{font-size:28px}
+ .today{padding:24px 16px 16px}
+ .today-grid{grid-template-columns:1fr}
+ .today-box+.today-box{border-left:0;border-top:1px solid var(--steel)}
+ .today-box b{font-size:38px}
+ .days{grid-template-columns:repeat(7,64px)}
+}
