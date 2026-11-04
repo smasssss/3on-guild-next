@@ -112,8 +112,8 @@ th{background:var(--panel);color:var(--muted);font-size:11px;font-weight:600}
 
 /* ───── 배치 개편: 컴퓨터는 왼쪽 고정 메뉴, 휴대폰은 아래쪽 탭 막대 ───── */
 .ops-side .hero{background:transparent;border:0;padding:0;margin-top:6px}
-.ops-side .hero h1{font-family:var(--display);font-weight:400;font-size:34px;line-height:1.05;letter-spacing:0}
-.ops-side .hero h1::first-letter{color:var(--amber)}
+.ops-side .hero h1{font-weight:700;font-size:30px;line-height:1.1;letter-spacing:-.02em}
+.ops-side .hero h1{border-left:4px solid var(--amber);padding-left:10px}
 th{top:0}
 
 /* 큰 숫자판: 상자 대신 한 줄 점수판 */
@@ -151,7 +151,7 @@ th{top:0}
  body{padding-bottom:76px}
  .ops-side .brand{margin-bottom:2px}
  .ops-side .hero{display:flex;flex-direction:column}
- .ops-side .hero h1{font-size:30px}
+ .ops-side .hero h1{font-size:24px}
  .ops-side .hero p{display:none}
  .ops-side .proto{font-size:11px;padding:7px 10px}
  .tabs{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:60;display:grid;grid-template-columns:repeat(5,1fr);gap:0;padding:0 0 env(safe-area-inset-bottom);background:#16201e;border-top:1px solid var(--line);border-bottom:0;overflow:visible}
