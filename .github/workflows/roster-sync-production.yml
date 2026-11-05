@@ -1,4 +1,5 @@
 name: Promote roster sync to Production after a fresh Staging verification (user-approved 2026-11-04)
+# Release 2 (user-approved 2026-11-05 09:00 KST): D1 read-budget fix and refreshed design.
 on:
   push:
     branches: [claude/new-session-narazy]
@@ -42,6 +43,7 @@ jobs:
           python tests/roster_sync_release_guards.py
           node tests/growth_roster_regression.cjs
           node tests/roster_sync_regression.cjs
+          node tests/roster_read_budget.cjs
           node tests/vip_sunday_regression.cjs
           node tests/weekly_input_regression.cjs
           node tests/vip_weekly_regression.cjs

@@ -46,6 +46,7 @@ jobs:
           python tests/roster_sync_release_guards.py
           node tests/growth_roster_regression.cjs
           node tests/roster_sync_regression.cjs
+          node tests/roster_read_budget.cjs
           node tests/vip_sunday_regression.cjs
           node tests/weekly_input_regression.cjs
           node tests/vip_weekly_regression.cjs
