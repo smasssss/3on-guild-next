@@ -3,6 +3,7 @@ name: Promote roster sync to Production after a fresh Staging verification (user
 # Release 3 (user-approved 2026-11-05): device default font for special-character nicknames; VIP picker info line removed.
 # Release 4 (user-approved 2026-11-05): framed special-character nicknames.
 # Release 5 (user-approved 2026-11-05): no layout jump on first load.
+# Release 6 (user-approved 2026-11-05): VIP selection rules (55,000,000 threshold setting, new queue order).
 on:
   push:
     branches: [claude/new-session-narazy]
@@ -48,6 +49,7 @@ jobs:
           node tests/roster_sync_regression.cjs
           node tests/roster_read_budget.cjs
           node tests/nickname_enclosure.cjs
+          node tests/vip_selection_regression.cjs
           node tests/vip_sunday_regression.cjs
           node tests/weekly_input_regression.cjs
           node tests/vip_weekly_regression.cjs
@@ -62,7 +64,7 @@ jobs:
           node tests/growth_changes_regression.cjs
           node tests/production_growth_regression.cjs
           node tests/canyon_latest_regression.cjs
-          python tests/roster_sync_scope_preserved.py
+          python tests/vip_selection_scope_preserved.py
           npm run build
           python tests/automation_operations_preserved.py
           python tests/vip_exclusions_regression.py
