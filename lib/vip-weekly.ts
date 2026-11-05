@@ -1,7 +1,9 @@
 // VIP policy uses stored observations only. Never fetches or modifies growth data.
 import { completeRoster, type PendingChange } from './growth-roster';
 export const VIP_KIND = 'vip-weekly';
-export const THRESHOLD = 21_720_000;
+// Weekly guild-war points needed for VIP. Stored as carriage.vipThreshold (Admin Settings); this is the default.
+export const THRESHOLD = 55_000_000;
+export const thresholdOf = (carriage:{vipThreshold?:number}) => Number.isSafeInteger(carriage.vipThreshold)&&carriage.vipThreshold!>0?carriage.vipThreshold!:THRESHOLD;
 const DAY = 86_400_000;
 const TEMPORARY = new Set(['언데드킬러','Fallwarrior','Natasha21','호야호야','백구김구','Bogui','MJ2012','레녹스','lina12bwina','수영민트','DrBillX','디디뽀','파츠','봉근대','반달gh','СкульпторДуш']);
 export type Member = { memberId:string; gameId:string; canonical:string; nickname:string; rank:string|null; level:number|null; current:boolean; temporary:boolean };
@@ -9,7 +11,7 @@ export type ScoreMember = Pick<Member,'memberId'|'gameId'|'nickname'|'current'>;
 export type ScoreRow = {memberId:string; nickname:string; points:number; participation?:'participated'|'not_participated'; evidence?:'user_screenshot'|'user_confirmation'};
 export type Weekly = {providedOn:string; appliesOn:string; coverage:'full'|'partial'; rows:ScoreRow[]; updatedAt:string};
 export type WeeklyData = {current:Weekly|null; pending:Weekly|null};
-type Carriage = {vipExcludedMembers?:Record<string,number>};
+type Carriage = {vipExcludedMembers?:Record<string,number>;rotationMembers?:{memberId:string}[];vipThreshold?:number};
 export const emptyWeekly = ():WeeklyData => ({current:null,pending:null});
 export const kstDay = (now:number) => new Date(now+9*3_600_000).toISOString().slice(0,10);
 export function weekOf(now:number){const d=new Date(kstDay(now)+'T00:00:00Z');d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7));return d.toISOString().slice(0,10);}
@@ -51,18 +53,16 @@ export function replaceWeekly(data:WeeklyData,next:Weekly,now=Date.now()):Weekly
  return next.appliesOn<=view.scoreWeek?{current:next,pending:view.pending}:{current:view.active,pending:next};
 }
 export function sameSnapshot(a:Weekly|null,b:Weekly){return !!a&&JSON.stringify({...a,updatedAt:''})===JSON.stringify({...b,updatedAt:''});}
+// VIP selection (2026-11-05): fixed carriage drivers and permanent exclusions never qualify;
+// everyone else qualifies with this week's guild-war points at or above the threshold.
+// No waiting period for new or returning members; no consecutive-selection block (queue order handles it).
 export function eligibility(member:Member|undefined,carriage:Carriage,weekly:Weekly|null,now=Date.now()){
- // Permanent exclusion always wins, including when membership/weekly data are missing.
  if(member&&carriage.vipExcludedMembers?.[member.memberId]===1)return {eligible:false,reason:'permanent'};
+ if(member&&carriage.rotationMembers?.some(e=>e.memberId===member.memberId))return {eligible:false,reason:'rotation'};
  if(!member?.current)return {eligible:false,reason:'membership'};
- const awaitingFirstSnapshot=!weekly||effectiveOn(weekly)>kstDay(now);
- if(member.temporary&&awaitingFirstSnapshot)return {eligible:false,reason:'temporary'};
- // Until the first snapshot actually takes effect, keep the existing selection rules.
- // Uploading the first future snapshot must not change eligibility ahead of Sunday.
- if(awaitingFirstSnapshot)return {eligible:true,reason:'eligible'};
- const row=weekly.rows.find(r=>r.memberId===member.memberId);
- if(!row)return {eligible:false,reason:'score_missing'};
- return row.points>=THRESHOLD?{eligible:true,reason:'eligible'}:{eligible:false,reason:'score_low'};
+ const active=weekly&&effectiveOn(weekly)<=kstDay(now)?weekly:null;
+ const points=active?.rows.find(r=>r.memberId===member.memberId)?.points??0;
+ return points>=thresholdOf(carriage)?{eligible:true,reason:'eligible'}:{eligible:false,reason:'score_low'};
 }
 // Recheck live mapping, membership and observation inside the same D1 transaction.
 // A departure approval need not bump identity_revision, so that revision alone is insufficient.

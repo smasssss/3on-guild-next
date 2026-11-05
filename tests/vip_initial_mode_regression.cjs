@@ -13,15 +13,18 @@ const ride=(id,vip,vipMemberId)=>({id,date:'2026-11-07',weekKey:'2026-11-02',typ
 async function run(){
  f.sql.prepare('INSERT INTO credentials VALUES(?,?,?,?,?)').run(await store.hash(token),'password-session-v1','admin',await store.hash(f.env.ADMIN_PASSWORD_HASH),now+10*86400000);
  const before=f.sql.prepare('SELECT * FROM documents ORDER BY kind').all();
- let view=await(await api.GET(new Request(origin+'/api/carriage/vip'))).json();assert.equal(view.awaitingFirstSnapshot,true);assert.equal(view.members.find(m=>m.memberId==='normal').eligibility.eligible,true);assert.equal(view.members.find(m=>m.memberId==='temporary').eligibility.reason,'temporary');assert.equal(view.members.find(m=>m.memberId==='permanent').eligibility.reason,'permanent');
+ // 2026-11-05 rules: before any applied score nobody qualifies (score_low); no temporary 16-member list.
+ let view=await(await api.GET(new Request(origin+'/api/carriage/vip'))).json();assert.equal(view.awaitingFirstSnapshot,true);
+ assert.equal(view.members.find(m=>m.memberId==='normal').eligibility.reason,'score_low');assert.equal(view.members.find(m=>m.memberId==='temporary').eligibility.reason,'score_low');assert.equal(view.members.find(m=>m.memberId==='permanent').eligibility.reason,'permanent');
  assert.deepEqual(f.sql.prepare('SELECT * FROM documents ORDER BY kind').all(),before,'matching current roster must not rewrite VIP records');
- for(const [id,name]of [['temporary','DrBillX'],['permanent','Permanent fixture']])assert.equal((await request(state,{kind:'carriage',revision:0,data:{...original,records:[ride('blocked',name,id)]}})).status,422);
- let r=await request(state,{kind:'carriage',revision:0,data:{...original,records:[ride('allowed','Normal fixture','normal')]}});assert.equal(r.status,200,await r.clone().text());
- const snapshot={providedOn:'2026-11-07',appliesOn:'2026-11-09',coverage:'full',rows:[{memberId:'normal',nickname:'Normal fixture',points:15000000},{memberId:'temporary',nickname:'DrBillX',points:21720000},{memberId:'permanent',nickname:'Permanent fixture',points:99000000}]};
+ for(const [id,name]of [['normal','Normal fixture'],['temporary','DrBillX'],['permanent','Permanent fixture']])assert.equal((await request(state,{kind:'carriage',revision:0,data:{...original,records:[ride('blocked',name,id)]}})).status,422,name+' refused without an applied score');
+ const snapshot={providedOn:'2026-11-07',appliesOn:'2026-11-09',coverage:'full',rows:[{memberId:'normal',nickname:'Normal fixture',points:54999999},{memberId:'temporary',nickname:'DrBillX',points:55000000},{memberId:'permanent',nickname:'Permanent fixture',points:99000000}]};
  assert.equal((await request(api,{revision:0,snapshot})).status,200);
- view=await(await api.GET(new Request(origin+'/api/carriage/vip'))).json();assert.equal(view.awaitingFirstSnapshot,true);assert.equal(view.members.find(m=>m.memberId==='normal').eligibility.eligible,true,'first upload waits for Sunday');assert.equal(view.members.find(m=>m.memberId==='temporary').eligibility.reason,'temporary');
- now=Date.parse('2026-11-08T15:00Z');view=await(await api.GET(new Request(origin+'/api/carriage/vip'))).json();assert.equal(view.awaitingFirstSnapshot,false);assert.equal(view.members.find(m=>m.memberId==='normal').eligibility.reason,'score_low');assert.equal(view.members.find(m=>m.memberId==='temporary').eligibility.eligible,true);assert.equal(view.members.find(m=>m.memberId==='permanent').eligibility.reason,'permanent');
+ view=await(await api.GET(new Request(origin+'/api/carriage/vip'))).json();assert.equal(view.awaitingFirstSnapshot,true,'first upload waits for Sunday');assert.equal(view.members.find(m=>m.memberId==='temporary').eligibility.reason,'score_low');
+ now=Date.parse('2026-11-08T15:00Z');view=await(await api.GET(new Request(origin+'/api/carriage/vip'))).json();assert.equal(view.awaitingFirstSnapshot,false);assert.equal(view.threshold,55000000);
+ assert.equal(view.members.find(m=>m.memberId==='normal').eligibility.reason,'score_low','54,999,999 is below 55,000,000');assert.equal(view.members.find(m=>m.memberId==='temporary').eligibility.eligible,true,'55,000,000 qualifies');assert.equal(view.members.find(m=>m.memberId==='permanent').eligibility.reason,'permanent');
+ let r=await request(state,{kind:'carriage',revision:0,data:{...original,records:[ride('allowed','DrBillX','temporary')]}});assert.equal(r.status,200,await r.clone().text());
  const saved=JSON.parse(f.sql.prepare("SELECT payload FROM documents WHERE kind='carriage'").get().payload);assert.equal(saved.records.length,1);assert.equal(saved.vipCarry['공 주'],1);assert.equal(saved.vipCarry.Other,999);assert.deepEqual(saved.vipExcludedMembers,{permanent:1});
- console.log('PASS: initial no-score roster read leaves documents intact; normal VIP allowed, 16-member/permanent restrictions enforced by API; first snapshot activates on Sunday onward');
+ console.log('PASS: no score means score_low; 54,999,999 refused / 55,000,000 allowed by API; permanent always refused; first snapshot activates on Sunday; documents intact');
 }
 run().catch(e=>{console.error(e);process.exitCode=1}).finally(()=>{Date.now=realNow});

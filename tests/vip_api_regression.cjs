@@ -7,7 +7,7 @@ const origin='http://localhost:8790',token='a'.repeat(64);let clock=Date.parse('
 f.seedMember('alice','Alice');f.seedMember('bob','Bob');f.addSnapshot('new');f.observe('new','alice','Alice');f.observe('new','bob','Bob');
 const original={pointer:3,records:[{id:'old',date:'2026-10-27',weekKey:'2026-10-26',type:'base',leader:'Leader',vip:'공 주'}],vipCarry:{'공 주':1,Other:999},vipResolution:{'공 주':1},vipExcludedMembers:{bob:1}};
 f.sql.prepare("UPDATE documents SET payload=?,revision=43 WHERE kind='carriage'").run(JSON.stringify(original));
-const snapshot={providedOn:'2026-10-31',appliesOn:'2026-11-02',coverage:'full',rows:[{memberId:'alice',nickname:'Alice',points:21720000},{memberId:'bob',nickname:'Bob',points:99000000}]};
+const snapshot={providedOn:'2026-10-31',appliesOn:'2026-11-02',coverage:'full',rows:[{memberId:'alice',nickname:'Alice',points:55000000},{memberId:'bob',nickname:'Bob',points:99000000}]};
 const post=(route,body,auth=true,requestOrigin=origin)=>route.POST(new Request(origin+'/api/test',{method:'POST',headers:{Origin:requestOrigin,'Content-Type':'application/json',...(auth?{Authorization:'Bearer '+token}:{})},body:JSON.stringify(body)}));
 let mutation=0;const key=()=> (++mutation).toString(16).padStart(32,'0');
 const saved=()=>JSON.parse(f.sql.prepare("SELECT payload FROM documents WHERE kind='carriage'").get().payload);
@@ -17,7 +17,7 @@ async function run(){
  // No score has ever been applied: roster membership and exclusions still govern selection.
  clock=Date.parse('2026-11-09T00:00Z');
  let initial=await (await api.GET(new Request(origin+'/api/carriage/vip'))).json();
- assert.equal(initial.members.find(m=>m.memberId==='alice').eligibility.eligible,true,'API must preserve normal eligibility before first score');
+ assert.equal(initial.members.find(m=>m.memberId==='alice').eligibility.reason,'score_low','2026-11-05 rules: no applied score means below the threshold');
  assert.equal(initial.members.find(m=>m.memberId==='bob').eligibility.reason,'permanent');assert.equal(initial.awaitingFirstSnapshot,true);
  clock=Date.parse('2026-10-31T13:00Z');
  let body={revision:0,mutation:key(),snapshot};
@@ -62,6 +62,7 @@ async function run(){
  clock=Date.parse('2026-10-31T13:00Z');
  r=await post(state,{kind:'carriage',revision:46,mutation:key(),data:{...saved(),records:[...saved().records,{...valid.records[1],id:'mismatch',vipCanonical:'Bob',vipMemberId:'alice'}]}});assert.equal(r.status,422);
  // A departure approval does not bump the growth identity revision.
+ clock=Date.parse('2026-11-02T00:00Z'); // scores applied, so Alice qualifies until the race (2026-11-05 rules)
  const departureKey=key();f.db.beforeBatch=()=>f.sql.prepare("UPDATE growth_external_ids SET departed_at=1 WHERE member_id='alice'").run();
  r=await post(state,{kind:'carriage',revision:46,mutation:departureKey,data:{...saved(),records:[...saved().records,{...valid.records[1],id:'departure-race'}]}});assert.equal(r.status,409,'commit must recheck actual current membership');
  assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM backups WHERE mutation=?').get(departureKey).n,0);

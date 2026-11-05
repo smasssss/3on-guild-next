@@ -19,6 +19,7 @@ export function validate(kind:string,data:any){
     if(data.vipExcludedMembers!==undefined){if(!obj(data.vipExcludedMembers))bad();for(const [key,value]of Object.entries(data.vipExcludedMembers))if(!key||key.length>200||['__proto__','constructor','prototype'].includes(key)||value!==1)bad();}
     for(const r of data.records){if(!obj(r)||typeof r.id!=='string'||r.id.length>200||ids.has(r.id)||!date(r.date)||!date(r.weekKey)||!['base','insert'].includes(r.type)||typeof r.leader!=='string')bad();ids.add(r.id);}
     for(const r of data.records)if(r.vipMemberId!==undefined&&(typeof r.vipMemberId!=='string'||!r.vipMemberId||r.vipMemberId.length>200||['__proto__','constructor','prototype'].includes(r.vipMemberId)))bad();
+    if(data.vipThreshold!==undefined&&(!Number.isSafeInteger(data.vipThreshold)||data.vipThreshold<1||data.vipThreshold>9_999_999_999))bad();
     for(const field of ['vipCarry','vipResolution'])if(data[field]!==undefined){if(!obj(data[field]))bad();for(const [k,v]of Object.entries(data[field]))if(['__proto__','constructor','prototype'].includes(k)||!Number.isSafeInteger(Number(v))||Number(v)<0)bad();}
   }else if(kind==='power'){
     if(data.version!==1||!Array.isArray(data.weeks)||data.weeks.length>2000)bad();const dates=new Set();

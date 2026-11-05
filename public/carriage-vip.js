@@ -1,6 +1,6 @@
 /* Weekly scores are separate from operational records and growth data. */
 const carriageVip={view:null,loading:null,hour:null,draft:null,error:''};
-const vipReason={permanent:'영구 VIP 제외',membership:'현재 소속·동일인 확인 필요',temporary:'이번 주 임시 제한',week_missing:'이번 주 자료 미제공',score_missing:'주간 점수 미확인',score_low:'21,720,000점 미만',unavailable:'자료 확인 필요'};
+const vipReason={permanent:'영구 제외',rotation:'고정 마차장',membership:'현재 소속·동일인 확인 필요',score_low:'점수 미달',unavailable:'자료 확인 필요'};
 function carriageMembers(){
  const all=new Map([...(GROWTH.archivedMembers||[]),...GROWTH.members].map(m=>[m.member_id,{...m,observedToday:false}]));
  for(const r of carriageVip.view?.members||[]){const before=all.get(r.memberId);all.set(r.memberId,{...before,member_id:r.memberId,name:before?.name||r.canonical,displayName:r.nickname,rank:r.rank,level:r.level,observedToday:r.current});}
@@ -15,19 +15,34 @@ function carriageTime(value){return value?new Date(value).toLocaleString('ko-KR'
 function carriageEffectiveDate(w){return new Date(Date.parse(w.appliesOn)-86_400_000).toISOString().slice(0,10);}
 function carriageWeekText(){
  const v=carriageVip.view;if(!v)return carriageVip.error||'마차 명단·주간 점수 확인 중';
- return `${v.scoreWeek||v.week} 주차 · ${v.active?`${v.active.appliesOn} 점수 기준 · VIP 제한 ${v.effectiveOn||carriageEffectiveDate(v.active)}부터${v.carriedForward?' · 새 자료 없음, 이전 점수·자격 유지':''} · 점수 갱신 ${carriageTime(v.active.updatedAt)}`:'첫 점수 적용 전 · 기존 자격 유지 · 지정 16명 제한'} · 명단 관측 ${carriageTime(v.roster.sourceAsOf)}`;
+ return `${v.scoreWeek||v.week} 주차 · ${v.active?`${v.active.appliesOn} 점수 기준 · VIP 제한 ${v.effectiveOn||carriageEffectiveDate(v.active)}부터${v.carriedForward?' · 새 자료 없음, 이전 점수·자격 유지':''} · 점수 갱신 ${carriageTime(v.active.updatedAt)}`:'첫 점수 적용 전 · 점수 없으면 점수 미달'} · 명단 관측 ${carriageTime(v.roster.sourceAsOf)}`;
 }
 function carriageInfo(label){
  const m=memberByLabel(label);if(!m)return '길드원 정보 미확인';const score=carriagePoints(m);
  return `${escapeLabel(m.rank||'등급 미확인')} · Lv.${m.level??'?'} · 주간 ${score===null?'미확인':fmt(score)+'점'}`;
 }
+// VIP queue (2026-11-05): 0 VIPs first (higher points first); then oldest last VIP first
+// (count-only history without dates counts as oldest), fewer VIPs, higher points; memberId breaks ties.
+function carriageVipHistory(m){
+ const dates=state.records.filter(r=>vipRecordCanonical(r)===m.name).map(r=>r.date).sort();
+ return {count:vipTotalCount(m.name),last:dates.length?dates[dates.length-1]:null};
+}
+function carriageVipOrder(a,b){
+ const pa=carriagePoints(a.m)??0,pb=carriagePoints(b.m)??0,byId=String(a.m.member_id).localeCompare(String(b.m.member_id));
+ if((a.count===0)!==(b.count===0))return a.count===0?-1:1;
+ if(a.count===0)return pb-pa||byId;
+ return String(a.last||'').localeCompare(String(b.last||''))||a.count-b.count||pb-pa||byId;
+}
+function carriageDaysAgo(d){if(!d)return '기록 날짜 없음';const today=new Date(Date.now()+9*3_600_000).toISOString().slice(0,10);const n=Math.round((Date.parse(today)-Date.parse(d))/86_400_000);return n<=0?'오늘':n+'일 전';}
 function renderCarriageVipResults(){
  const q=(document.getElementById('vipSearch').value||'').toLowerCase();
- const arr=carriageMembers().filter(m=>m.observedToday===true&&state.vipExcludedMembers?.[m.member_id]!==1&&(m.name+' '+labelOfMember(m)).toLowerCase().includes(q)).map(m=>({m,count:vipTotalCount(m.name)})).sort((a,b)=>Number(!carriageVipStatus(a.m).eligible)-Number(!carriageVipStatus(b.m).eligible)||a.count-b.count||(b.m.level||0)-(a.m.level||0)||(carriagePoints(b.m)??-1)-(carriagePoints(a.m)??-1)||labelOfMember(a.m).localeCompare(labelOfMember(b.m),'ko')).slice(0,100);
+ const all=carriageMembers().filter(m=>m.observedToday===true&&(m.name+' '+labelOfMember(m)).toLowerCase().includes(q)).map(m=>({m,...carriageVipHistory(m),status:carriageVipStatus(m)}));
+ const arr=[...all.filter(x=>x.status.eligible).sort(carriageVipOrder),...all.filter(x=>!x.status.eligible).sort(carriageVipOrder)].slice(0,100);
+ const top=arr.find(x=>x.status.eligible);
  // The picker shows only the member list; week/score/roster details are not shown (user request 2026-11-05).
- document.getElementById('vipResults').innerHTML=arr.map(({m,count})=>{
-  const status=carriageVipStatus(m),reason=vipReason[status.reason]||'';
-  return `<div class="viprow"><div class="vip-main"><b>${escapeLabel(labelOfMember(m))}</b><br><span>${carriageInfo(m.name)}</span>${!status.eligible?'<br><span class="pill warn">'+reason+'</span>':''}</div><div class="vip-actions"><span class="vip-count ${count===0?'zero':''}">VIP ${count}회${carryConflict(m.name)?' · 확인 필요':''}</span><div class="vip-pick-buttons"><button class="smallbtn" data-leader="${escapeLabel(m.member_id)}">마차장</button><button class="smallbtn" data-vip="${escapeLabel(m.member_id)}" ${status.eligible?'':'disabled aria-disabled="true"'} title="${reason}">VIP</button></div></div></div>`;
+ document.getElementById('vipResults').innerHTML=arr.map(x=>{
+  const {m,count,last,status}=x,reason=vipReason[status.reason]||'',points=carriagePoints(m);
+  return `<div class="viprow"><div class="vip-main"><b>${escapeLabel(labelOfMember(m))}</b>${x===top?' <span class="pill good">오늘 추천</span>':''}<br><span>길드전 ${points===null?'미확인':fmt(points)+'점'} · 누적 ${count}회 · 마지막 VIP ${count?carriageDaysAgo(last):'없음'}</span><br><span class="pill ${status.eligible?'good':'warn'}">${status.eligible?'대상':reason}</span></div><div class="vip-actions"><span class="vip-count ${count===0?'zero':''}">VIP ${count}회${carryConflict(m.name)?' · 확인 필요':''}</span><div class="vip-pick-buttons"><button class="smallbtn" data-leader="${escapeLabel(m.member_id)}">마차장</button><button class="smallbtn" data-vip="${escapeLabel(m.member_id)}" ${status.eligible?'':'disabled aria-disabled="true"'} title="${reason}">VIP</button></div></div></div>`;
  }).join('')+(arr.length?'':'<p class="sub">현재 선택 가능한 명단이 없습니다. 자동수집 명단·연결 상태를 확인해 주세요.</p>');
  document.querySelectorAll('[data-leader]').forEach(b=>b.onclick=()=>{const m=carriageMembers().find(m=>m.member_id===b.dataset.leader&&m.observedToday);if(!m)return;mode='insert';leaderSelectionDirty=true;renderForm();document.getElementById('leaderSelect').value=m.name;renderPreview();});
  document.querySelectorAll('[data-vip]').forEach(b=>b.onclick=()=>{const m=carriageMembers().find(m=>m.member_id===b.dataset.vip);if(!m||!carriageVipStatus(m).eligible)return;selectedVip=labelOfMember(m);selectedVipCanonical=m.name;document.getElementById('vipModal').classList.remove('show');renderForm();});
@@ -95,3 +110,23 @@ function initCarriageVip(){
 memberByCanonical=function(name){return carriageMembers().find(m=>m.name===name);};
 memberByLabel=function(label){const can=VERIFIED_IDENTITIES[label]||aliases[label]||label;return memberByCanonical(can)||carriageMembers().find(m=>labelOfMember(m)===label);};
 window.addEventListener('DOMContentLoaded',initCarriageVip);
+/* Admin Settings: weekly guild-war points needed for VIP (carriage.vipThreshold; default 55,000,000). */
+function renderVipThresholdSetting(){
+ const page=document.getElementById('settings');if(!page)return;
+ let card=document.getElementById('vipThresholdCard');
+ if(!card){
+  card=document.createElement('div');card.className='card';card.id='vipThresholdCard';
+  card.innerHTML='<h2>VIP 기준 점수</h2><p class="sub">이번 주 길드전 포인트가 이 점수 이상이면 VIP 대상입니다.</p><div class="field"><label for="vipThresholdInput">기준 점수</label><input id="vipThresholdInput" inputmode="numeric" autocomplete="off"></div><div class="actions"><button class="btn primary" id="vipThresholdSave" type="button">기준 점수 저장</button></div>';
+  page.appendChild(card);
+  document.getElementById('vipThresholdSave').onclick=async()=>{
+   if(!adminOK())return showNotice('관리자 인증 후 저장할 수 있습니다.');
+   const n=Number(String(document.getElementById('vipThresholdInput').value).replace(/[^0-9]/g,''));
+   if(!Number.isSafeInteger(n)||n<1)return showNotice('1 이상의 정수 점수를 입력해 주세요.');
+   if(!await askConfirm('VIP 기준 점수를 '+fmt(n)+'점으로 저장할까요? 변경 전 자료는 자동 백업합니다.'))return;
+   state.vipThreshold=n;await saveState();await refreshCarriageVip(true);renderVipThresholdSetting();showNotice('VIP 기준 점수를 '+fmt(n)+'점으로 저장했습니다.');
+  };
+ }
+ const input=document.getElementById('vipThresholdInput');
+ if(input&&document.activeElement!==input)input.value=fmt(state.vipThreshold||55000000);
+}
+window.addEventListener('DOMContentLoaded',()=>{renderVipThresholdSetting();document.querySelectorAll('[data-tab="settings"]').forEach(b=>b.addEventListener('click',renderVipThresholdSetting));});

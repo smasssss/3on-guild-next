@@ -1,5 +1,5 @@
 import { actor,db,read,response,validOrigin } from '../../../../lib/store';
-import { VIP_KIND,THRESHOLD,ROSTER_GUARD_SQL,SCORE_REFERENCE_GUARD_SQL,emptyWeekly,readWeekly,readRoster,readScoreRoster,weeklyView,prepareWeekly,replaceWeekly,sameSnapshot,eligibility } from '../../../../lib/vip-weekly';
+import { VIP_KIND,thresholdOf,ROSTER_GUARD_SQL,SCORE_REFERENCE_GUARD_SQL,emptyWeekly,readWeekly,readRoster,readScoreRoster,weeklyView,prepareWeekly,replaceWeekly,sameSnapshot,eligibility } from '../../../../lib/vip-weekly';
 export const dynamic='force-dynamic';
 export function OPTIONS(req:Request){return response(req,{},204);}
 export async function GET(req:Request){try{
@@ -11,7 +11,7 @@ export async function GET(req:Request){try{
  }
  const [document,carriage]=await Promise.all([readWeekly(database),read('carriage')]),roster=await readRoster(database);
  const now=Date.now(),view=weeklyView(document.data,now),scoreMembers=await readScoreRoster(database,roster.members);
- return response(req,{schema:'3on-vip-weekly-v1',threshold:THRESHOLD,timezone:'Asia/Seoul',serverTime:new Date(now).toISOString(),revision:document.revision,...view,scoreMembers,roster:{snapshotId:roster.snapshotId,sourceAsOf:roster.sourceAsOf,receivedAt:roster.receivedAt},rosterPending:roster.pending,snapshotAdded:roster.snapshotAdded,members:roster.members.map(m=>({...m,eligibility:eligibility(m,carriage.data as {vipExcludedMembers?:Record<string,number>},view.active,now)}))});
+ return response(req,{schema:'3on-vip-weekly-v1',threshold:thresholdOf(carriage.data as {vipThreshold?:number}),timezone:'Asia/Seoul',serverTime:new Date(now).toISOString(),revision:document.revision,...view,scoreMembers,roster:{snapshotId:roster.snapshotId,sourceAsOf:roster.sourceAsOf,receivedAt:roster.receivedAt},rosterPending:roster.pending,snapshotAdded:roster.snapshotAdded,members:roster.members.map(m=>({...m,eligibility:eligibility(m,carriage.data as {vipExcludedMembers?:Record<string,number>},view.active,now)}))});
  }catch{return response(req,{error:'마차 명단·주간 점수를 확인하지 못했습니다. VIP 선택을 보류합니다.'},503);}}
 export async function POST(req:Request){try{
  if(!validOrigin(req))return response(req,{error:'허용되지 않은 주소입니다.'},403);

@@ -4,7 +4,8 @@ const f=require('./vip-fixture.cjs')(),v=f.load('lib/vip-weekly.ts'),api=f.load(
 const snapshot={providedOn:'2026-11-01',appliesOn:'2026-11-02',coverage:'full',updatedAt:'2026-11-01T02:00:00Z',rows:[{memberId:'low',nickname:'Low',points:0},{memberId:'high',nickname:'High',points:21720000},{memberId:'temp',nickname:'DrBillX',points:25000000},{memberId:'permanent',nickname:'Permanent',points:99000000}]};
 for(const [id,name] of [['low','Low'],['high','High'],['temp','DrBillX'],['permanent','Permanent']])f.seedMember(id,name);
 f.addSnapshot('new');for(const [id,name] of [['low','Low'],['high','High'],['temp','DrBillX'],['permanent','Permanent']])f.observe('new',id,name);
-const carriage={pointer:0,records:[],vipCarry:{'공 주':1,Other:999},vipResolution:{'공 주':1},vipExcludedMembers:{permanent:1}};
+// 2026-11-05 rules: configured threshold 21,720,000 for this boundary test; no score applied yet means score_low.
+const carriage={pointer:0,records:[],vipCarry:{'공 주':1,Other:999},vipResolution:{'공 주':1},vipExcludedMembers:{permanent:1},vipThreshold:21720000};
 f.sql.prepare("UPDATE documents SET payload=? WHERE kind='carriage'").run(JSON.stringify(carriage));
 f.sql.prepare('INSERT INTO documents VALUES(?,?,?,?,?,?)').run('vip-weekly',1,JSON.stringify({current:null,pending:snapshot}),'unchanged','admin','original');
 const original=f.sql.prepare('SELECT * FROM documents ORDER BY kind').all();
@@ -13,8 +14,8 @@ async function main(){
  try{
  for(const [time,active] of [['2026-10-31T14:59:59Z',false],['2026-10-31T15:00:00Z',true],['2026-11-01T14:59:59Z',true],['2026-11-01T15:00:00Z',true]]){
   Date.now=()=>Date.parse(time);const view=await (await api.GET(new Request('http://localhost/api/carriage/vip'))).json();
-  assert.equal(!view.awaitingFirstSnapshot,active,time);assert.equal(view.members.find(m=>m.memberId==='low').eligibility.reason,active?'score_low':'eligible',time);
-  assert.equal(view.members.find(m=>m.memberId==='temp').eligibility.reason,active?'eligible':'temporary',time);assert.equal(view.members.find(m=>m.memberId==='permanent').eligibility.reason,'permanent');
+  assert.equal(!view.awaitingFirstSnapshot,active,time);assert.equal(view.members.find(m=>m.memberId==='low').eligibility.reason,'score_low',time);assert.equal(view.members.find(m=>m.memberId==='high').eligibility.reason,active?'eligible':'score_low',time);
+  assert.equal(view.members.find(m=>m.memberId==='temp').eligibility.reason,active?'eligible':'score_low',time);assert.equal(view.members.find(m=>m.memberId==='permanent').eligibility.reason,'permanent');
   if(active){assert.equal(view.effectiveOn,'2026-11-01');assert.equal(view.active.appliesOn,'2026-11-02');}
  }
  assert.deepEqual(f.sql.prepare('SELECT * FROM documents ORDER BY kind').all(),original,'read-time Sunday activation never changes stored rows or operation weeks');
@@ -28,9 +29,9 @@ async function main(){
  }finally{Date.now=realNow;}
  const nodes={vipSearch:{value:''},vipResults:{innerHTML:''}};
  const members=[{memberId:'low',canonical:'Low',nickname:'Low',current:true,level:30,eligibility:{eligible:false,reason:'score_low'}},{memberId:'high',canonical:'High',nickname:'High',current:true,level:30,eligibility:{eligible:true,reason:'eligible'}},{memberId:'later',canonical:'Later',nickname:'Later',current:true,level:20,eligibility:{eligible:true,reason:'eligible'}},{memberId:'temp',canonical:'Temp',nickname:'Temp',current:true,level:20,eligibility:{eligible:false,reason:'temporary'}},{memberId:'permanent',canonical:'Permanent',nickname:'Permanent',current:true,eligibility:{eligible:false,reason:'permanent'}}];
- const ctx={console,Date,Number,Set,Map,JSON,Promise,crypto,VERIFIED_IDENTITIES:{},aliases:{},window:{addEventListener(){}},document:{getElementById:id=>nodes[id],querySelectorAll:()=>[]},GROWTH:{members:[],archivedMembers:[]},state:{vipExcludedMembers:{permanent:1}},labelOfMember:m=>m.displayName||m.name,vipTotalCount:n=>({Low:0,High:999,Later:1,Temp:2})[n],carryConflict:()=>false,escapeLabel:s=>String(s),fmt:n=>Number(n).toLocaleString('ko-KR'),memberByCanonical(){},memberByLabel(){}};
+ const ctx={console,Date,Number,Set,Map,JSON,Promise,crypto,VERIFIED_IDENTITIES:{},aliases:{},window:{addEventListener(){}},document:{getElementById:id=>nodes[id],querySelectorAll:()=>[]},GROWTH:{members:[],archivedMembers:[]},state:{vipExcludedMembers:{permanent:1},records:[]},vipRecordCanonical:r=>r.vipCanonical,labelOfMember:m=>m.displayName||m.name,vipTotalCount:n=>({Low:0,High:999,Later:1,Temp:2,Permanent:0})[n],carryConflict:()=>false,escapeLabel:s=>String(s),fmt:n=>Number(n).toLocaleString('ko-KR'),memberByCanonical(){},memberByLabel(){}};
  vm.createContext(ctx);vm.runInContext(fs.readFileSync('public/carriage-vip.js','utf8'),ctx);ctx.view={week:'2026-10-26',roster:{sourceAsOf:1},members,active:snapshot};vm.runInContext('carriageVip.view=view',ctx);ctx.renderCarriageVipResults();
- const ids=[...nodes.vipResults.innerHTML.matchAll(/data-vip="([^"]+)"/g)].map(m=>m[1]);assert.deepEqual(ids,['later','high','low','temp'],'restricted entries follow all eligible entries, preserving old count sorting inside groups');
+ const ids=[...nodes.vipResults.innerHTML.matchAll(/data-vip="([^"]+)"/g)].map(m=>m[1]);assert.deepEqual(ids,['later','high','permanent','low','temp'],'excluded entries (incl. permanent, shown with its reason) follow all eligible entries; same queue order inside each group');
  nodes.vipSearch.value='low';ctx.renderCarriageVipResults();assert(nodes.vipResults.innerHTML.includes('data-vip="low"'));assert(!nodes.vipResults.innerHTML.includes('data-vip="high"'));
  console.log('PASS: actual VIP renderer sorts restricted people last, preserves group tie-breakers, exclusions and search');
 }

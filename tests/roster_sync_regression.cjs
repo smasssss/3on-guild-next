@@ -92,7 +92,7 @@ async function main(){
   assert.equal(r.status,422,name+' VIP assignment is refused by the server');
  }
  const ok=await post(state,{kind:'carriage',revision:10,mutation:key(),data:{...carriage,records:[...carriage.records,{id:'normal',date:'2026-11-06',weekKey:'2026-11-02',type:'insert',leader:'Leader',vip:'game_50373046_'+normal[1].id,vipCanonical:'game_50373046_'+normal[1].id,vipMemberId:'game_50373046_'+normal[1].id}]}});
- assert.equal(ok.status,200,await ok.clone().text());
+ assert.equal(ok.status,422,'2026-11-05 rules: a normal member without an applied score is below the threshold');
  // 4) Sunday snapshot: participants join the current roster and VIP at once; absence never removes; limits still apply.
  clock=Date.parse('2026-11-08T02:00:00Z');
  const powers=JSON.stringify(f.sql.prepare('SELECT member_id,power FROM growth_observations ORDER BY observation_id').all()),hourly=count('growth_hourly_observations');
