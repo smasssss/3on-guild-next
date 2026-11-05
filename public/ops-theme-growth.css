@@ -61,3 +61,7 @@ h1{font-size:22px;font-weight:800;letter-spacing:-.02em}
 .enc-square{border-radius:.08em}
 .enc-circle{border-radius:999px}
 .enc-mark{display:inline!important;font-size:0!important}
+
+/* 자동 수집 상자 자리: 내용이 오기 전부터 실제 높이만큼 비워 두어 아래 내용이 밀려 내려가지 않게 합니다. */
+#growthAutomatic:empty{display:block;min-height:288px;margin:14px 0;border:1px solid rgba(63,208,143,.35);border-radius:16px;background:var(--panel)}
+@media(max-width:620px){#growthAutomatic:empty{min-height:330px}}

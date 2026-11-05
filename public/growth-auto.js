@@ -3,8 +3,8 @@ if(!document.getElementById('opsThemeGrowth')){const l=document.createElement('l
 if(!document.getElementById('opsNames')){const n=document.createElement('script');n.id='opsNames';n.src='/ops-names.js';n.defer=true;document.head.appendChild(n);}
 /* Existing growth view enhancement. Reads only the guild's own Workers API. */
 (()=>{'use strict';
- const box=document.createElement('section');box.id='growthAutomatic';box.style.cssText='display:block;border:1px solid #426b70;border-radius:12px;padding:14px;margin:14px 0;background:#112a30';
- const root=document.querySelector('main')||document.body;root.prepend(box);
+ const box=document.getElementById('growthAutomatic')||document.createElement('section');box.id='growthAutomatic';box.style.cssText='display:block;border:1px solid #426b70;border-radius:12px;padding:14px;margin:14px 0;background:#112a30';
+ if(!box.isConnected)(document.querySelector('main')||document.body).prepend(box);
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const num=n=>n==null?'—':Number(n).toLocaleString('ko-KR');
  const time=t=>t?new Date(t).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',hour12:false}):'—';
