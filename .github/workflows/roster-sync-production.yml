@@ -2,6 +2,7 @@ name: Promote roster sync to Production after a fresh Staging verification (user
 # Release 2 (user-approved 2026-11-05 09:00 KST): D1 read-budget fix and refreshed design.
 # Release 3 (user-approved 2026-11-05): device default font for special-character nicknames; VIP picker info line removed.
 # Release 4 (user-approved 2026-11-05): framed special-character nicknames.
+# Release 5 (user-approved 2026-11-05): no layout jump on first load.
 on:
   push:
     branches: [claude/new-session-narazy]
@@ -164,7 +165,7 @@ jobs:
   production:
     needs: staging
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     concurrency:
       group: cloudflare-production-roster-sync
       cancel-in-progress: false
