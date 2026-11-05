@@ -1,6 +1,7 @@
 name: Promote roster sync to Production after a fresh Staging verification (user-approved 2026-11-04)
 # Release 2 (user-approved 2026-11-05 09:00 KST): D1 read-budget fix and refreshed design.
 # Release 3 (user-approved 2026-11-05): device default font for special-character nicknames; VIP picker info line removed.
+# Release 4 (user-approved 2026-11-05): framed special-character nicknames.
 on:
   push:
     branches: [claude/new-session-narazy]
@@ -45,6 +46,7 @@ jobs:
           node tests/growth_roster_regression.cjs
           node tests/roster_sync_regression.cjs
           node tests/roster_read_budget.cjs
+          node tests/nickname_enclosure.cjs
           node tests/vip_sunday_regression.cjs
           node tests/weekly_input_regression.cjs
           node tests/vip_weekly_regression.cjs
