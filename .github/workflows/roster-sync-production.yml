@@ -4,6 +4,7 @@ name: Promote roster sync to Production after a fresh Staging verification (user
 # Release 4 (user-approved 2026-11-05): framed special-character nicknames.
 # Release 5 (user-approved 2026-11-05): no layout jump on first load.
 # Release 6 (user-approved 2026-11-05): VIP selection rules (55,000,000 threshold setting, new queue order). Retry 1: verify accepts the new threshold.
+# Release 7 (user-approved 2026-11-05): pastel theme, Cafe24 Syongsyong font, site-drawn driver picker.
 on:
   push:
     branches: [claude/new-session-narazy]
