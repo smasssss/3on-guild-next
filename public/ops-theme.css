@@ -156,3 +156,19 @@ th{background:var(--panel);color:var(--muted);font-size:12px;font-weight:600;top
 .enc-circle{border-radius:999px}
 .enc-mark{display:inline!important;font-size:0!important}
 #vipSearch,.modal input,.modal select,.modal textarea{background:var(--well)!important;border:1px solid var(--line)!important;color:#000!important;border-radius:10px}
+
+/* 마차장 선택 창(ops-select.js): 원래 선택 칸은 숨기고 같은 모양의 버튼과 목록 창을 씁니다. */
+.ops-pick-native{display:none!important}
+.ops-pick{width:100%;min-height:44px;text-align:left;background:var(--well);border:1px solid var(--line);border-radius:10px;color:#000;font:inherit;font-size:15px;padding:10px 40px 10px 12px;position:relative;cursor:pointer}
+.ops-pick::after{content:'';position:absolute;right:16px;top:50%;width:8px;height:8px;border-right:2px solid #000;border-bottom:2px solid #000;transform:translateY(-70%) rotate(45deg)}
+.ops-pick:disabled{opacity:.5}
+.ops-pick-modal{z-index:300}
+.ops-pick-modal .modal-card{padding:16px}
+.ops-pick-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.ops-pick-head h3{margin:0;font-size:18px}
+.ops-pick-list{display:grid;gap:6px;max-height:65vh;overflow:auto}
+.ops-pick-row{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;min-height:52px;padding:10px 14px;background:#fff;border:1px solid var(--hair);border-radius:12px;color:#000;font:inherit;font-size:17px;text-align:left;cursor:pointer}
+.ops-pick-row:hover{background:var(--accent-soft)}
+.ops-pick-row.on{background:var(--accent-soft);border-color:var(--accent)}
+.ops-pick-dot{flex:0 0 auto;width:20px;height:20px;border-radius:50%;border:2px solid #b9a3ab;background:#fff}
+.ops-pick-row.on .ops-pick-dot{border-color:#d6578a;background:radial-gradient(circle,#d6578a 0 45%,#fff 50%)}
