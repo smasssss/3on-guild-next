@@ -54,3 +54,10 @@ h1{font-size:22px;font-weight:800;letter-spacing:-.02em}
 #growthAutomatic [style*="#b8cdd6"],#growthAutomatic [style*="#9fb0c4"]{color:var(--muted)!important}
 #growthAutomatic [style*="#102030"]{background:var(--well)!important;border-color:var(--line)!important;border-radius:10px}
 #growthAutomatic [style*="#8fd8ff"]{color:#a9d0ff!important}
+/* 특수기호로 감싼 닉네임(예: 어⃢서): 게임·휴대폰처럼 두 글자를 화면 모양 테두리로 감쌉니다. */
+/* Other rules style every <span> inside cards (labels); the frame must not inherit them. */
+.enc-name{display:inline-block!important;font:inherit!important;color:inherit!important;border:.09em solid currentColor;padding:0 .14em!important;margin:0 .06em!important;line-height:1.08!important;white-space:nowrap;width:auto!important;min-width:0!important;background:none!important}
+.enc-screen{border-radius:28%/42%}
+.enc-square{border-radius:.08em}
+.enc-circle{border-radius:999px}
+.enc-mark{display:inline!important;font-size:0!important}

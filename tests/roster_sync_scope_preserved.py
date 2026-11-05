@@ -2,7 +2,7 @@
 import re,subprocess
 from pathlib import Path
 base='8276206ec1a7061a1e12cc30a68c5c65f1cd9328'
-allowed={'lib/growth-roster.ts','lib/growth-automation.ts','lib/vip-weekly.ts','app/api/carriage/vip/route.ts','public/carriage-vip.js','public/growth-auto.js','public/legacy.html','public/ops-theme.css','public/ops-theme-growth.css'}
+allowed={'lib/growth-roster.ts','lib/growth-automation.ts','lib/vip-weekly.ts','app/api/carriage/vip/route.ts','public/carriage-vip.js','public/growth-auto.js','public/legacy.html','public/ops-theme.css','public/ops-theme-growth.css','public/ops-names.js'}
 roots=['app','lib','public','build','drizzle']
 show=lambda name:subprocess.check_output(['git','show',base+':'+name])
 tracked=subprocess.check_output(['git','ls-tree','-r','--name-only',base,'--',*roots,'package.json','package-lock.json','vite.config.ts','wrangler.jsonc'],text=True).splitlines()
