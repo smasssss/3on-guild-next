@@ -1,14 +1,15 @@
 /* 3ON 운영센터 테마: 성장추적 화면(내부 프레임)용. 기능은 그대로, 겉모습만 바꿉니다. */
 /* 글꼴: 특수문자 닉네임(예: 일⃢리)이 깨지지 않도록 기존 화면과 같은 기기 기본 글꼴을 씁니다. */
 :root{
- --bg:#0f1829;--panel:#15223a;--panel2:#1b2b47;--line:#263a5a;--text:#eef3fb;--muted:#9fb1cc;
- --green:#3fd08f;--blue:#5aa9ff;--red:#ff6b6b;--yellow:#f5c451;--purple:#b79cff;
- --accent:#5aa9ff;--accent-soft:rgba(90,169,255,.14);--well:#111c30;--hair:#22334f;
- --font:-apple-system,BlinkMacSystemFont,"Noto Sans KR","Malgun Gothic",sans-serif;
+ --bg:#fff6f9;--panel:#ffffff;--panel2:#fff3d6;--line:#f2c6d4;--text:#000000;--muted:#3d3d3d;
+ --green:#1e8a4c;--blue:#d6578a;--red:#c62828;--yellow:#b7791f;--purple:#7e57c2;
+ --accent:#f59ab8;--accent-soft:#ffe0ea;--well:#fffaf0;--hair:#f6d5e0;
+ --font:'Cafe24Syongsyong',-apple-system,BlinkMacSystemFont,"Noto Sans KR","Malgun Gothic",sans-serif;
 }
-html{color-scheme:dark}
+@font-face{font-family:'Cafe24Syongsyong';src:url('/fonts/cafe24-syongsyong.woff') format('woff');font-display:swap;unicode-range:U+0020-007E,U+1100-11FF,U+3131-318E,U+AC00-D7A3}
+html{color-scheme:light}
 body{background:var(--bg);font-family:var(--font);-webkit-font-smoothing:antialiased;font-feature-settings:'tnum' 1}
-::selection{background:rgba(90,169,255,.35);color:#fff}
+::selection{background:rgba(245,154,184,.45);color:#000}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
 main{padding:16px 16px 96px}
 h1{font-size:22px;font-weight:800;letter-spacing:-.02em}
@@ -19,41 +20,42 @@ h1{font-size:22px;font-weight:800;letter-spacing:-.02em}
 .kpi{background:var(--panel);border:1px solid var(--hair);border-radius:14px;text-align:left;padding:14px 16px}
 .kpi span{color:var(--muted);font-size:12.5px;font-weight:500}
 .kpi b{font-size:24px;font-weight:800;letter-spacing:-.02em}
-.nav{background:rgba(15,24,41,.94);backdrop-filter:blur(12px);border-bottom:1px solid var(--hair);gap:6px;padding:10px 0}
+.nav{background:rgba(255,248,217,.97);backdrop-filter:blur(12px);border-bottom:1px solid var(--hair);gap:6px;padding:10px 0}
 .nav button{background:transparent;border:1px solid var(--line);border-radius:999px;color:var(--muted);padding:8px 13px;font-size:13px;font-weight:600}
-.nav button.active{background:var(--accent-soft);color:#cfe4ff;border-color:rgba(90,169,255,.45)}
-.guide,.callout{background:var(--well);border:1px solid var(--hair);border-radius:12px;font-size:13px;color:#d5deec}
+.nav button.active{background:var(--accent-soft);color:#000;border-color:#f59ab8}
+.guide,.callout{background:var(--well);border:1px solid var(--hair);border-radius:12px;font-size:13px;color:#000}
 .callout,.callout.warn{border-left-width:1px}
-.callout.warn{background:rgba(245,196,81,.07);border-color:rgba(245,196,81,.25)}
+.callout.warn{background:#fff3c4;border-color:#f3d98a}
 .gtitle h2{font-size:18px;font-weight:800;letter-spacing:-.02em}
 .mini{background:var(--panel);border:1px solid var(--hair);border-left-width:1px;border-radius:12px}
-.mini.good b{color:#7ee8b5}.mini.bad b{color:#ff9d9d}.mini.warn b{color:#f5d27e}
+.mini.good b{color:#1e6b3c}.mini.bad b{color:#a32020}.mini.warn b{color:#7a5300}
 .member-card{background:var(--panel);border:1px solid var(--hair);border-radius:14px}
-.leader-card{border-color:rgba(183,156,255,.45)}.new-card{border-color:rgba(90,169,255,.45)}
+.leader-card{border-color:#cdb8f0}.new-card{border-color:#f2b5c9}
 .rank{background:var(--panel2);border-radius:999px;font-weight:700}
 .ident strong{font-size:15px;font-weight:700}
-.pill{border-radius:999px;font-weight:700;font-size:11px;background:rgba(90,169,255,.14);color:#a9d0ff}
-.pill.good{background:rgba(63,208,143,.14);color:#7ee8b5}.pill.bad{background:rgba(255,107,107,.14);color:#ff9d9d}.pill.warn{background:rgba(245,196,81,.14);color:#f5d27e}
-.pill.neutral{background:var(--panel2);color:var(--muted)}.pill.leader{background:rgba(183,156,255,.16);color:#d3c4ff}.pill.new{background:rgba(90,169,255,.14);color:#a9d0ff}
+.pill{border-radius:999px;font-weight:700;font-size:11px;background:#ffe0ea;color:#000}
+.pill.good{background:#dff5e6;color:#000}.pill.bad{background:#fde0e0;color:#000}.pill.warn{background:#fff1bf;color:#000}
+.pill.neutral{background:var(--panel2);color:var(--muted)}.pill.leader{background:#ece3fb;color:#000}.pill.new{background:#ffe0ea;color:#000}
 .body{background:var(--well);border-top-color:var(--hair)}
-.tag{background:rgba(183,156,255,.16);color:#d3c4ff;font-weight:700}
+.tag{background:#ece3fb;color:#000;font-weight:700}
 .metrics div,.weekbox,.hist{background:var(--panel2);border-radius:10px}
 .weekbox{border-color:var(--hair)}
 .weeknav button,.filters button{background:transparent;border:1px solid var(--line);color:var(--text);border-radius:999px;font-weight:600}
-.filters button.active{background:var(--accent-soft);color:#cfe4ff;border-color:rgba(90,169,255,.45)}
+.filters button.active{background:var(--accent-soft);color:#000;border-color:#f59ab8}
 .zero{color:var(--muted)!important}
-.grid{stroke:#263a5a}.line{stroke:var(--accent)}.dot{fill:#cfe4ff;stroke:#0f1829}.val{fill:var(--text)}.date,.axis{fill:var(--muted)}
+.grid{stroke:#f2c6d4}.line{stroke:#d6578a}.dot{fill:#fff;stroke:#d6578a}.val{fill:var(--text)}.date,.axis{fill:var(--muted)}
 .hist.current{outline-color:var(--accent)}
 .note{background:var(--well);border-left:1px solid var(--hair);border-radius:10px}
 .change{background:var(--panel);border-color:var(--hair);border-radius:12px}
 .toolbar input,.toolbar select{background:var(--well);border:1px solid var(--line);border-radius:10px;min-height:44px;font-size:15px}
-.toolbar input:focus,.toolbar select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(90,169,255,.18)}
+.toolbar input:focus,.toolbar select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(245,154,184,.3)}
 /* 자동 수집 상태 상자(growth-auto.js가 그리는 부분) */
-#growthAutomatic{background:var(--panel)!important;border:1px solid rgba(63,208,143,.35)!important;border-radius:16px!important}
+#growthAutomatic{background:var(--panel)!important;border:1px solid #a7dfbb!important;border-radius:16px!important;color:#000!important}
 #growthAutomatic h2{font-size:18px!important;font-weight:800;letter-spacing:-.02em}
 #growthAutomatic [style*="#b8cdd6"],#growthAutomatic [style*="#9fb0c4"]{color:var(--muted)!important}
 #growthAutomatic [style*="#102030"]{background:var(--well)!important;border-color:var(--line)!important;border-radius:10px}
-#growthAutomatic [style*="#8fd8ff"]{color:#a9d0ff!important}
+#growthAutomatic [style*="#8fd8ff"]{color:#b03a6a!important}
+#growthAutomatic h2,#growthAutomatic summary,#growthAutomatic td,#growthAutomatic button{color:#000!important}
 /* 특수기호로 감싼 닉네임(예: 어⃢서): 게임·휴대폰처럼 두 글자를 화면 모양 테두리로 감쌉니다. */
 /* Other rules style every <span> inside cards (labels); the frame must not inherit them. */
 .enc-name{display:inline-block!important;font:inherit!important;color:inherit!important;border:.09em solid currentColor;padding:0 .14em!important;margin:0 .06em!important;line-height:1.08!important;white-space:nowrap;width:auto!important;min-width:0!important;background:none!important}
@@ -63,5 +65,5 @@ h1{font-size:22px;font-weight:800;letter-spacing:-.02em}
 .enc-mark{display:inline!important;font-size:0!important}
 
 /* 자동 수집 상자 자리: 내용이 오기 전부터 실제 높이만큼 비워 두어 아래 내용이 밀려 내려가지 않게 합니다. */
-#growthAutomatic:empty{display:block;min-height:288px;margin:14px 0;border:1px solid rgba(63,208,143,.35);border-radius:16px;background:var(--panel)}
+#growthAutomatic:empty{display:block;min-height:288px;margin:14px 0;border:1px solid #a7dfbb;border-radius:16px;background:var(--panel)}
 @media(max-width:620px){#growthAutomatic:empty{min-height:330px}}
