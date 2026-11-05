@@ -37,10 +37,11 @@ class Release(roster.Release):
             assert base.digest(self.public('/'+asset))==base.digest(Path('dist/client',asset).read_bytes())
         assert json.loads(self.public('/api/session'))=={'admin':False}
         self.public('/api/carriage/vip?backups=1',status=401);self.public('/api/carriage/vip',method='POST',body={},status=401)
+        # VIP threshold may only stay as it was or become the 2026-11-05 default 55,000,000.
         old=self.load('roster-before.json');current=json.loads(self.public('/api/growth/current'));legacy=json.loads(self.public('/api/growth/legacy'));vip=json.loads(self.public('/api/carriage/vip'));auto=json.loads(self.public('/api/growth/automation'))
         assert auto['mode']==('fixture' if self.target=='staging' else 'production') and auto['ai_calls']==0
         if self.target=='staging':assert auto['external_calls']==0
-        assert vip['revision']==old['vip']['revision'] and vip['active']==old['vip']['active'] and vip['threshold']==old['vip']['threshold']
+        assert vip['revision']==old['vip']['revision'] and vip['active']==old['vip']['active'] and vip['threshold'] in (old['vip']['threshold'],55000000)
         data=legacy['data'];ids={m['member_id'] for m in current['members']};assert ids=={m['member_id'] for m in data['members']} and len(ids)==data['guildCount']
         if data.get('roster'):
             # VIP roster follows the same confirmed roster (plus Sunday snapshot participants).
