@@ -1,10 +1,10 @@
 /* 3ON 운영센터 테마: 성장추적 화면(내부 프레임)용. 기능은 그대로, 겉모습만 바꿉니다. */
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
+/* 글꼴: 특수문자 닉네임(예: 일⃢리)이 깨지지 않도록 기존 화면과 같은 기기 기본 글꼴을 씁니다. */
 :root{
  --bg:#0f1829;--panel:#15223a;--panel2:#1b2b47;--line:#263a5a;--text:#eef3fb;--muted:#9fb1cc;
  --green:#3fd08f;--blue:#5aa9ff;--red:#ff6b6b;--yellow:#f5c451;--purple:#b79cff;
  --accent:#5aa9ff;--accent-soft:rgba(90,169,255,.14);--well:#111c30;--hair:#22334f;
- --font:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Noto Sans KR','Malgun Gothic',sans-serif;
+ --font:-apple-system,BlinkMacSystemFont,"Noto Sans KR","Malgun Gothic",sans-serif;
 }
 html{color-scheme:dark}
 body{background:var(--bg);font-family:var(--font);-webkit-font-smoothing:antialiased;font-feature-settings:'tnum' 1}
