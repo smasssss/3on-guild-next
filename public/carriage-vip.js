@@ -15,13 +15,7 @@ function carriageTime(value){return value?new Date(value).toLocaleString('ko-KR'
 function carriageEffectiveDate(w){return new Date(Date.parse(w.appliesOn)-86_400_000).toISOString().slice(0,10);}
 function carriageWeekText(){
  const v=carriageVip.view;if(!v)return carriageVip.error||'마차 명단·주간 점수 확인 중';
- return `${v.scoreWeek||v.week} 주차 · ${v.active?`${v.active.appliesOn} 점수 기준 · VIP 제한 ${v.effectiveOn||carriageEffectiveDate(v.active)}부터${v.carriedForward?' · 새 자료 없음, 이전 점수·자격 유지':''} · 점수 갱신 ${carriageTime(v.active.updatedAt)}`:'첫 점수 적용 전 · 기존 자격 유지 · 지정 16명 제한'} · 명단 관측 ${carriageTime(v.roster.sourceAsOf)}${carriagePendingText(v)}`;
-}
-// Roster changes wait for 3 consecutive hourly collections; Sunday snapshot participants join at once.
-function carriagePendingText(v){
- const p=v.rosterPending||[],join=p.filter(x=>x.change==='join'),leave=p.filter(x=>x.change==='leave'),added=(v.snapshotAdded||[]).length;
- const list=xs=>xs.map(x=>`${x.name} ${x.confirmations}/${x.required}`).join(', ');
- return (join.length?` · 가입 변동 대기 ${join.length}명(${list(join)})`:'')+(leave.length?` · 탈퇴 변동 대기 ${leave.length}명(${list(leave)})`:'')+(added?` · 일요일 스냅샷 반영 ${added}명`:'');
+ return `${v.scoreWeek||v.week} 주차 · ${v.active?`${v.active.appliesOn} 점수 기준 · VIP 제한 ${v.effectiveOn||carriageEffectiveDate(v.active)}부터${v.carriedForward?' · 새 자료 없음, 이전 점수·자격 유지':''} · 점수 갱신 ${carriageTime(v.active.updatedAt)}`:'첫 점수 적용 전 · 기존 자격 유지 · 지정 16명 제한'} · 명단 관측 ${carriageTime(v.roster.sourceAsOf)}`;
 }
 function carriageInfo(label){
  const m=memberByLabel(label);if(!m)return '길드원 정보 미확인';const score=carriagePoints(m);
@@ -30,7 +24,8 @@ function carriageInfo(label){
 function renderCarriageVipResults(){
  const q=(document.getElementById('vipSearch').value||'').toLowerCase();
  const arr=carriageMembers().filter(m=>m.observedToday===true&&state.vipExcludedMembers?.[m.member_id]!==1&&(m.name+' '+labelOfMember(m)).toLowerCase().includes(q)).map(m=>({m,count:vipTotalCount(m.name)})).sort((a,b)=>Number(!carriageVipStatus(a.m).eligible)-Number(!carriageVipStatus(b.m).eligible)||a.count-b.count||(b.m.level||0)-(a.m.level||0)||(carriagePoints(b.m)??-1)-(carriagePoints(a.m)??-1)||labelOfMember(a.m).localeCompare(labelOfMember(b.m),'ko')).slice(0,100);
- document.getElementById('vipResults').innerHTML=`<div class="sub" role="status">${escapeLabel(carriageWeekText())}</div>`+arr.map(({m,count})=>{
+ // The picker shows only the member list; week/score/roster details are not shown (user request 2026-11-05).
+ document.getElementById('vipResults').innerHTML=arr.map(({m,count})=>{
   const status=carriageVipStatus(m),reason=vipReason[status.reason]||'';
   return `<div class="viprow"><div class="vip-main"><b>${escapeLabel(labelOfMember(m))}</b><br><span>${carriageInfo(m.name)}</span>${!status.eligible?'<br><span class="pill warn">'+reason+'</span>':''}</div><div class="vip-actions"><span class="vip-count ${count===0?'zero':''}">VIP ${count}회${carryConflict(m.name)?' · 확인 필요':''}</span><div class="vip-pick-buttons"><button class="smallbtn" data-leader="${escapeLabel(m.member_id)}">마차장</button><button class="smallbtn" data-vip="${escapeLabel(m.member_id)}" ${status.eligible?'':'disabled aria-disabled="true"'} title="${reason}">VIP</button></div></div></div>`;
  }).join('')+(arr.length?'':'<p class="sub">현재 선택 가능한 명단이 없습니다. 자동수집 명단·연결 상태를 확인해 주세요.</p>');
