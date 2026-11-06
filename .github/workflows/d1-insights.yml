@@ -1,6 +1,7 @@
 name: D1 read usage report (analytics only, no database rows read)
 # 2026-11-06: user asked why D1 rows read exceeded the daily limit. This only asks Cloudflare's
 # query analytics which queries read the most rows; it never queries or changes the databases.
+# Rerun 1: hourly rows-read totals per database.
 on:
   push:
     branches: [claude/new-session-narazy]
@@ -33,3 +34,15 @@ jobs:
                   console.log([r.totalRowsRead,r.numberOfTimesRun,r.avgRowsRead,q].join(" | "));}'
             done
           done
+      - name: Rows read per hour for each database (last 26 hours, UTC)
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          node -e '
+            const since=new Date(Date.now()-26*3600e3).toISOString(),until=new Date().toISOString();
+            const query=`query($a:String!,$s:Time!,$u:Time!){viewer{accounts(filter:{accountTag:$a}){d1AnalyticsAdaptiveGroups(limit:200,filter:{datetimeHour_geq:$s,datetimeHour_leq:$u},orderBy:[datetimeHour_ASC]){sum{rowsRead readQueries rowsWritten}dimensions{datetimeHour databaseId}}}}}`;
+            fetch("https://api.cloudflare.com/client/v4/graphql",{method:"POST",headers:{"Authorization":"Bearer "+process.env.CLOUDFLARE_API_TOKEN,"Content-Type":"application/json"},body:JSON.stringify({query,variables:{a:process.env.CLOUDFLARE_ACCOUNT_ID,s:since,u:until}})})
+            .then(r=>r.json()).then(j=>{if(j.errors){console.log("graphql errors:",JSON.stringify(j.errors).slice(0,400));return;}
+              const names={"31e3bbb6-2860-40cb-9390-d989d37f11c2":"production","9c3667a6-e510-40a6-b4e6-4852515fdb3a":"staging"};
+              for(const g of j.data.viewer.accounts[0].d1AnalyticsAdaptiveGroups)console.log(g.dimensions.datetimeHour,names[g.dimensions.databaseId]||"other",g.sum.rowsRead,g.sum.readQueries,g.sum.rowsWritten);});'
