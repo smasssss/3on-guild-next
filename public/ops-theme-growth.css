@@ -89,3 +89,6 @@ table,td{font-size:15px}th{font-size:14px}
    한 줄보다 긴 닉네임·숫자만 예외로 칸 끝에서 나눕니다. */
 html,body{word-break:keep-all;overflow-wrap:break-word}
 p,.sub,.notice,.preview,.guide,.callout,.note,summary,h1,h2,h3{text-wrap:pretty}
+
+/* 첫 로딩: 글꼴이 도착할 때까지(최대 2초) 내용을 숨겨 글자 줄이 바뀌며 화면이 밀리는 것을 막습니다. */
+html.ops-wait body{visibility:hidden}

@@ -2,7 +2,7 @@
 if(window.frameElement){
  if(!document.querySelector('#opsThemeGrowth')){const l=document.createElement('link');l.id='opsThemeGrowth';l.rel='stylesheet';l.href='/ops-theme-growth.css';document.head.appendChild(l);}
  if(!document.querySelector('#opsNames')){const n=document.createElement('script');n.id='opsNames';n.src='/ops-names.js';n.defer=true;document.head.appendChild(n);}
- if(!document.querySelector('#opsSelect')){const n=document.createElement('script');n.id='opsSelect';n.src='/ops-select.js';n.defer=true;document.head.appendChild(n);}
+ if(!document.querySelector('#opsSelect')){const n=document.createElement('script');n.id='opsSelect';n.src='/ops-select.js?v=9b';n.defer=true;document.head.appendChild(n);}
 }
 /* 자동 수집 상태(관리설정 화면). Reads only the guild's own Workers API. */
 else (()=>{'use strict';
