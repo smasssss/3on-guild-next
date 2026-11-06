@@ -13,7 +13,7 @@ export function scheduledAction(cron:string,time:number){
  return d.getUTCMinutes()===0?'collect':d.getUTCHours()===15&&d.getUTCMinutes()===10?'close':'idle';
 }
 const HOUR=3_600_000, DAY=24*HOUR;
-type Row={id:string;name:string;power:number;castle:number;rank:number;activity:number|null;kills:number|null;joined:number|null};
+type Row={id:string;name:string;power:number;castle:number;rank:number|null;activity:number|null;kills:number|null;joined:number|null};
 type Snapshot={id:string;server:number;tag:string;members:number;power:number;asOf:number;roster:Row[]};
 type AutoEnv={DB?:D1Database;GROWTH_AUTO_MODE?:string};
 export const kstDate=(ms:number)=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(ms);
@@ -42,9 +42,11 @@ export function validateSnapshot(input:any,calledAt:number):Snapshot {
   const ids=new Set<string>();
   for(const r of input.roster){
     if(typeof r.id!=='string'||!/^\d{1,24}$/.test(r.id)||ids.has(r.id))throw Error('DUPLICATE_OR_INVALID_ID');ids.add(r.id);
-    if(typeof r.name!=='string'||!r.name.trim()||r.name.length>100||!number(r.power)||!number(r.castle,999)||r.castle<1||!Number.isInteger(r.rank)||r.rank<1||r.rank>5)throw Error('INVALID_PLAYER');
+    if(typeof r.name!=='string'||!r.name.trim()||r.name.length>100||!number(r.power)||!number(r.castle,999)||r.castle<1||(r.rank!=null&&(!Number.isInteger(r.rank)||r.rank<1||r.rank>5)))throw Error('INVALID_PLAYER');
     if(r.activity!=null&&!number(r.activity))throw Error('INVALID_ACTIVITY');
     if(r.kills!=null&&!number(r.kills))throw Error('INVALID_KILLS');
+    // Since 2026-11-06 the source sends joined=-1 for an unknown join time: treat it as unknown.
+    if(r.joined===-1)r.joined=null;
     if(r.joined!=null&&(!number(r.joined,9_999_999_999_999)||r.joined>calledAt+300_000))throw Error('INVALID_JOINED');
   }
   return input;
@@ -103,6 +105,8 @@ export async function ingestStored(db:D1Database,runId:string,acceptedAt=Date.no
   const sameNames=new Map<string,number>();for(const r of source.roster)sameNames.set(r.name,(sameNames.get(r.name)||0)+1);
   for(const r of source.roster){
     let m=byId.get(r.id),reason=anomaly(r,prev.get(r.id)||approved.get(m?.member_id));
+    // A missing rank (seen 2026-11-05) holds only this player for review; the roster is still accepted.
+    if(r.rank==null)reason=reason||'등급 누락 · 원본 검토 필요';
     if(!m){
       const collision=names.has(r.name)||sameNames.get(r.name)!==1;
       m={game_id:r.id,member_id:collision?null:'game_50373046_'+r.id,source_name:r.name,status:collision?'review':'confirmed',evidence:collision?'동일 이름의 기존 회원 또는 동명이인 · 수동 연결 필요':'새 게임 ID · 완전한 허가 길드 로스터',departed_at:null};
@@ -112,7 +116,7 @@ export async function ingestStored(db:D1Database,runId:string,acceptedAt=Date.no
     }
     if(m.status!=='confirmed')reason=reason||'게임 ID 연결 검토 필요';
     if(m.departed_at){reason=reason||'탈퇴 확정 후 재관측 · 재가입 검토';event('rejoin_candidate',m,'pending',null,{name:r.name});}
-    const row={snapshot_id:snapshotId,game_id:r.id,member_id:m.member_id||null,source_as_of:sourceTime,received_at:run.received_at,accepted_at:acceptedAt,source_name:r.name,power:r.power,level:r.castle,rank:'R'+r.rank,activity:r.activity??null,kills:r.kills??null,joined_at:r.joined??null,status:reason?'review':'valid',reason};rows.push(row);
+    const row={snapshot_id:snapshotId,game_id:r.id,member_id:m.member_id||null,source_as_of:sourceTime,received_at:run.received_at,accepted_at:acceptedAt,source_name:r.name,power:r.power,level:r.castle,rank:r.rank==null?(prev.get(r.id)?.rank??approved.get(m.member_id)?.rank??'R?'):'R'+r.rank,activity:r.activity??null,kills:r.kills??null,joined_at:r.joined??null,status:reason?'review':'valid',reason};rows.push(row);
     if(reason)event('observation_review',m,'pending',prev.get(r.id)||null,row,reason);
     if(!reason&&m.source_name!==r.name){renames.push({...m,source_name:r.name});event('nickname',m,'recorded',{name:m.display_name||m.source_name},{name:r.name});}
     const p=prev.get(r.id)||approved.get(m.member_id);if(!reason&&p?.rank!==undefined&&p.rank!==row.rank)event('rank',m,'recorded',{rank:p.rank},{rank:row.rank});
