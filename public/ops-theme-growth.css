@@ -84,3 +84,8 @@ table,td{font-size:15px}th{font-size:14px}
 .ops-pick-row:hover,.ops-pick-row.on{background:var(--accent-soft)}.ops-pick-row.on{border-color:var(--accent)}
 .ops-pick-dot{flex:0 0 auto;width:20px;height:20px;border-radius:50%;border:2px solid #b9a3ab;background:#fff}
 .ops-pick-row.on .ops-pick-dot{border-color:#d6578a;background:radial-gradient(circle,#d6578a 0 45%,#fff 50%)}
+
+/* 줄바꿈: 한글 단어가 중간에서 잘려 다음 줄로 넘어가지 않게 단어 단위로 내립니다.
+   한 줄보다 긴 닉네임·숫자만 예외로 칸 끝에서 나눕니다. */
+html,body{word-break:keep-all;overflow-wrap:break-word}
+p,.sub,.notice,.preview,.guide,.callout,.note,summary,h1,h2,h3{text-wrap:pretty}

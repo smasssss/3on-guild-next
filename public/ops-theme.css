@@ -239,3 +239,8 @@ details summary{font-size:16px}
 @media(max-width:700px){.kpi b{font-size:24px}}
 /* 운행일: 새 달력 창이 예전 '날짜 선택'(연·월·일 칸) 보조 기능을 대신합니다. */
 #chooseRunDate,#runDateChoice{display:none!important}
+
+/* 줄바꿈: 한글 단어가 중간에서 잘려 다음 줄로 넘어가지 않게 단어 단위로 내립니다.
+   한 줄보다 긴 닉네임·숫자만 예외로 칸 끝에서 나눕니다. */
+html,body{word-break:keep-all;overflow-wrap:break-word}
+p,.sub,.notice,.preview,.guide,.callout,.note,summary,h1,h2,h3{text-wrap:pretty}
