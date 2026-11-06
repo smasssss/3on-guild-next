@@ -1,7 +1,7 @@
 /* 3ON 운영센터 화면 테마. 기능·메뉴·버튼은 그대로 두고 겉모습과 배치만 바꿉니다. */
 /* 글꼴: 카페24 숑숑(사이트에 직접 포함). 특수문자 닉네임은 ops-names.js가 테두리로 그려 깨지지 않습니다.
    색: 파스텔 연분홍(바탕·강조) + 연노랑(메뉴·보조 면) + 흰색(카드), 글자는 검정. */
-@font-face{font-family:'Cafe24Syongsyong';src:url('/fonts/cafe24-syongsyong.woff') format('woff');font-display:swap;unicode-range:U+0020-007E,U+1100-11FF,U+3131-318E,U+AC00-D7A3}
+@font-face{font-family:'Cafe24Syongsyong';src:url('/fonts/cafe24-syongsyong.woff?v=1') format('woff');font-display:swap;unicode-range:U+0020-007E,U+1100-11FF,U+3131-318E,U+AC00-D7A3}
 :root{
  --bg:#fff6f9;--panel:#ffffff;--panel2:#fff3d6;--line:#f2c6d4;--text:#000000;--muted:#3d3d3d;
  --green:#1e8a4c;--blue:#d6578a;--red:#c62828;--yellow:#b7791f;--purple:#7e57c2;--orange:#e07a2e;
@@ -245,5 +245,5 @@ details summary{font-size:16px}
 html,body{word-break:keep-all;overflow-wrap:break-word}
 p,.sub,.notice,.preview,.guide,.callout,.note,summary,h1,h2,h3{text-wrap:pretty}
 
-/* 첫 로딩: 글꼴이 도착할 때까지(최대 2초) 내용을 숨겨 글자 줄이 바뀌며 화면이 밀리는 것을 막습니다. */
+/* 첫 로딩: 글꼴이 도착할 때까지(최대 1초) 내용을 숨겨 글자 줄이 바뀌며 화면이 밀리는 것을 막습니다. */
 html.ops-wait body{visibility:hidden}

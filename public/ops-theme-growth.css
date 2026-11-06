@@ -6,7 +6,7 @@
  --accent:#f59ab8;--accent-soft:#ffe0ea;--well:#fffaf0;--hair:#f6d5e0;
  --font:'Cafe24Syongsyong',-apple-system,BlinkMacSystemFont,"Noto Sans KR","Malgun Gothic",sans-serif;
 }
-@font-face{font-family:'Cafe24Syongsyong';src:url('/fonts/cafe24-syongsyong.woff') format('woff');font-display:swap;unicode-range:U+0020-007E,U+1100-11FF,U+3131-318E,U+AC00-D7A3}
+@font-face{font-family:'Cafe24Syongsyong';src:url('/fonts/cafe24-syongsyong.woff?v=1') format('woff');font-display:swap;unicode-range:U+0020-007E,U+1100-11FF,U+3131-318E,U+AC00-D7A3}
 html{color-scheme:light}
 body{background:var(--bg);font-family:var(--font);-webkit-font-smoothing:antialiased;font-feature-settings:'tnum' 1}
 ::selection{background:rgba(245,154,184,.45);color:#000}
@@ -90,5 +90,5 @@ table,td{font-size:15px}th{font-size:14px}
 html,body{word-break:keep-all;overflow-wrap:break-word}
 p,.sub,.notice,.preview,.guide,.callout,.note,summary,h1,h2,h3{text-wrap:pretty}
 
-/* 첫 로딩: 글꼴이 도착할 때까지(최대 2초) 내용을 숨겨 글자 줄이 바뀌며 화면이 밀리는 것을 막습니다. */
+/* 첫 로딩: 글꼴이 도착할 때까지(최대 1초) 내용을 숨겨 글자 줄이 바뀌며 화면이 밀리는 것을 막습니다. */
 html.ops-wait body{visibility:hidden}
