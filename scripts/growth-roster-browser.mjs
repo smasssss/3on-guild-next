@@ -41,8 +41,6 @@ const actions=async(page,input,password)=>{
  const result=await page.evaluate(async()=>{const a=await(await fetch('/api/growth/current')).json(),b=await(await fetch('/api/growth/legacy')).json(),c=await(await fetch('/api/growth/automation')).json();return {current:a,legacy:b,auto:c,dataCount:GROWTH.members.length};});
  require(result.dataCount===result.legacy.data.guildCount&&result.current.members.length===result.dataCount,'API/current/page count agreement');
  require(result.auto.members.length===result.dataCount,'Hourly current table count');
- await page.frameLocator('#growthFrame').locator('#growthAutomatic [data-game]').first().waitFor({state:'attached',timeout:30000});
- require(await page.frameLocator('#growthFrame').locator('#growthAutomatic [data-game]').count()===result.dataCount,'Actual hourly table count');
  const kpi=await page.frameLocator('#growthFrame').locator('#kpis').innerText();require(kpi.includes(result.dataCount+'명'),'Actual iframe guild count');
  if(input.target==='staging'){
   require(result.dataCount===input.expectedCount,'Complete fixture membership');
@@ -52,11 +50,17 @@ const actions=async(page,input,password)=>{
  }
  phase='MENUS';
  for(const tab of ['growth','canyon','carriage','history']){await page.locator('.tabs [data-tab="'+tab+'"]').click();require(await page.locator('#'+tab).evaluate(e=>e.classList.contains('active')),'Existing tab');}
- await page.locator('.tabs [data-tab="carriage"]').click();await page.locator('#chooseRunDate').click();await page.locator('#runDateYear').fill('2026');await page.locator('#runDateMonth').selectOption('11');await page.locator('#runDateDay').selectOption('3');await page.locator('#applyRunDate').click();require(await page.locator('#runDate').inputValue()==='2026-11-03','Existing run date selector');
+ await page.locator('.tabs [data-tab="carriage"]').click();await page.locator('#runDate ~ .ops-pick').click();
+ for(let i=0;i<240;i++){const [y,m]=(await page.locator('.ops-cal-nav b').innerText()).match(/\d+/g).map(Number);if(y===2026&&m===11)break;await page.locator('.ops-cal-nav button[aria-label="'+(y*12+m>2026*12+11?'이전 달':'다음 달')+'"]').click();}
+ await page.locator('.ops-cal-grid button[aria-label="2026-11-03"]').click();require(await page.locator('#runDate').inputValue()==='2026-11-03','Existing run date selector');
  phase='VIP_PICKER';await page.locator('#pickVipBtn').click();await page.locator('#vipModal.show').waitFor();
  const buttons=await page.locator('[data-vip]').evaluateAll(rows=>rows.map(b=>b.disabled));require(buttons.every((d,i)=>!i||d||!buttons[i-1]),'Restricted-last ordering preserved');await page.locator('#closeVip').click();
  if(input.target==='staging'){
-  phase='AUTH';await page.locator('.tabs [data-tab="settings"]').click();await page.locator('#pw').fill(password);await page.locator('#loginBtn').click();await page.waitForFunction(()=>adminOK(),{timeout:30000});require(await page.locator('#rotationEditor').count()===1,'Existing rotation settings');await page.evaluate(()=>sharedLogout());
+  phase='AUTH';await page.locator('.tabs [data-tab="settings"]').click();await page.locator('#pw').fill(password);await page.locator('#loginBtn').click();await page.waitForFunction(()=>adminOK(),{timeout:30000});require(await page.locator('#rotationEditor').count()===1,'Existing rotation settings');
+  // The hourly collection table now lives in 관리설정 (after admin login) and loads only while it is shown.
+  await page.locator('#growthAutomatic [data-game]').first().waitFor({state:'attached',timeout:30000});
+  require(await page.locator('#growthAutomatic [data-game]').count()===result.dataCount,'Actual hourly table count');
+ await page.evaluate(()=>sharedLogout());
  }
  phase='MOBILE';await page.setViewportSize({width:390,height:844});await page.locator('.tabs [data-tab="carriage"]').click();await page.locator('#chooseRunDate').click();require(await page.locator('#runDateChoice').isVisible(),'Mobile date selector');await page.locator('#cancelRunDate').click();
  require(await page.evaluate(old=>JSON.stringify(state)===old,original),'All operation values unchanged');

@@ -20,7 +20,7 @@ async function main(){
  t+=3_600_000;await auto.fixture(f.db,JSON.stringify({...source,asOf:Math.floor(t/1000)-60}),t);
  seen.length=0;await auto.automaticStatus(f.db);assert(seen.filter(heavy).length>0,'a new collection refreshes status');
  f.db.prepare=prepare;
- const ui=fs.readFileSync('public/growth-auto.js','utf8');assert(ui.includes('window.frameElement.offsetParent===null'),'hidden growth screen does not poll');
+ const ui=fs.readFileSync('public/growth-auto.js','utf8');assert(ui.includes('box.offsetParent!==null'),'hidden settings screen does not poll');
  console.log('PASS: status and growth views reused while unchanged; identity change and new collection refresh them; hidden screen does not poll');
 }
 main().catch(e=>{console.error(e);process.exitCode=1});

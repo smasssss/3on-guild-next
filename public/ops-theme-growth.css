@@ -49,13 +49,6 @@ h1{font-size:22px;font-weight:800;letter-spacing:-.02em}
 .change{background:var(--panel);border-color:var(--hair);border-radius:12px}
 .toolbar input,.toolbar select{background:var(--well);border:1px solid var(--line);border-radius:10px;min-height:44px;font-size:15px}
 .toolbar input:focus,.toolbar select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(245,154,184,.3)}
-/* 자동 수집 상태 상자(growth-auto.js가 그리는 부분) */
-#growthAutomatic{background:var(--panel)!important;border:1px solid #a7dfbb!important;border-radius:16px!important;color:#000!important}
-#growthAutomatic h2{font-size:18px!important;font-weight:800;letter-spacing:-.02em}
-#growthAutomatic [style*="#b8cdd6"],#growthAutomatic [style*="#9fb0c4"]{color:var(--muted)!important}
-#growthAutomatic [style*="#102030"]{background:var(--well)!important;border-color:var(--line)!important;border-radius:10px}
-#growthAutomatic [style*="#8fd8ff"]{color:#b03a6a!important}
-#growthAutomatic h2,#growthAutomatic summary,#growthAutomatic td,#growthAutomatic button{color:#000!important}
 /* 특수기호로 감싼 닉네임(예: 어⃢서): 게임·휴대폰처럼 두 글자를 화면 모양 테두리로 감쌉니다. */
 /* Other rules style every <span> inside cards (labels); the frame must not inherit them. */
 .enc-name{display:inline-block!important;font:inherit!important;color:inherit!important;border:.09em solid currentColor;padding:0 .14em!important;margin:0 .06em!important;line-height:1.08!important;white-space:nowrap;width:auto!important;min-width:0!important;background:none!important}
@@ -64,6 +57,30 @@ h1{font-size:22px;font-weight:800;letter-spacing:-.02em}
 .enc-circle{border-radius:999px}
 .enc-mark{display:inline!important;font-size:0!important}
 
-/* 자동 수집 상자 자리: 내용이 오기 전부터 실제 높이만큼 비워 두어 아래 내용이 밀려 내려가지 않게 합니다. */
-#growthAutomatic:empty{display:block;min-height:288px;margin:14px 0;border:1px solid #a7dfbb;border-radius:16px;background:var(--panel)}
-@media(max-width:620px){#growthAutomatic:empty{min-height:330px}}
+/* 글자 크기: 본문은 16px 정도, 보조 글자도 13~14px 아래로 내려가지 않게 합니다. */
+.sub,.brand,.guide,.callout,.note,.change p,.nodata{font-size:15px}
+.kpi span,.cur span,.ident span,.gtitle span,.weektitle{font-size:14px}
+.kpi b{font-size:26px}
+.nav button,.filters button,.weeknav button{font-size:14.5px}
+.mini{padding:12px 14px}
+.mini strong{font-size:16px}.mini span{font-size:14px;margin-top:4px}.mini b{font-size:16px;margin-top:6px}
+.ident strong{font-size:17px}.cur b,.metrics b,.change b{font-size:16px}
+.rank,.pill,.tag,.metrics span,.hist span,.weekhelp,.charthead span{font-size:13px}
+.hist strong,.charthead b{font-size:14px}
+.val,.date{font-size:9.6px}.axis{font-size:9.2px}
+table,td{font-size:15px}th{font-size:14px}
+/* 선택 칸(ops-select.js): 기본 목록 대신 같은 모양의 선택 창 */
+.ops-pick-native{display:none!important}
+.ops-pick{display:inline-block;min-width:160px;max-width:100%;min-height:44px;text-align:left;background:var(--well);border:1px solid var(--line);border-radius:10px;color:#000;font:inherit;font-size:15px;padding:10px 40px 10px 12px;position:relative;cursor:pointer}
+.toolbar .ops-pick{display:block;width:100%}
+.ops-pick::after{content:'';position:absolute;right:16px;top:50%;width:8px;height:8px;border-right:2px solid #000;border-bottom:2px solid #000;transform:translateY(-70%) rotate(45deg)}
+.ops-pick-modal{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(60,30,40,.35)}
+.ops-pick-modal .modal-card{width:min(440px,100%);max-height:85vh;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:0 24px 60px rgba(120,60,80,.18)}
+.ops-pick-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.ops-pick-head h3{margin:0;font-size:18px}
+.ops-pick-head .smallbtn{background:var(--panel2);border:1px solid var(--line);border-radius:8px;min-height:40px;padding:7px 12px;font:inherit;font-size:14.5px;color:#000}
+.ops-pick-list{display:grid;gap:6px;max-height:65vh;overflow:auto}
+.ops-pick-row{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;min-height:52px;padding:10px 14px;background:#fff;border:1px solid var(--hair);border-radius:12px;color:#000;font:inherit;font-size:17px;text-align:left;cursor:pointer}
+.ops-pick-row:hover,.ops-pick-row.on{background:var(--accent-soft)}.ops-pick-row.on{border-color:var(--accent)}
+.ops-pick-dot{flex:0 0 auto;width:20px;height:20px;border-radius:50%;border:2px solid #b9a3ab;background:#fff}
+.ops-pick-row.on .ops-pick-dot{border-color:#d6578a;background:radial-gradient(circle,#d6578a 0 45%,#fff 50%)}

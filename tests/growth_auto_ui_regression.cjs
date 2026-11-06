@@ -6,6 +6,8 @@ const source=readFileSync('public/growth-auto.js','utf8');
 const statement=source.match(/parent\.postMessage\([^\n]+?\)(?=\}catch)/)?.[0];
 assert(statement,'Growth refresh message is present');
 const origin='https://3on-guild-production.295server.workers.dev';
+// Focus refresh is limited to once a minute (D1 read budget): each focus below happens 61 seconds later.
+let clock=Date.now();class ClockDate extends Date{static now(){return clock+=61_000}}
 let sent;
 runInNewContext(statement,{location:{origin:'null'},parent:{location:{origin},postMessage:(data,target)=>{sent={data,target}}}});
 assert.equal(sent.target,origin);
@@ -18,7 +20,7 @@ console.log('PASS: srcdoc daily refresh targets the actual parent origin');
  runInNewContext(source,{
   document:{hidden:false,createElement:()=>box,querySelector:()=>({prepend(){}})},
   fetch:async()=>({ok:true,json:async()=>({members:[],changes:[],mode:'production'})}),
-  sessionStorage:{getItem:()=>null},setInterval(){},
+  sessionStorage:{getItem:()=>null},setInterval(){},Date:ClockDate,
   window:{addEventListener:(_,fn)=>{focus=fn}},parent:{location:{origin},postMessage(){}},
  });
  await new Promise(setImmediate);
@@ -33,7 +35,7 @@ console.log('PASS: srcdoc daily refresh targets the actual parent origin');
  let data={members:[{game_id:'test-1',display_name:'Test',power:100,source_as_of:asOf}],changes:[],mode:'production',control:{enabled:1},last_run:{called_at:called,status:'accepted'},last_good:{source_as_of:asOf,member_count:1}};
  let focus;const controls={};
  const box={innerHTML:'',style:{},querySelectorAll:()=>[],querySelector:s=>controls[s]??={},insertAdjacentHTML:(_,html)=>{box.innerHTML+=html}};
- runInNewContext(source,{document:{hidden:false,createElement:()=>box,querySelector:()=>({prepend(){}})},fetch:async()=>({ok:true,json:async()=>data}),sessionStorage:{getItem:()=>null},setInterval(){},window:{addEventListener:(_,fn)=>{focus=fn}},parent:{location:{origin},postMessage(){}}});
+ runInNewContext(source,{document:{hidden:false,createElement:()=>box,querySelector:()=>({prepend(){}})},fetch:async()=>({ok:true,json:async()=>data}),sessionStorage:{getItem:()=>null},setInterval(){},Date:ClockDate,window:{addEventListener:(_,fn)=>{focus=fn}},parent:{location:{origin},postMessage(){}}});
  await new Promise(setImmediate);
  assert.match(box.innerHTML,/자동 수집 정상/);
  assert.match(box.innerHTML,/마지막 수집 2026\. 10\. 18\. 2시 0분 24초/);
