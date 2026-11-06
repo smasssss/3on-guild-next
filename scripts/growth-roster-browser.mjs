@@ -62,7 +62,7 @@ const actions=async(page,input,password)=>{
   require(await page.locator('#growthAutomatic [data-game]').count()===result.dataCount,'Actual hourly table count');
  await page.evaluate(()=>sharedLogout());
  }
- phase='MOBILE';await page.setViewportSize({width:390,height:844});await page.locator('.tabs [data-tab="carriage"]').click();await page.locator('#chooseRunDate').click();require(await page.locator('#runDateChoice').isVisible(),'Mobile date selector');await page.locator('#cancelRunDate').click();
+ phase='MOBILE';await page.setViewportSize({width:390,height:844});await page.locator('.tabs [data-tab="carriage"]').click();await page.locator('#runDate ~ .ops-pick').click();require(await page.locator('.ops-cal-grid').isVisible(),'Mobile date selector');await page.locator('.ops-pick-modal .ops-pick-head button').click();
  require(await page.evaluate(old=>JSON.stringify(state)===old,original),'All operation values unchanged');
  return {verified:true,target:input.target,current:result.dataCount,checks:['current-roster','actual-iframe','archived-history','VIP-totals','rotation','restricted-last','date','menus','mobile',...(input.target==='staging'?['login','logout','stable-rejoin']:[])]};
  }catch{throw Error('VIP_CHECK_'+phase);}

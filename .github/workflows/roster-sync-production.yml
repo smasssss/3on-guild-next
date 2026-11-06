@@ -6,7 +6,7 @@ name: Promote roster sync to Production after a fresh Staging verification (user
 # Release 6 (user-approved 2026-11-05): VIP selection rules (55,000,000 threshold setting, new queue order). Retry 1: verify accepts the new threshold.
 # Release 7 (user-approved 2026-11-05): pastel theme, Cafe24 Syongsyong font, site-drawn driver picker.
 # Release 8 (user-approved 2026-11-06): pastel theme and driver picker, fewer D1 reads, collection format fix.
-# Release 9 (user-approved 2026-11-06): larger text, collection status in settings, weekly cards, site-drawn selects and calendar, word wrapping.
+# Release 9 (user-approved 2026-11-06): larger text, collection status in settings, weekly cards, site-drawn selects and calendar, word wrapping. Retry 1: mobile check opens the new calendar.
 on:
   push:
     branches: [claude/new-session-narazy]
