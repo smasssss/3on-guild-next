@@ -1,4 +1,4 @@
-import { completeRoster } from './growth-roster';
+import { completeRoster, reuseUnlessChanged } from './growth-roster';
 // Deterministic Workers/D1 pipeline. No AI service or connector is used here.
 export const ALLIANCE_URL='https://lastasylum.gg/api/alliance/50373046';
 export const COLLECT_CRON='0 * * * *';
@@ -271,7 +271,13 @@ export async function scheduledAutomation(controller:{cron:string;scheduledTime:
   catch(e){await stmt(db,"UPDATE growth_auto_executions SET completed_at=?,status='failed',error=? WHERE execution_id=?",Date.now(),(e as Error).message.slice(0,300),id).run();throw e;}
 }
 
+// Public status is reused until collection, events, identities or closes change (D1 read budget).
 export async function automaticStatus(db:D1Database,admin=false){
+  if(admin)return automaticStatusFresh(db,true);
+  const base=await reuseUnlessChanged(db,'automatic-status',()=>automaticStatusFresh(db,false));
+  return {...base,delayed:!base.last_good||Date.now()-(base.last_good as {source_as_of:number}).source_as_of>2*HOUR};
+}
+async function automaticStatusFresh(db:D1Database,admin=false){
   const [control,lastRun,lastGood,close,pending]=await Promise.all([
     first(db,'SELECT enabled,start_date,last_call_at FROM growth_auto_control WHERE id=1'),
     first(db,'SELECT run_id,trigger_kind,called_at,received_at,source_as_of,status,error,http_status,validation_json FROM growth_auto_runs ORDER BY called_at DESC LIMIT 1'),

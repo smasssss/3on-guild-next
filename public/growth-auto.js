@@ -3,6 +3,7 @@ if(!document.getElementById('opsThemeGrowth')){const l=document.createElement('l
 if(!document.getElementById('opsNames')){const n=document.createElement('script');n.id='opsNames';n.src='/ops-names.js';n.defer=true;document.head.appendChild(n);}
 /* Existing growth view enhancement. Reads only the guild's own Workers API. */
 (()=>{'use strict';
+ let lastLoad=0;const visible=()=>!document.hidden&&!(window.frameElement&&window.frameElement.offsetParent===null);
  const box=document.getElementById('growthAutomatic')||document.createElement('section');box.id='growthAutomatic';box.style.cssText='display:block;border:1px solid #426b70;border-radius:12px;padding:14px;margin:14px 0;background:#112a30';
  if(!box.isConnected)(document.querySelector('main')||document.body).prepend(box);
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -17,6 +18,7 @@ if(!document.getElementById('opsNames')){const n=document.createElement('script'
   box.querySelector('#autoSearch').onchange=e=>{query=e.target.value;render()};box.querySelector('#autoSort').onchange=e=>{sort=e.target.value;render()};
   box.querySelectorAll('[data-game]').forEach(b=>b.onclick=async()=>{const target=box.querySelector('#autoHistory');target.textContent='시간별 관측 이력을 불러오는 중…';try{const r=await fetch('/api/growth/automation?game_id='+encodeURIComponent(b.dataset.game),{cache:'no-store'});if(!r.ok)throw Error();const h=await r.json();target.innerHTML='<h3>'+esc(b.textContent)+' · 최근 168개 관측</h3><div style="max-height:260px;overflow:auto;font-size:12px">'+h.observations.map(o=>'<p>'+esc(time(o.source_as_of))+' · '+num(o.power)+' · '+esc(o.rank)+' / Lv.'+num(o.level)+' · '+esc(o.status)+(o.reason?' · '+esc(o.reason):'')+'</p>').join('')+'</div>'}catch{target.textContent='시간별 관측을 읽지 못했습니다.'}});
  }
- async function load(){if(refreshing||document.hidden)return;refreshing=true;try{const r=await fetch('/api/growth/automation',{cache:'no-store'});if(!r.ok)throw Error();state=await r.json();render();let old;try{old=JSON.parse(sessionStorage.getItem('3on_growth_iframe_data')||'null')}catch{}if(state.last_close?.date&&old?.date&&state.last_close.date>old.date)parent.postMessage({kind:'3on-growth-auto-refresh'},parent.location.origin)}catch{box.textContent='자동 수집 상태를 읽지 못했습니다. 기존 확정 성장기록은 아래에서 확인할 수 있습니다.'}finally{refreshing=false}}
- load();setInterval(load,300_000);window.addEventListener('focus',load);
+ async function load(){if(refreshing||!visible())return;refreshing=true;lastLoad=Date.now();try{const r=await fetch('/api/growth/automation',{cache:'no-store'});if(!r.ok)throw Error();state=await r.json();render();let old;try{old=JSON.parse(sessionStorage.getItem('3on_growth_iframe_data')||'null')}catch{}if(state.last_close?.date&&old?.date&&state.last_close.date>old.date)parent.postMessage({kind:'3on-growth-auto-refresh'},parent.location.origin)}catch{box.textContent='자동 수집 상태를 읽지 못했습니다. 기존 확정 성장기록은 아래에서 확인할 수 있습니다.'}finally{refreshing=false}}
+ // Refresh only while the growth screen is actually shown (D1 read budget): at most every 5 minutes.
+ load();setInterval(()=>{if(Date.now()-lastLoad>=300_000)load();},30_000);window.addEventListener('focus',()=>{if(Date.now()-lastLoad>=60_000)load();});
 })();

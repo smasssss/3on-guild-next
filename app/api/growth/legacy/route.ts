@@ -1,10 +1,14 @@
-import { completeRoster } from '../../../../lib/growth-roster';
+import { completeRoster, reuseUnlessChanged } from '../../../../lib/growth-roster';
 import { db, response } from '../../../../lib/store';
 import { GROWTH_API, GROWTH_SCHEMA, meta } from '../../../../lib/growth';
 import { growthChanges } from '../../../../lib/growth-changes';
 export const dynamic='force-dynamic';
 
+// Reused until collection, events, identities, closes or publications change (D1 read budget).
 export async function GET(req:Request){try{
+  return response(req,await reuseUnlessChanged(db(),'growth-legacy',buildLegacy));
+}catch{return response(req,{error:'호환 성장자료를 만들지 못했습니다.'},503);}}
+async function buildLegacy(){
   const latest=await db().prepare("SELECT batch_id,observed_date,slot FROM growth_batches WHERE state='published' ORDER BY observed_date DESC,published_revision DESC LIMIT 1").first<{batch_id:string;observed_date:string;slot:string}>();if(!latest)throw Error();
   const lineage=`WITH RECURSIVE valid_lineage(batch_id,lineage_depth) AS (
     SELECT batch_id,0 FROM growth_batches WHERE batch_id=? AND state='published'
@@ -67,5 +71,5 @@ export async function GET(req:Request){try{
   }
   changes.changeHistory.sort((a:any,b:any)=>b.date.localeCompare(a.date));
   const data={...metadata,...changes,date:latest.observed_date,guildCount:current.length,members:current,archivedMembers:archived,...(roster?{roster:{snapshot_id:roster.snapshot_id,source_as_of:roster.source_as_of,source_member_count:roster.member_count}}:{})};
-  const revision=await meta();return response(req,{schema:GROWTH_SCHEMA,api:GROWTH_API,revision:revision.growthRevision,identity_revision:revision.identityRevision,data});
-}catch{return response(req,{error:'호환 성장자료를 만들지 못했습니다.'},503);}}
+  const revision=await meta();return {schema:GROWTH_SCHEMA,api:GROWTH_API,revision:revision.growthRevision,identity_revision:revision.identityRevision,data};
+}

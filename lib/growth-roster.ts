@@ -111,3 +111,33 @@ export async function completeRoster(db:D1Database,cutoff?:number){
  const settledEvidence=(gameId:string)=>{const s=sequences.get(gameId);return s?evidenceOf(collections,Math.min(trailingRun(s),CONFIRMATIONS)):[];};
  return {...snapshot,members,pending,snapshotAdded,gameIds:confirmed.map(r=>r.game_id),latest,settledEvidence};
 }
+
+// D1 free tier: 5,000,000 rows read per day, and open pages poll every few minutes.
+// Heavy read-only views are reused per database until something they depend on changes.
+// The change key reads only a few indexed rows plus two small scans (pending events, ID mappings).
+const caches=new WeakMap<object,Map<string,{key:string;at:number;value:unknown}>>();
+const MAX_AGE=10*60_000;
+export async function growthChangeKey(db:D1Database){
+ const row=await db.prepare(`SELECT
+  (SELECT run_id||':'||status||':'||COALESCE(completed_at,'') FROM growth_auto_runs ORDER BY called_at DESC LIMIT 1) run,
+  (SELECT snapshot_id FROM growth_auto_snapshots ORDER BY source_as_of DESC LIMIT 1) snap,
+  (SELECT COUNT(*) FROM growth_hourly_observations WHERE snapshot_id=(SELECT snapshot_id FROM growth_auto_snapshots ORDER BY source_as_of DESC LIMIT 1)) stored,
+  (SELECT MAX(rowid) FROM growth_auto_events) ev,
+  (SELECT COUNT(*)||':'||COALESCE(MAX(rowid),0) FROM growth_mutations) muts,
+  (SELECT batch_id||':'||updated_at||':'||state FROM growth_batches ORDER BY updated_at DESC LIMIT 1) batch,
+  (SELECT COUNT(*) FROM growth_auto_events WHERE status='pending') pend,
+  (SELECT group_concat(key||'='||value||'@'||updated_at) FROM growth_meta) meta,
+  (SELECT MAX(updated_at) FROM growth_external_ids) ids,
+  (SELECT date||':'||status FROM growth_daily_closes ORDER BY date DESC LIMIT 1) close,
+  (SELECT execution_id||':'||status FROM growth_auto_executions ORDER BY scheduled_at DESC LIMIT 1) exec,
+  (SELECT revision FROM documents WHERE kind='vip-weekly') weekly`).first<Record<string,unknown>>();
+ return JSON.stringify(row);
+}
+export async function reuseUnlessChanged<T>(db:D1Database,name:string,compute:()=>Promise<T>,now=Date.now()):Promise<T>{
+ const key=await growthChangeKey(db);
+ let byDb=caches.get(db as object);if(!byDb){byDb=new Map();caches.set(db as object,byDb);}
+ const hit=byDb.get(name);
+ if(hit&&hit.key===key&&now-hit.at<MAX_AGE)return structuredClone(hit.value) as T;
+ const value=await compute();byDb.set(name,{key,at:now,value:structuredClone(value)});
+ return value;
+}
