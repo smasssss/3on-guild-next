@@ -122,7 +122,10 @@ export async function ingestStored(db:D1Database,runId:string,acceptedAt=Date.no
     const p=prev.get(r.id)||approved.get(m.member_id);if(!reason&&p?.rank!==undefined&&p.rank!==row.rank)event('rank',m,'recorded',{rank:p.rank},{rank:row.rank});
   }
   const present=new Set(source.roster.map(r=>r.id));
-  for(const m of mappings)if(m.status==='confirmed'&&!m.departed_at&&!present.has(m.game_id))event('departure_candidate',m,'pending',null,null,'명단 미관측 · 탈퇴 미확정');
+  // Only members still on the confirmed roster can become departure candidates; members the
+  // 3-collection rule already removed are not re-flagged every hour.
+  const onRoster=rosterBefore?new Set(rosterBefore.gameIds):null;
+  for(const m of mappings)if(m.status==='confirmed'&&!m.departed_at&&!present.has(m.game_id)&&(!onRoster||onRoster.has(m.game_id)))event('departure_candidate',m,'pending',null,null,'명단 미관측 · 탈퇴 미확정');
   const guard='auto-ingest-'+runId;
   const statements=[
     stmt(db,"INSERT INTO growth_tx_guards VALUES(?,CASE WHEN NOT EXISTS(SELECT 1 FROM growth_auto_snapshots WHERE source_as_of=? ) AND EXISTS(SELECT 1 FROM growth_auto_runs WHERE run_id=? AND status IN ('received','db_error')) AND (SELECT value FROM growth_meta WHERE key='identity_revision')=? THEN 1 ELSE NULL END,?)",guard,sourceTime,runId,revision.value,new Date(acceptedAt).toISOString()),
@@ -152,7 +155,11 @@ export async function ingestStored(db:D1Database,runId:string,acceptedAt=Date.no
 // Best effort: evidence never blocks or undoes a stored collection.
 async function recordRosterChanges(db:D1Database,before:Awaited<ReturnType<typeof completeRoster>>,runId:string,at:number){
   try{
-    const after=await completeRoster(db);if(!before||!after)return;
+    const after=await completeRoster(db);if(!after)return;
+    // A member the 3-collection rule has taken off the roster is a departure: close its open
+    // absence candidates (history kept; departed_at untouched so a return still rejoins after 3 collections).
+    await stmt(db,`UPDATE growth_auto_events SET status='resolved',reason=COALESCE(reason,'')||' / 수집 3회 연속 미관측 · 탈퇴 처리',after_json=json_set(COALESCE(after_json,'{}'),'$.decision','roster_leave') WHERE kind='departure_candidate' AND status='pending' AND game_id NOT IN(SELECT value FROM json_each(?))`,json(after.gameIds)).run();
+    if(!before)return;
     const was=new Set(before.gameIds),now=new Set(after.gameIds),snap=new Set(after.snapshotAdded);
     const events=[...[...now].filter(id=>!was.has(id)).map(id=>['roster_join',id]),...[...was].filter(id=>!now.has(id)).map(id=>['roster_leave',id])].map(([kind,id])=>{
       const r=after.latest.get(id)||before.latest.get(id);

@@ -35,6 +35,9 @@
   const head=document.createElement('div');head.className='ops-pick-head';const h=document.createElement('h3');h.textContent=title;
   const close=document.createElement('button');close.type='button';close.className='smallbtn';close.textContent='닫기';head.append(h,close);
   card.appendChild(head);wrap.appendChild(card);document.body.appendChild(wrap);
+  // 성장추적 화면은 내용 전체 높이로 늘어난 틀 안에 있어 창이 목록 한가운데 뜹니다. 지금 보이는 부분에 띄웁니다.
+  try{const fe=window.frameElement;if(fe){const r=fe.getBoundingClientRect(),vh=parent.innerHeight,top=Math.max(0,-r.top),h=Math.max(200,Math.min(vh,r.bottom)-Math.max(0,r.top));
+   wrap.style.alignItems='flex-start';card.style.marginTop=(top+16)+'px';card.style.maxHeight=(h-32)+'px';card.style.setProperty('--ops-pick-list-max',(h-120)+'px');}}catch{/* 다른 출처의 틀이면 기본 위치 */}
   const back=document.activeElement;
   const done=()=>{wrap.remove();document.removeEventListener('keydown',esc);back?.focus?.();};
   const esc=e=>{if(e.key==='Escape')done();};
