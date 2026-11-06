@@ -173,6 +173,8 @@ class Release:
         with tempfile.TemporaryDirectory() as directory:
             path=Path(directory)/'legacy.html';path.write_bytes(subprocess.check_output(['git','show',BASE+':public/legacy.html']))
             patch=Path(directory)/'patch.mjs';patch.write_bytes(subprocess.check_output(['git','show',BASE+':scripts/growth-auto-ui.mjs']))
+            # Releases from 2026-11-06 also add a font cache rule to the build folder's _headers file.
+            (Path(directory)/'_headers').write_text('')
             assert subprocess.run(['node',str(patch),str(path)],capture_output=True).returncode==0
             actual=digest(self.public('/legacy.html'))
             assert actual in [digest(path.read_bytes()),digest(Path('dist/client/legacy.html').read_bytes())],'Live source differs from reviewed baseline'

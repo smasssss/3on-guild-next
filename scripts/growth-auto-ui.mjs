@@ -1,5 +1,5 @@
 // Enhance the built copy while leaving the established operation functions exact.
-import {readFileSync,writeFileSync,appendFileSync} from 'node:fs';
+import {readFileSync,writeFileSync,appendFileSync,existsSync} from 'node:fs';
 import {join,dirname} from 'node:path';
 const path=process.argv[2]||'dist/client/legacy.html';let source=readFileSync(path,'utf8');
 const before="frame.srcdoc=new TextDecoder('utf-8').decode(bytes);";
@@ -17,4 +17,4 @@ writeFileSync(path,source);
 // The font is referenced only with a version query (?v=N), so phones may keep it for a year without asking again.
 const headers=join(dirname(path),'_headers');
 const rule='\n/fonts/*\n  Cache-Control: public, max-age=31536000, immutable\n';
-if(!readFileSync(headers,'utf8').includes('/fonts/*'))appendFileSync(headers,rule);
+if(existsSync(headers)&&!readFileSync(headers,'utf8').includes('/fonts/*'))appendFileSync(headers,rule);

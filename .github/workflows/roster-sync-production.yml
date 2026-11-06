@@ -8,7 +8,7 @@ name: Promote roster sync to Production after a fresh Staging verification (user
 # Release 8 (user-approved 2026-11-06): pastel theme and driver picker, fewer D1 reads, collection format fix.
 # Release 9 (user-approved 2026-11-06): larger text, collection status in settings, weekly cards, site-drawn selects and calendar, word wrapping. Retry 1: mobile check opens the new calendar.
 # Release 10 (user-approved 2026-11-06): no first-load movement (versioned assets, font wait max 1s), font cached for a year.
-# Release 11 (user-approved 2026-11-06): absence candidates closed by the 3-collection rule (818 pending rows resolved, history kept), R5 HyunE tab removed, glyph-aware font range, in-view growth pickers, pastel growth frame.
+# Release 11 (user-approved 2026-11-06): absence candidates closed by the 3-collection rule (818 pending rows resolved, history kept), R5 HyunE tab removed, glyph-aware font range, in-view growth pickers, pastel growth frame. Retry 1: live-artifact check rebuilds with the build folder header file.
 on:
   push:
     branches: [claude/new-session-narazy]
