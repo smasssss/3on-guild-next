@@ -247,3 +247,5 @@ p,.sub,.notice,.preview,.guide,.callout,.note,summary,h1,h2,h3{text-wrap:pretty}
 
 /* 첫 로딩: 글꼴이 도착할 때까지(최대 1초) 내용을 숨겨 글자 줄이 바뀌며 화면이 밀리는 것을 막습니다. */
 html.ops-wait body{visibility:hidden}
+/* 성장추적 화면 틀: 내용이 뜨기 전 잠깐 보이던 검은 사각형 대신 바탕과 같은 연분홍으로 둡니다. */
+#growthFrame{background:var(--bg)!important;color-scheme:light}
