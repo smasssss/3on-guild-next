@@ -9,6 +9,7 @@ name: Promote roster sync to Production after a fresh Staging verification (user
 # Release 9 (user-approved 2026-11-06): larger text, collection status in settings, weekly cards, site-drawn selects and calendar, word wrapping. Retry 1: mobile check opens the new calendar.
 # Release 10 (user-approved 2026-11-06): no first-load movement (versioned assets, font wait max 1s), font cached for a year.
 # Release 11 (user-approved 2026-11-06): absence candidates closed by the 3-collection rule (818 pending rows resolved, history kept), R5 HyunE tab removed, glyph-aware font range, in-view growth pickers, pastel growth frame. Retry 1: live-artifact check rebuilds with the build folder header file.
+# Release 12 (user-approved 2026-11-08, Workers paid plan): VIP roster check one lookup per member (was ~16M D1 rows per save), VIP eligibility from Monday.
 on:
   push:
     branches: [claude/new-session-narazy]
@@ -59,6 +60,8 @@ jobs:
           node tests/collection_format_regression.cjs
           node tests/growth_auto_ui_regression.cjs
           node tests/departure_candidates_regression.cjs
+          node tests/vip_guard_read_budget.cjs
+          node tests/vip_weekly_import_regression.cjs
           node tests/vip_sunday_regression.cjs
           node tests/weekly_input_regression.cjs
           node tests/vip_weekly_regression.cjs
