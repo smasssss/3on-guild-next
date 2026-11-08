@@ -4,6 +4,7 @@ name: D1 read usage report (analytics only, no database rows read)
 # Rerun 1: hourly rows-read totals per database.
 # Rerun 2: per-query rows read inside the 2026-11-06 15:00-16:00 UTC spike.
 # Rerun 3: minute-by-minute rows read in that hour, and the same hour on 2026-11-04/05.
+# Rerun 4: the 2026-11-08 02:30-02:45 UTC weekly-points import window.
 on:
   push:
     branches: [claude/new-session-narazy]
@@ -54,7 +55,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           node -e '
-            const query=`query($a:String!){viewer{accounts(filter:{accountTag:$a}){d1QueriesAdaptiveGroups(limit:50,filter:{datetime_geq:"2026-11-06T15:00:00Z",datetime_leq:"2026-11-06T16:00:00Z",databaseId:"31e3bbb6-2860-40cb-9390-d989d37f11c2"},orderBy:[sum_rowsRead_DESC]){count sum{rowsRead rowsWritten queryDurationMs}dimensions{query error}}}}}`;
+            const query=`query($a:String!){viewer{accounts(filter:{accountTag:$a}){d1QueriesAdaptiveGroups(limit:50,filter:{datetime_geq:"2026-11-08T02:30:00Z",datetime_leq:"2026-11-08T02:45:00Z",databaseId:"31e3bbb6-2860-40cb-9390-d989d37f11c2"},orderBy:[sum_rowsRead_DESC]){count sum{rowsRead rowsWritten queryDurationMs}dimensions{query error}}}}}`;
             fetch("https://api.cloudflare.com/client/v4/graphql",{method:"POST",headers:{"Authorization":"Bearer "+process.env.CLOUDFLARE_API_TOKEN,"Content-Type":"application/json"},body:JSON.stringify({query,variables:{a:process.env.CLOUDFLARE_ACCOUNT_ID}})})
             .then(r=>r.json()).then(j=>{if(j.errors){console.log("graphql errors:",JSON.stringify(j.errors).slice(0,600));return;}
               for(const g of j.data.viewer.accounts[0].d1QueriesAdaptiveGroups)console.log(g.sum.rowsRead,"|",g.count,"|",g.sum.queryDurationMs,"|",String(g.dimensions.error||"").slice(0,80),"|",String(g.dimensions.query).replace(/\s+/g," ").slice(0,400));});'
@@ -66,8 +67,8 @@ jobs:
           node -e '
             const ask=(from,to,dim)=>fetch("https://api.cloudflare.com/client/v4/graphql",{method:"POST",headers:{"Authorization":"Bearer "+process.env.CLOUDFLARE_API_TOKEN,"Content-Type":"application/json"},body:JSON.stringify({query:`query($a:String!){viewer{accounts(filter:{accountTag:$a}){d1AnalyticsAdaptiveGroups(limit:200,filter:{${dim}_geq:"${from}",${dim}_leq:"${to}",databaseId:"31e3bbb6-2860-40cb-9390-d989d37f11c2"},orderBy:[${dim}_ASC]){sum{rowsRead readQueries rowsWritten}dimensions{${dim}}}}}}`,variables:{a:process.env.CLOUDFLARE_ACCOUNT_ID}})}).then(r=>r.json());
             (async()=>{
-              const m=await ask("2026-11-06T15:00:00Z","2026-11-06T16:00:00Z","datetimeMinute");
+              const m=await ask("2026-11-08T02:30:00Z","2026-11-08T02:45:00Z","datetimeMinute");
               if(m.errors)console.log("errors",JSON.stringify(m.errors).slice(0,400));else for(const g of m.data.viewer.accounts[0].d1AnalyticsAdaptiveGroups)if(g.sum.rowsRead>1000)console.log("minute",g.dimensions.datetimeMinute,g.sum.rowsRead,g.sum.readQueries,g.sum.rowsWritten);
-              const d=await ask("2026-11-03T00:00:00Z","2026-11-06T16:00:00Z","datetimeHour");
+              const d=await ask("2026-11-03T00:00:00Z","2026-11-08T02:45:00Z","datetimeHour");
               if(d.errors)console.log("errors",JSON.stringify(d.errors).slice(0,400));else for(const g of d.data.viewer.accounts[0].d1AnalyticsAdaptiveGroups)if(g.sum.rowsRead>500000)console.log("big hour",g.dimensions.datetimeHour,g.sum.rowsRead,g.sum.readQueries);
             })();'
