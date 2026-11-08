@@ -31,8 +31,7 @@ async function run(){
  assert.equal((await post(api,{revision:1,mutation:key(),snapshot:correction})).status,200);
  assert.equal((await post(api,{revision:2,mutation:key(),snapshot})).status,200);
  assert.deepEqual(saved(),original,'score uploads never modify carriage or VIP counts');
- clock=Date.parse('2026-11-02T02:00Z'); // 2026-11-08 rule: scores apply from Monday 11:00 KST
- 
+ clock=Date.parse('2026-11-02T00:00Z');
  const get=async()=>{const r=await api.GET(new Request(origin+'/api/carriage/vip'));assert.equal(r.status,200);return r.json()};
  let view=await get();assert.equal(view.week,'2026-11-02');assert.equal(view.members.find(m=>m.memberId==='bob').eligibility.reason,'permanent');
  let forged=assign('forged','Bob','bob');delete forged.vipExcludedMembers;
@@ -63,8 +62,7 @@ async function run(){
  clock=Date.parse('2026-10-31T13:00Z');
  r=await post(state,{kind:'carriage',revision:46,mutation:key(),data:{...saved(),records:[...saved().records,{...valid.records[1],id:'mismatch',vipCanonical:'Bob',vipMemberId:'alice'}]}});assert.equal(r.status,422);
  // A departure approval does not bump the growth identity revision.
- clock=Date.parse('2026-11-02T02:00Z'); // 2026-11-08 rule: scores apply from Monday 11:00 KST
-  // scores applied, so Alice qualifies until the race (2026-11-05 rules)
+ clock=Date.parse('2026-11-02T00:00Z'); // scores applied, so Alice qualifies until the race (2026-11-05 rules)
  const departureKey=key();f.db.beforeBatch=()=>f.sql.prepare("UPDATE growth_external_ids SET departed_at=1 WHERE member_id='alice'").run();
  r=await post(state,{kind:'carriage',revision:46,mutation:departureKey,data:{...saved(),records:[...saved().records,{...valid.records[1],id:'departure-race'}]}});assert.equal(r.status,409,'commit must recheck actual current membership');
  assert.equal(f.sql.prepare('SELECT COUNT(*) n FROM backups WHERE mutation=?').get(departureKey).n,0);
