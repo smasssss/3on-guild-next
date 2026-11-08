@@ -2,7 +2,7 @@
  "source": "in-game weekly guild war ranking screenshots (이번 주), sent by the user 2026-11-08",
  "providedOn": "2026-11-08",
  "appliesOn": "2026-11-09",
- "apply": false,
+ "apply": true,
  "rows": [
   {
    "rank": 1,
