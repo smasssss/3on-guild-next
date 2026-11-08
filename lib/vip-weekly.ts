@@ -68,10 +68,14 @@ export function eligibility(member:Member|undefined,carriage:Carriage,weekly:Wee
 // A departure approval need not bump identity_revision, so that revision alone is insufficient.
 // Each member's latest observation up to the roster snapshot is checked; a member awaiting
 // 3-collection removal is no longer in the newest snapshot but is still current.
+// D1 read budget (2026-11-08): CROSS JOIN fixes the order (listed members first, then one
+// rowid lookup each). The old JOIN let D1 scan every valid hourly row and re-read each
+// member's whole history per row: about 16M rows per weekly save or VIP carriage save.
+// Rows of one snapshot share its source_as_of, so ordering by x.source_as_of (indexed) is the same order.
 export const ROSTER_GUARD_SQL = `(SELECT COUNT(*) FROM json_each(?) j
- JOIN growth_external_ids e ON e.member_id=json_extract(j.value,'$.memberId') AND e.game_id=json_extract(j.value,'$.gameId')
- JOIN growth_members m ON m.member_id=e.member_id
- JOIN growth_hourly_observations o ON o.game_id=e.game_id AND o.rowid=(SELECT x.rowid FROM growth_hourly_observations x JOIN growth_auto_snapshots s ON s.snapshot_id=x.snapshot_id WHERE x.game_id=e.game_id AND s.source_as_of<=(SELECT source_as_of FROM growth_auto_snapshots WHERE snapshot_id=?) ORDER BY s.source_as_of DESC LIMIT 1)
+ CROSS JOIN growth_external_ids e ON e.member_id=json_extract(j.value,'$.memberId') AND e.game_id=json_extract(j.value,'$.gameId')
+ CROSS JOIN growth_members m ON m.member_id=e.member_id
+ CROSS JOIN growth_hourly_observations o ON o.rowid=(SELECT x.rowid FROM growth_hourly_observations x JOIN growth_auto_snapshots s ON s.snapshot_id=x.snapshot_id WHERE x.game_id=e.game_id AND s.source_as_of<=(SELECT source_as_of FROM growth_auto_snapshots WHERE snapshot_id=?) ORDER BY x.source_as_of DESC LIMIT 1)
  WHERE e.status='confirmed' AND e.departed_at IS NULL AND o.status='valid'
  AND COALESCE(m.display_name,o.source_name)=json_extract(j.value,'$.nickname'))=?`;
 // Score references preserve confirmed history only; they never grant selection membership.
