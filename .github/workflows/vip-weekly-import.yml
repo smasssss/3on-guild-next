@@ -1,0 +1,29 @@
+name: Import weekly guild-war points into Production (user-approved 2026-11-08)
+# Same rules, backup and guards as 관리설정 > 길드전 주간 포인트. The data file's "apply" flag
+# decides: false = check only (nothing written), true = save. Reads a few thousand D1 rows.
+on:
+  push:
+    branches: [claude/new-session-narazy]
+    paths: ['.github/workflows/vip-weekly-import.yml', 'data/guildwar/**']
+permissions:
+  contents: read
+concurrency:
+  group: vip-weekly-import
+  cancel-in-progress: false
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Regression test of the importer (no network)
+        run: node tests/vip_weekly_import_regression.cjs
+      - name: Import data/guildwar/2026-11-08.json
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/vip-weekly-import.cjs data/guildwar/2026-11-08.json
