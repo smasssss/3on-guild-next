@@ -12,7 +12,7 @@ function carriageVipStatus(m){
 }
 function carriagePoints(m){return carriageVip.view?.active?.rows.find(r=>r.memberId===m?.member_id)?.points??null;}
 function carriageTime(value){return value?new Date(value).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+' KST':'미확인';}
-function carriageEffectiveDate(w){return new Date(Date.parse(w.appliesOn)-86_400_000).toISOString().slice(0,10);}
+function carriageEffectiveDate(w){return w.appliesOn;} // 2026-11-08: VIP 자격은 주차 기준 월요일부터
 function carriageWeekText(){
  const v=carriageVip.view;if(!v)return carriageVip.error||'마차 명단·주간 점수 확인 중';
  return `${v.scoreWeek||v.week} 주차 · ${v.active?`${v.active.appliesOn} 점수 기준 · VIP 제한 ${v.effectiveOn||carriageEffectiveDate(v.active)}부터${v.carriedForward?' · 새 자료 없음, 이전 점수·자격 유지':''} · 점수 갱신 ${carriageTime(v.active.updatedAt)}`:'첫 점수 적용 전 · 점수 없으면 점수 미달'} · 명단 관측 ${carriageTime(v.roster.sourceAsOf)}`;
@@ -89,7 +89,7 @@ async function reviewVipSnapshot(event){
 async function saveVipSnapshot(){
  if(!ensureAdmin()||!carriageVip.draft)return;
  const b=carriageVip.draft;
- if(!await askConfirm(`${carriageEffectiveDate(b.snapshot)}부터 적용할 주간 점수를 저장할까요? 일요일부터 이전 점수를 대체하며 VIP 누적 횟수는 유지됩니다.`))return;
+ if(!await askConfirm(`${carriageEffectiveDate(b.snapshot)}부터 적용할 주간 점수를 저장할까요? 그 월요일부터 이전 점수를 대체하며 VIP 누적 횟수는 유지됩니다.`))return;
  const button=document.getElementById('vipWeeklySave');button.disabled=true;
  try{await sharedRequest('/api/carriage/vip',{method:'POST',body:JSON.stringify(b)});carriageVip.draft=null;await refreshCarriageVip(true);document.getElementById('vipWeeklyPreview').textContent='주간 점수를 저장했습니다. 적용 주차는 서버 KST 기준입니다.';}
  catch(e){document.getElementById('vipWeeklyPreview').textContent=e.message;button.disabled=false;}
@@ -101,7 +101,7 @@ function weeklyResultsText(view){
 function initCarriageVip(){
  const section=document.getElementById('settings');if(!section||document.getElementById('vipWeeklyPanel'))return;
  const panel=document.createElement('div');panel.className='card';panel.id='vipWeeklyPanel';
- panel.innerHTML='<h2>길드전 주간 포인트</h2><p class="sub" id="vipWeeklyStatus"></p><p class="sub" id="vipWeeklyPending"></p><details><summary>저장된 주간 결과 보기</summary><pre id="vipWeeklyResults" style="white-space:pre-wrap;max-height:360px;overflow:auto"></pre></details><p class="sub">토·일요일에 제공한 주간 자료는 해당 일요일부터 VIP 자격에 적용합니다. 주차 기준일은 기존 월요일을 유지합니다. 미관측 회원의 미참여는 관리자 확인 0점으로 별도 보존합니다. 새 자료가 없는 주에는 이전 점수와 자격을 유지합니다. 기준 21,720,000점 · 새 자료로 대체 · VIP 누적 횟수 유지. 새 자료에서 누락된 개인 점수는 미확인으로 남습니다.</p><div class="actions"><button type="button" class="btn ghost" id="vipWeeklyTemplate">입력 양식 받기</button><label class="btn ghost">JSON 자료 선택<input type="file" accept="application/json,.json" id="vipWeeklyFile" hidden></label><button type="button" class="btn primary" id="vipWeeklySave" disabled>검토한 점수 저장</button><button type="button" class="btn ghost" id="vipWeeklyReload">최신 자료 확인</button><button type="button" class="btn ghost" id="vipWeeklyBackup">점수 복구 사본 받기</button></div><pre id="vipWeeklyPreview" style="white-space:pre-wrap;max-height:320px;overflow:auto"></pre>';
+ panel.innerHTML='<h2>길드전 주간 포인트</h2><p class="sub" id="vipWeeklyStatus"></p><p class="sub" id="vipWeeklyPending"></p><details><summary>저장된 주간 결과 보기</summary><pre id="vipWeeklyResults" style="white-space:pre-wrap;max-height:360px;overflow:auto"></pre></details><p class="sub">토·일요일에 제공한 주간 자료는 다음 월요일부터 VIP 자격에 적용합니다. 주차 기준일은 기존 월요일을 유지합니다. 미관측 회원의 미참여는 관리자 확인 0점으로 별도 보존합니다. 새 자료가 없는 주에는 이전 점수와 자격을 유지합니다. 기준 21,720,000점 · 새 자료로 대체 · VIP 누적 횟수 유지. 새 자료에서 누락된 개인 점수는 미확인으로 남습니다.</p><div class="actions"><button type="button" class="btn ghost" id="vipWeeklyTemplate">입력 양식 받기</button><label class="btn ghost">JSON 자료 선택<input type="file" accept="application/json,.json" id="vipWeeklyFile" hidden></label><button type="button" class="btn primary" id="vipWeeklySave" disabled>검토한 점수 저장</button><button type="button" class="btn ghost" id="vipWeeklyReload">최신 자료 확인</button><button type="button" class="btn ghost" id="vipWeeklyBackup">점수 복구 사본 받기</button></div><pre id="vipWeeklyPreview" style="white-space:pre-wrap;max-height:320px;overflow:auto"></pre>';
  section.prepend(panel);document.getElementById('vipWeeklyTemplate').onclick=vipTemplate;document.getElementById('vipWeeklyFile').onchange=reviewVipSnapshot;document.getElementById('vipWeeklySave').onclick=saveVipSnapshot;document.getElementById('vipWeeklyReload').onclick=()=>refreshCarriageVip(true);
  document.getElementById('vipWeeklyBackup').onclick=async()=>{if(!ensureAdmin())return;try{downloadJSON(await sharedRequest('/api/carriage/vip?backups=1'),'3ON_주간점수_복구사본.json');}catch(e){showNotice(e.message);}};
  refreshCarriageVip();
