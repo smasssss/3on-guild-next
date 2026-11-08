@@ -13,12 +13,16 @@ export async function GET(req:Request){try{
  const now=Date.now(),view=weeklyView(document.data,now),scoreMembers=await readScoreRoster(database,roster.members);
  return response(req,{schema:'3on-vip-weekly-v1',threshold:thresholdOf(carriage.data as {vipThreshold?:number}),timezone:'Asia/Seoul',serverTime:new Date(now).toISOString(),revision:document.revision,...view,scoreMembers,roster:{snapshotId:roster.snapshotId,sourceAsOf:roster.sourceAsOf,receivedAt:roster.receivedAt},rosterPending:roster.pending,snapshotAdded:roster.snapshotAdded,members:roster.members.map(m=>({...m,eligibility:eligibility(m,carriage.data as {vipExcludedMembers?:Record<string,number>},view.active,now)}))});
  }catch{return response(req,{error:'마차 명단·주간 점수를 확인하지 못했습니다. VIP 선택을 보류합니다.'},503);}}
-export async function POST(req:Request){try{
+export async function POST(req:Request){
+ // If D1 commits the batch but the reply fails (slow or busy), report the save that did happen.
+ let committed:(()=>Promise<Response|null>)|null=null;
+ try{
  if(!validOrigin(req))return response(req,{error:'허용되지 않은 주소입니다.'},403);
  const user=await actor(req);if(!user)return response(req,{error:'관리자 인증이 필요합니다.'},401);
  if(Number(req.headers.get('Content-Length')||0)>250000)return response(req,{error:'자료가 너무 큽니다.'},413);
  const text=await req.text();if(text.length>250000)return response(req,{error:'자료가 너무 큽니다.'},413);
  const b=JSON.parse(text);
+ committed=async()=>typeof b.mutation==='string'&&await db().prepare('SELECT 1 FROM documents WHERE kind=? AND last_mutation=?').bind(VIP_KIND,b.mutation).first()?response(req,{...await readWeekly(db()),recovered:true}):null;
  if(!Number.isSafeInteger(b.revision)||b.revision<0||typeof b.mutation!=='string'||!/^[a-f0-9-]{32,64}$/.test(b.mutation))return response(req,{error:'주간 저장 요청을 확인해 주세요.'},400);
  const database=db(),duplicate=await database.prepare('SELECT kind FROM backups WHERE mutation=?').bind(b.mutation).first<{kind:string}>();
  if(duplicate)return duplicate.kind===VIP_KIND?response(req,{...await readWeekly(database),duplicate:true}):response(req,{error:'저장 요청 식별자가 중복되었습니다.'},409);
@@ -38,4 +42,5 @@ export async function POST(req:Request){try{
  ]);
  if(results[2].meta.changes!==1)return response(req,{error:'명단 또는 점수가 변경되었습니다. 최신 자료로 다시 확인해 주세요.'},409);
  return response(req,await readWeekly(database));
- }catch(e){if(e instanceof Error&&e.message.includes('NOT NULL constraint failed: documents.payload'))return response(req,{error:'명단이 변경되었습니다. 다시 확인해 주세요.'},409);return response(req,{error:e instanceof Error?e.message:'주간 점수를 저장하지 못했습니다.'},400);}}
+ }catch(e){try{const saved=await committed?.();if(saved)return saved;}catch{/* fall through to the original error */}
+ if(e instanceof Error&&e.message.includes('NOT NULL constraint failed: documents.payload'))return response(req,{error:'명단이 변경되었습니다. 다시 확인해 주세요.'},409);return response(req,{error:e instanceof Error?e.message:'주간 점수를 저장하지 못했습니다.'},400);}}

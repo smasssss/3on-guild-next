@@ -30,13 +30,14 @@ async function run(){
  const input={providedOn:'2026-10-31',appliesOn:'2026-11-02',coverage:'partial',rows:[{memberId:'eligible',nickname:'Eligible',points:21720000}]};
  const weekly=v.prepareWeekly(input,roster.members,now);assert.equal(weekly.rows[0].points,21720000);
  const doc={current:null,pending:weekly};assert.equal(v.weeklyView(doc,now).active,null);
- let view=v.weeklyView(doc,at('2026-11-01T15:00:00Z'));assert.equal(view.active.appliesOn,'2026-11-02');
- assert.equal(v.eligibility(eligible,T,view.active,at('2026-11-01T15:00:00Z')).eligible,true);
- assert.equal(v.eligibility(eligible,carriage,view.active,at('2026-11-01T15:00:00Z')).reason,'permanent');
- assert.equal(v.eligibility(blocked,T,view.active,at('2026-11-01T15:00:00Z')).reason,'score_low','missing from the snapshot counts as 0 points');
+ assert.equal(v.weeklyView(doc,at('2026-11-02T01:59:59Z')).active,null,'2026-11-08 rule: not before Monday 11:00 KST');
+ let view=v.weeklyView(doc,at('2026-11-02T02:00:00Z'));assert.equal(view.active.appliesOn,'2026-11-02');
+ assert.equal(v.eligibility(eligible,T,view.active,at('2026-11-02T02:00:00Z')).eligible,true);
+ assert.equal(v.eligibility(eligible,carriage,view.active,at('2026-11-02T02:00:00Z')).reason,'permanent');
+ assert.equal(v.eligibility(blocked,T,view.active,at('2026-11-02T02:00:00Z')).reason,'score_low','missing from the snapshot counts as 0 points');
  const released={...weekly,rows:[{memberId:'blocked',nickname:'언데드킬러',points:21720000}]};
- assert.equal(v.eligibility(blocked,T,released,at('2026-11-01T15:00:00Z')).eligible,true,'scores at the configured threshold qualify');
- assert.equal(v.eligibility(blocked,{vipExcludedMembers:{blocked:1}},released,at('2026-11-01T15:00:00Z')).reason,'permanent','Sunday never lifts permanent exclusion');
+ assert.equal(v.eligibility(blocked,T,released,at('2026-11-02T02:00:00Z')).eligible,true,'scores at the configured threshold qualify');
+ assert.equal(v.eligibility(blocked,{vipExcludedMembers:{blocked:1}},released,at('2026-11-02T02:00:00Z')).reason,'permanent','Sunday never lifts permanent exclusion');
  const carried=v.weeklyView(doc,at('2026-11-08T15:00:00Z'));
  assert.equal(carried.week,'2026-11-09');assert(carried.active,'missing snapshot must retain previous applied scores');assert.equal(carried.active.appliesOn,'2026-11-02','missing snapshot retains last applied scores');assert.equal(carried.carriedForward,true);
  assert.equal(carried.active.updatedAt,weekly.updatedAt,'carry-forward must not fabricate an update timestamp');
@@ -48,12 +49,13 @@ async function run(){
  assert.equal(JSON.stringify(doc),JSON.stringify({current:null,pending:weekly}),'read-time rollover does not write records');
  for(const points of [21719999,15000000]){const w={...weekly,rows:[{...weekly.rows[0],points}]};assert.equal(v.eligibility(eligible,T,w,at('2026-11-02T01:00Z')).reason,'score_low');}
  const second=v.prepareWeekly({...input,providedOn:'2026-11-07',appliesOn:'2026-11-09',rows:[{...input.rows[0],points:15000000}]},roster.members,at('2026-11-07T13:00Z'));
- const replaced=v.replaceWeekly(doc,second,at('2026-11-07T13:00Z'));assert.equal(v.weeklyView(replaced,at('2026-11-08T15:00Z')).active.rows[0].points,15000000);
+ const replaced=v.replaceWeekly(doc,second,at('2026-11-07T13:00Z'));assert.equal(v.weeklyView(replaced,at('2026-11-09T02:00Z')).active.rows[0].points,15000000);
+ assert.equal(v.weeklyView(replaced,at('2026-11-09T01:59:59Z')).active.rows[0].points,21720000,'2026-11-08 rule: previous score until Monday 11:00 KST');
  assert.equal(v.weeklyView(replaced,at('2026-11-07T14:59:59Z')).active.rows[0].points,21720000,'new pending upload keeps previous score until Sunday');
- assert.equal(v.weeklyView(replaced,at('2026-11-08T15:00Z')).carriedForward,false);
+ assert.equal(v.weeklyView(replaced,at('2026-11-09T02:00Z')).carriedForward,false);
  assert.equal(v.eligibility(eligible,T,v.weeklyView(replaced,at('2026-11-15T15:00Z')).active,at('2026-11-16T00:00Z')).reason,'score_low','retained low scores stay ineligible');
  const third=v.prepareWeekly({...input,providedOn:'2026-11-14',appliesOn:'2026-11-16',rows:[{...input.rows[0],points:23000000}]},roster.members,at('2026-11-14T13:00Z'));
- assert.equal(v.weeklyView(v.replaceWeekly(replaced,third,at('2026-11-14T13:00Z')),at('2026-11-15T15:00Z')).active.rows[0].points,23000000);
+ assert.equal(v.weeklyView(v.replaceWeekly(replaced,third,at('2026-11-14T13:00Z')),at('2026-11-16T02:00Z')).active.rows[0].points,23000000);
  const later={...third,providedOn:'2026-11-21',appliesOn:'2026-11-23'};
  const afterGap=v.replaceWeekly(doc,later,at('2026-11-21T13:00Z'));assert.equal(afterGap.current.appliesOn,'2026-11-02');assert.equal(v.weeklyView(afterGap,at('2026-11-21T13:00Z')).active.rows[0].points,21720000);
  const correctedRetained=v.prepareWeekly({...input,rows:[{...input.rows[0],points:15000000}]},roster.members,at('2026-11-21T13:00Z'),'2026-11-02');
