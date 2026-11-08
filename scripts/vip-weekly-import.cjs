@@ -61,7 +61,7 @@ async function importWeekly(db,input,{now=Date.now(),actor='guild-war-import',lo
  log('SAVED: revision '+current.revision+' -> '+after.revision+' (previous version backed up)');
  return {status:'saved',revision:after.revision};
 }
-module.exports={importWeekly};
+module.exports={importWeekly,remoteD1,loader};
 
 if(require.main===module){
  const file=process.argv[2];const input=JSON.parse(fs.readFileSync(file,'utf8'));

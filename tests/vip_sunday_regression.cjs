@@ -12,20 +12,29 @@ const original=f.sql.prepare('SELECT * FROM documents ORDER BY kind').all();
 async function main(){
  const realNow=Date.now;
  try{
- for(const [time,active] of [['2026-10-31T14:59:59Z',false],['2026-10-31T15:00:00Z',true],['2026-11-01T14:59:59Z',true],['2026-11-01T15:00:00Z',true]]){
+ // 2026-11-08 user rule: VIP eligibility starts Monday 11:00 KST of the score week (not the Sunday before, not Monday 00:00).
+ for(const [time,active] of [['2026-10-31T15:00:00Z',false],['2026-11-01T15:00:00Z',false],['2026-11-02T01:59:59Z',false],['2026-11-02T02:00:00Z',true],['2026-11-09T01:59:59Z',true]]){
   Date.now=()=>Date.parse(time);const view=await (await api.GET(new Request('http://localhost/api/carriage/vip'))).json();
   assert.equal(!view.awaitingFirstSnapshot,active,time);assert.equal(view.members.find(m=>m.memberId==='low').eligibility.reason,'score_low',time);assert.equal(view.members.find(m=>m.memberId==='high').eligibility.reason,active?'eligible':'score_low',time);
   assert.equal(view.members.find(m=>m.memberId==='temp').eligibility.reason,active?'eligible':'score_low',time);assert.equal(view.members.find(m=>m.memberId==='permanent').eligibility.reason,'permanent');
-  if(active){assert.equal(view.effectiveOn,'2026-11-01');assert.equal(view.active.appliesOn,'2026-11-02');}
+  if(active){assert.equal(view.effectiveOn,'2026-11-02');assert.equal(view.active.appliesOn,'2026-11-02');}
  }
- assert.deepEqual(f.sql.prepare('SELECT * FROM documents ORDER BY kind').all(),original,'read-time Sunday activation never changes stored rows or operation weeks');
+ assert.deepEqual(f.sql.prepare('SELECT * FROM documents ORDER BY kind').all(),original,'read-time Monday activation never changes stored rows or operation weeks');
  const roster=await v.readRoster(f.db);assert.throws(()=>v.prepareWeekly(snapshot,roster.members,Date.parse('2026-11-08T02:00:00Z'),'2026-11-09'),'Sunday rejects replacing the active cycle with an unrelated older week');
  const next={...snapshot,appliesOn:'2026-11-09',providedOn:'2026-11-08',rows:[{memberId:'low',nickname:'Low',points:22000000}]},data={current:snapshot,pending:next};
- assert.equal(v.weeklyView(data,Date.parse('2026-11-07T14:59:59Z')).active.rows[0].points,0);
- assert.equal(v.weeklyView(data,Date.parse('2026-11-07T15:00:00Z')).active.rows[0].points,22000000);
+ assert.equal(v.weeklyView(data,Date.parse('2026-11-07T15:00:00Z')).active.rows[0].points,0,'Sunday still uses the previous week');
+ assert.equal(v.weeklyView(data,Date.parse('2026-11-08T15:00:00Z')).active.rows[0].points,0,'Monday morning still uses the previous week');
+ assert.equal(v.weeklyView(data,Date.parse('2026-11-09T01:59:59Z')).active.rows[0].points,0);
+ assert.equal(v.weeklyView(data,Date.parse('2026-11-09T02:00:00Z')).active.rows[0].points,22000000,'new points from Monday 11:00 KST');
+ // A Sunday upload waits as pending: the points in force are not replaced before Monday 11:00 KST.
+ const replaced=v.replaceWeekly({current:snapshot,pending:null},next,Date.parse('2026-11-08T05:00:00Z'));
+ assert.equal(replaced.current,snapshot);assert.equal(replaced.pending,next);
+ assert.equal(v.weeklyView(replaced,Date.parse('2026-11-09T01:59:59Z')).active,snapshot);assert.equal(v.weeklyView(replaced,Date.parse('2026-11-09T02:00:00Z')).active,next);
+ const fixed=v.replaceWeekly({current:snapshot,pending:null},{...snapshot,rows:[{memberId:'low',nickname:'Low',points:1}]},Date.parse('2026-11-04T05:00:00Z'));
+ assert.equal(fixed.current.rows[0].points,1,'a correction for the week in force replaces it at once');
  assert.equal(v.weeklyView({current:null,pending:snapshot},Date.parse('2026-11-07T15:00:00Z')).carriedForward,true);
  assert.equal(v.weekOf(Date.parse('2026-11-01T14:59:59Z')),'2026-10-26','operational Monday week stays unchanged');
- console.log('PASS: stored pending scores activate at Sunday KST boundary, permanent/temporary policy and carry-forward preserve all DB documents');
+ console.log('PASS: stored pending scores activate at Monday 11:00 KST and Sunday uploads wait as pending, permanent/temporary policy and carry-forward preserve all DB documents');
  }finally{Date.now=realNow;}
  const nodes={vipSearch:{value:''},vipResults:{innerHTML:''}};
  const members=[{memberId:'low',canonical:'Low',nickname:'Low',current:true,level:30,eligibility:{eligible:false,reason:'score_low'}},{memberId:'high',canonical:'High',nickname:'High',current:true,level:30,eligibility:{eligible:true,reason:'eligible'}},{memberId:'later',canonical:'Later',nickname:'Later',current:true,level:20,eligibility:{eligible:true,reason:'eligible'}},{memberId:'temp',canonical:'Temp',nickname:'Temp',current:true,level:20,eligibility:{eligible:false,reason:'temporary'}},{memberId:'permanent',canonical:'Permanent',nickname:'Permanent',current:true,eligibility:{eligible:false,reason:'permanent'}}];

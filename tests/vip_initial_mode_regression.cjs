@@ -21,7 +21,8 @@ async function run(){
  const snapshot={providedOn:'2026-11-07',appliesOn:'2026-11-09',coverage:'full',rows:[{memberId:'normal',nickname:'Normal fixture',points:54999999},{memberId:'temporary',nickname:'DrBillX',points:55000000},{memberId:'permanent',nickname:'Permanent fixture',points:99000000}]};
  assert.equal((await request(api,{revision:0,snapshot})).status,200);
  view=await(await api.GET(new Request(origin+'/api/carriage/vip'))).json();assert.equal(view.awaitingFirstSnapshot,true,'first upload waits for Sunday');assert.equal(view.members.find(m=>m.memberId==='temporary').eligibility.reason,'score_low');
- now=Date.parse('2026-11-08T15:00Z');view=await(await api.GET(new Request(origin+'/api/carriage/vip'))).json();assert.equal(view.awaitingFirstSnapshot,false);assert.equal(view.threshold,55000000);
+ now=Date.parse('2026-11-09T02:00Z'); // 2026-11-08 rule: Monday 11:00 KST
+ view=await(await api.GET(new Request(origin+'/api/carriage/vip'))).json();assert.equal(view.awaitingFirstSnapshot,false);assert.equal(view.threshold,55000000);
  assert.equal(view.members.find(m=>m.memberId==='normal').eligibility.reason,'score_low','54,999,999 is below 55,000,000');assert.equal(view.members.find(m=>m.memberId==='temporary').eligibility.eligible,true,'55,000,000 qualifies');assert.equal(view.members.find(m=>m.memberId==='permanent').eligibility.reason,'permanent');
  let r=await request(state,{kind:'carriage',revision:0,data:{...original,records:[ride('allowed','DrBillX','temporary')]}});assert.equal(r.status,200,await r.clone().text());
  const saved=JSON.parse(f.sql.prepare("SELECT payload FROM documents WHERE kind='carriage'").get().payload);assert.equal(saved.records.length,1);assert.equal(saved.vipCarry['공 주'],1);assert.equal(saved.vipCarry.Other,999);assert.deepEqual(saved.vipExcludedMembers,{permanent:1});

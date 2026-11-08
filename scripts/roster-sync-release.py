@@ -41,7 +41,10 @@ class Release(roster.Release):
         old=self.load('roster-before.json');current=json.loads(self.public('/api/growth/current'));legacy=json.loads(self.public('/api/growth/legacy'));vip=json.loads(self.public('/api/carriage/vip'));auto=json.loads(self.public('/api/growth/automation'))
         assert auto['mode']==('fixture' if self.target=='staging' else 'production') and auto['ai_calls']==0
         if self.target=='staging':assert auto['external_calls']==0
-        assert vip['revision']==old['vip']['revision'] and vip['active']==old['vip']['active'] and vip['threshold'] in (old['vip']['threshold'],55000000)
+        # 2026-11-08 (user-approved): points apply from Monday 11:00 KST. The only allowed change in the
+        # points in force is that a week not yet due moves to pending and the earlier week stays in force.
+        held=bool(old['vip'].get('active') and vip.get('active') and vip.get('pending')) and vip['pending']==old['vip']['active'] and vip['active']['appliesOn']<vip['pending']['appliesOn']
+        assert vip['revision']==old['vip']['revision'] and (vip['active']==old['vip']['active'] or held) and vip['threshold'] in (old['vip']['threshold'],55000000)
         data=legacy['data'];ids={m['member_id'] for m in current['members']};assert ids=={m['member_id'] for m in data['members']} and len(ids)==data['guildCount']
         if data.get('roster'):
             # VIP roster follows the same confirmed roster (plus Sunday snapshot participants).
