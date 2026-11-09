@@ -1,0 +1,15 @@
+name: Find free (CC0) chiptune music for 핀볼 추첨 (read-only)
+# 2026-11-10: the user asked to find ~10 free upbeat 8-bit tracks on the web and add them.
+on:
+  push:
+    branches: [claude/new-session-narazy]
+    paths: ['.github/workflows/music-fetch.yml']
+permissions:
+  contents: read
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - run: python3 scripts/music-discover.py
