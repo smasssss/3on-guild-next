@@ -30,5 +30,5 @@ export async function POST(req:Request){
   const after=await readPinball();
   return response(req,{schema:'3on-pinball-v1',revision:after.revision,draws:after.data.draws});
  }catch(e){try{const saved=await committed?.();if(saved)return saved;}catch{/* 원래 오류를 알립니다 */}
-  return response(req,{error:e instanceof Error&&/확인해 주세요|낮은 참가자|맞지 않습니다/.test(e.message)?e.message:'추첨 기록을 저장하지 못했습니다. 다시 시도해 주세요.'},400);}
+  return response(req,{error:e instanceof Error&&/확인해 주세요|낮은 참가자|맞지 않습니다|쓰지 않습니다/.test(e.message)?e.message:'추첨 기록을 저장하지 못했습니다. 다시 시도해 주세요.'},400);}
 }
