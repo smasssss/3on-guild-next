@@ -1,5 +1,6 @@
 name: VIP queue report from the live Production page (read-only)
 # 2026-11-09: user asked for the VIP order as text for members with 40,000,000+ weekly points.
+# Rerun 1: render the real VIP picker after shared records load (counts and order exactly as on screen).
 on:
   push:
     branches: [claude/new-session-narazy]
