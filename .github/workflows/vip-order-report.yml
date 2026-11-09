@@ -1,0 +1,22 @@
+name: VIP queue report from the live Production page (read-only)
+# 2026-11-09: user asked for the VIP order as text for members with 40,000,000+ weekly points.
+on:
+  push:
+    branches: [claude/new-session-narazy]
+    paths: ['.github/workflows/vip-order-report.yml']
+permissions:
+  contents: read
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - run: npm install --prefix "$RUNNER_TEMP/pw" --no-audit --no-fund --ignore-scripts playwright-core@1.56.1
+      - name: VIP queue (40,000,000+ points)
+        run: |
+          cp scripts/vip-order-report.mjs "$RUNNER_TEMP/pw/report.mjs"
+          CHROME_BIN="$(command -v google-chrome)" node "$RUNNER_TEMP/pw/report.mjs" 40000000
