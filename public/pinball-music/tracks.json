@@ -1,0 +1,86 @@
+[
+ {
+  "key": "bgm01",
+  "kind": "music",
+  "title": "5 Chiptunes (Action)",
+  "author": "SubspaceAudio",
+  "seconds": 14.7
+ },
+ {
+  "key": "bgm02",
+  "kind": "music",
+  "title": "5 Chiptunes (Action)",
+  "author": "SubspaceAudio",
+  "seconds": 80.4
+ },
+ {
+  "key": "bgm03",
+  "kind": "music",
+  "title": "5 Chiptunes (Action)",
+  "author": "SubspaceAudio",
+  "seconds": 80.4
+ },
+ {
+  "key": "bgm04",
+  "kind": "music",
+  "title": "5 Chiptunes (Action)",
+  "author": "SubspaceAudio",
+  "seconds": 91.1
+ },
+ {
+  "key": "bgm05",
+  "kind": "music",
+  "title": "We Are Prophet - Happy, Energetic Tune",
+  "author": "TinyWorlds",
+  "seconds": 34.5
+ },
+ {
+  "key": "bgm06",
+  "kind": "music",
+  "title": "NES Shooter Music (5 tracks, 3 jingles)",
+  "author": "SketchyLogic",
+  "seconds": 46.8
+ },
+ {
+  "key": "bgm07",
+  "kind": "music",
+  "title": "NES Shooter Music (5 tracks, 3 jingles)",
+  "author": "SketchyLogic",
+  "seconds": 40.4
+ },
+ {
+  "key": "bgm08",
+  "kind": "music",
+  "title": "NES Shooter Music (5 tracks, 3 jingles)",
+  "author": "SketchyLogic",
+  "seconds": 25.7
+ },
+ {
+  "key": "bgm09",
+  "kind": "music",
+  "title": "Free Fall",
+  "author": "TAD",
+  "seconds": 92.2
+ },
+ {
+  "key": "bgm10",
+  "kind": "music",
+  "title": "Insert Coin",
+  "author": "megupets",
+  "seconds": 51.3
+ },
+ {
+  "key": "goal",
+  "kind": "sfx",
+  "title": "10 8bit coin sounds",
+  "author": "Luke.RUSTLTD",
+  "seconds": 3.2
+ },
+ {
+  "key": "win",
+  "kind": "sfx",
+  "title": "Victorious",
+  "author": "SpiderDave",
+  "seconds": 88.6
+ }
+]
