@@ -113,7 +113,18 @@
  const fmtN=n=>Number(n).toLocaleString('ko-KR');
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const palette=['#f59ab8','#6cc58e','#f2b84b','#7fb3ec','#b994ee','#f39168','#58cfc6','#e58ed2','#a5cc5a','#ef9f7b'];
- let records={revision:0,draws:[]},playing=null,manual=new Set(),manualTouched=false;
+ let records={revision:0,draws:[]},playing=null,manual=new Set(),manualTouched=false,tracks=[];
+ // 소리(모두 CC0 공개 저작물, 출처는 /pinball-music/CREDITS.md). 휴대폰은 누르는 순간에만 소리를 낼 수 있어 시작 버튼에서 켭니다.
+ const sound={bgm:null,fade:null};
+ function soundOn(){return !!$('pbSound')?.checked;}
+ function startMusic(seed){
+  stopMusic(true);if(!soundOn())return;const pick=$('pbTrack').value,music=tracks.filter(t=>t.kind==='music');
+  const n=pick==='auto'?(music.length?1+parseInt(seed,16)%music.length:1):Number(pick);
+  const a=new Audio('/pinball-music/bgm'+String(n).padStart(2,'0')+'.mp3?v=1');a.loop=true;a.volume=.55;a.play().catch(()=>{});sound.bgm=a;
+ }
+ function stopMusic(now){const a=sound.bgm;if(!a)return;clearInterval(sound.fade);if(now){a.pause();sound.bgm=null;return;}sound.fade=setInterval(()=>{a.volume=Math.max(0,a.volume-.05);if(a.volume<=0){a.pause();clearInterval(sound.fade);if(sound.bgm===a)sound.bgm=null;}},120);}
+ function effect(name){if(!soundOn())return;const a=new Audio('/pinball-music/'+name+'.mp3?v=1');a.volume=.8;a.play().catch(()=>{});}
+ async function loadTracks(){try{tracks=await (await fetch('/pinball-music/tracks.json?v=1')).json();}catch{tracks=[];}const sel=$('pbTrack');if(sel)sel.innerHTML='<option value="auto">추첨마다 자동</option>'+tracks.filter(t=>t.kind==='music').map((t,k)=>'<option value="'+(k+1)+'">'+(k+1)+'. '+esc(t.title)+'</option>').join('');}
  const view=()=>typeof carriageVip!=='undefined'?carriageVip.view:null;
  function settings(){return {source:document.querySelector('input[name="pbSource"]:checked')?.value||'auto',threshold:Number(String($('pbThreshold').value).replace(/[^0-9]/g,''))||0,includeFixed:$('pbFixed').checked,mode:$('pbMode').value,count:Math.max(1,Number($('pbCount').value)||1),course:$('pbCourse').value,slow:$('pbSlow').checked,speed:Number($('pbSpeed').value)||1};}
  function roster(){
@@ -160,6 +171,7 @@
  function confetti(){const c=$('pbConfetti'),ctx=c.getContext('2d'),w=c.width=c.clientWidth*devicePixelRatio,h=c.height=c.clientHeight*devicePixelRatio,bits=Array.from({length:120},()=>({x:Math.random()*w,y:-Math.random()*h,v:2+Math.random()*4,s:4+Math.random()*6,c:palette[Math.floor(Math.random()*palette.length)],a:Math.random()*6}));let k=0;(function tick(){ctx.clearRect(0,0,w,h);for(const b of bits){b.y+=b.v*devicePixelRatio;b.a+=.1;ctx.fillStyle=b.c;ctx.fillRect(b.x+Math.sin(b.a)*8,b.y,b.s,b.s*.6);}if(++k<240&&!$('pbPopup').hidden)requestAnimationFrame(tick);else ctx.clearRect(0,0,w,h);})();}
  function play(result,meta){
   if(playing)playing.stop=true;
+  if(!sound.bgm)startMusic(meta.seed);
   const box=$('pbStage'),canvas=$('pbCanvas'),ctx=canvas.getContext('2d'),b=result.sim.board,list=result.list;
   box.hidden=false;box.scrollIntoView({behavior:'smooth',block:'start'});
   const pickIdx=result.picks.map(id=>list.findIndex(p=>p.memberId===id)),hit=new Set(pickIdx),finish=result.sim.finish,order=result.sim.order,frames=result.sim.frames;
@@ -174,7 +186,7 @@
    const target=pickIdx.filter(i=>finish[i]>fi).sort((a,c)=>finish[a]-finish[c])[0];
    const ty=fi<b.mixFrames?0:target===undefined?b.height-viewH:pos[2*target+1]-viewH*.45;cam+=(Math.max(0,Math.min(b.height-viewH,ty))-cam)*.12;
    drawFrame(ctx,b,result,fi,cam,viewH,s,target);
-   while(shown<order.length&&finish[order[shown]]<=fi){const i=order[shown],p=list[i];const li=document.createElement('li');li.className=hit.has(i)?'pick':'';li.innerHTML='<span>'+(shown+1)+'</span><b>'+esc(p.nickname)+'</b>'+(hit.has(i)?'<i>당첨</i>':'');$('pbBoard').prepend(li);shown++;}
+   while(shown<order.length&&finish[order[shown]]<=fi){const i=order[shown],p=list[i];const li=document.createElement('li');li.className=hit.has(i)?'pick':'';li.innerHTML='<span>'+(shown+1)+'</span><b>'+esc(p.nickname)+'</b>'+(hit.has(i)?'<i>당첨</i>':'');$('pbBoard').prepend(li);shown++;if(hit.has(i)&&f<frames.length-1)effect('goal');}
    if(fi>=frames.length-1&&shown>=order.length){finishPlay(result,meta);return;}
    const opt=settings(),near=target!==undefined&&pos[2*target+1]>b.goalY-240&&fi>=b.mixFrames;
    f+=opt.speed*(opt.slow&&near?.3:1);requestAnimationFrame(tick);
@@ -184,7 +196,7 @@
  function finishPlay(result,meta){
   const names=result.picks.map(id=>result.list.find(p=>p.memberId===id).nickname),title=(meta.mode==='first'?'먼저':'늦게')+' 들어온 '+result.picks.length+'명';
   $('pbResult').hidden=false;$('pbResultTitle').textContent=title+' · 추첨 번호 '+meta.seed+(result.sim.timedOut?' · 시간 초과로 남은 구슬은 골에 가까운 순서':'');$('pbResultText').value=names.join('\n');
-  $('pbPopupNames').innerHTML=names.map(n=>'<li>'+esc(n)+'</li>').join('');$('pbPopupTitle').textContent=title;$('pbPopup').hidden=false;confetti();
+  $('pbPopupNames').innerHTML=names.map(n=>'<li>'+esc(n)+'</li>').join('');$('pbPopupTitle').textContent=title;$('pbPopup').hidden=false;confetti();stopMusic(false);effect('win');
  }
  async function api(path,options){return typeof sharedRequest==='function'?sharedRequest(path,options):(await fetch(path,{cache:'no-store'})).json();}
  async function loadRecords(){try{records=await api('/api/pinball');}catch(e){records={revision:0,draws:[],error:e.message};}renderRecords();}
@@ -194,20 +206,21 @@
   if(!records.draws.length){el.innerHTML='<p class="sub">아직 기록이 없습니다.</p>';return;}
   el.innerHTML=records.draws.map(d=>{const names=d.picks.map(id=>d.participants.find(p=>p.memberId===id)?.nickname||id);return '<details class="pb-record"><summary><b>'+esc(new Date(d.at).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}))+'</b><span>'+(d.source==='manual'?'직접 선택':fmtN(d.threshold)+'점 이상')+' '+d.participants.length+'명 · '+(d.mode==='first'?'먼저':'늦게')+' 들어온 '+d.count+'명 · '+d.course+'번 코스 · 추첨 번호 '+esc(d.seed)+'</span></summary><ol>'+names.map(n=>'<li>'+esc(n)+'</li>').join('')+'</ol><div class="actions"><button type="button" class="btn ghost" data-replay="'+esc(d.id)+'">다시 보기</button></div></details>';}).join('');
   el.querySelectorAll('[data-replay]').forEach(btn=>btn.onclick=()=>{const d=records.draws.find(x=>x.id===btn.dataset.replay);if(!d)return;const result=run(d.participants,d.seed,d.mode,d.count,d.course);
-   if(JSON.stringify(result.order)!==JSON.stringify(d.order))showNoticeSafe('다시 계산한 결과가 기록과 다릅니다. 관리자에게 알려 주세요.');play(result,d);});
+   if(JSON.stringify(result.order)!==JSON.stringify(d.order))showNoticeSafe('다시 계산한 결과가 기록과 다릅니다. 관리자에게 알려 주세요.');startMusic(d.seed);play(result,d);});
  }
  function showNoticeSafe(m){if(typeof showNotice==='function')showNotice(m);else alert(m);}
  async function start(){
   if(typeof ensureAdmin==='function'&&!ensureAdmin())return;
   const list=candidates(),s=settings();if(!list||!list.length)return;
   const count=Math.min(s.count,list.length),seed=Array.from(crypto.getRandomValues(new Uint8Array(4)),x=>x.toString(16).padStart(2,'0')).join('');
+  startMusic(seed);
   const course=s.course==='random'?1+parseInt(seed,16)%COURSES.length:Number(s.course);
   const participants=list.map(m=>({memberId:m.memberId,nickname:m.nickname,points:m.points}));
   const result=run(participants,seed,s.mode,count,course);
   const drawRec={id:crypto.randomUUID(),seed,source:s.source,threshold:s.source==='auto'?s.threshold:0,includeFixed:s.includeFixed,mode:s.mode,count,course,week:view().active?.appliesOn||null,participants:result.list,order:result.order,picks:result.picks,timedOut:result.sim.timedOut};
   $('pbStart').disabled=true;
   try{records=await api('/api/pinball',{method:'POST',body:JSON.stringify({revision:records.revision,mutation:crypto.randomUUID(),draw:drawRec})});renderRecords();}
-  catch(e){showNoticeSafe('추첨 기록을 저장하지 못해 추첨을 시작하지 않았습니다. '+e.message);$('pbStart').disabled=false;return;}
+  catch(e){stopMusic(true);showNoticeSafe('추첨 기록을 저장하지 못해 추첨을 시작하지 않았습니다. '+e.message);$('pbStart').disabled=false;return;}
   $('pbStart').disabled=false;play(result,drawRec);
  }
  function init(){
@@ -220,7 +233,9 @@
    +'<div class="field"><label for="pbMode">뽑는 방식</label><select id="pbMode"><option value="first">먼저 들어온 사람</option><option value="last">늦게 들어온 사람</option></select></div>'
    +'<div class="field"><label for="pbCount">뽑는 인원</label><input id="pbCount" type="number" min="1" max="150" value="5" inputmode="numeric"></div>'
    +'<div class="field"><label for="pbSpeed">배속</label><select id="pbSpeed"><option value="0.5">0.5배</option><option value="1" selected>1배</option><option value="2">2배</option><option value="3">3배</option></select></div>'
-   +'<div class="field pb-check"><label><input id="pbSlow" type="checkbox" checked> 끝나기 전 느린 화면</label></div></div>'
+   +'<div class="field pb-check"><label><input id="pbSlow" type="checkbox" checked> 끝나기 전 느린 화면</label></div>'
+   +'<div class="field"><label for="pbTrack">배경음악</label><select id="pbTrack"><option value="auto">추첨마다 자동</option></select></div>'
+   +'<div class="field pb-check"><label><input id="pbSound" type="checkbox" checked> 소리 켜기</label></div></div>'
    +'<p class="sub" id="pbSummary" role="status"></p><div class="actions"><button type="button" class="btn primary" id="pbStart">추첨 시작</button></div></div>'
    +'<div class="card" id="pbStage" hidden><p class="sub" id="pbCourseName"></p><div class="pb-controls"><button type="button" class="smallbtn" id="pbSkip">결과 바로 보기</button><span class="sub">배속과 느린 화면은 위 설정을 바꾸면 바로 적용됩니다.</span></div>'
    +'<div class="pb-stage-grid"><div class="pb-canvas-wrap"><canvas id="pbCanvas" aria-label="핀볼 추첨 화면"></canvas><div class="pb-popup" id="pbPopup" hidden><canvas id="pbConfetti"></canvas><div class="pb-popup-card"><p>당첨 결과</p><h3 id="pbPopupTitle"></h3><ol id="pbPopupNames"></ol><button type="button" class="btn primary" id="pbPopupClose">확인</button></div></div></div><div>'
@@ -236,7 +251,9 @@
   $('pbSelNone').onclick=()=>{manualTouched=true;manual=new Set();renderManual();summary();};
   $('pbStart').onclick=start;$('pbPopupClose').onclick=()=>{$('pbPopup').hidden=true;};
   $('pbCopy').onclick=async()=>{try{await navigator.clipboard.writeText($('pbResultText').value);showNoticeSafe('결과를 복사했습니다.');}catch{$('pbResultText').select();}};
-  summary();loadRecords();
+  summary();loadRecords();loadTracks();
+  $('pbSound').addEventListener('change',()=>{if(!soundOn())stopMusic(true);});
+  $('pbPopupClose').addEventListener('click',()=>stopMusic(true));
   if(typeof refreshCarriageVip==='function'&&!view())refreshCarriageVip().then(()=>{renderManual();summary();},summary);
   const timer=setInterval(()=>{if(view()){renderManual();summary();clearInterval(timer);}},1000);
  }
