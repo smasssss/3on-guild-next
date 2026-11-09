@@ -1,16 +1,25 @@
-name: Find free (CC0) chiptune music for 핀볼 추첨 (read-only)
+name: Download the chosen CC0 chiptune music for 핀볼 추첨
 # 2026-11-10: the user asked to find ~10 free upbeat 8-bit tracks on the web and add them.
-# Rerun 1: print only CC0 pages and their main audio files.
+# Downloads 10 CC0 tracks + 2 CC0 sound effects from OpenGameArt (license re-checked per page),
+# normalizes them to small mono MP3s and commits them to public/pinball-music on this branch.
 on:
   push:
     branches: [claude/new-session-narazy]
     paths: ['.github/workflows/music-fetch.yml']
 permissions:
-  contents: read
+  contents: write
 jobs:
-  discover:
+  download:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
-      - run: python3 scripts/music-discover.py
+      - run: sudo apt-get install -y -qq ffmpeg >/dev/null
+      - run: python3 scripts/music-download.py
+      - name: Commit the files to this branch (no deploy is triggered)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/pinball-music
+          git commit -m "Add CC0 chiptune music and sound effects for 핀볼 추첨 (downloaded by CI)"
+          git push origin HEAD:claude/new-session-narazy
