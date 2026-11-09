@@ -53,7 +53,7 @@ body{background:var(--bg);font-family:var(--font);line-height:1.5;-webkit-font-s
 @media(max-width:999px){
  .ops-side .hero p{display:none}
  .ops-side .proto{margin-top:10px;font-size:11.5px;padding:8px 11px}
- .tabs{position:fixed;inset:auto 0 0 0;z-index:60;display:grid;grid-template-columns:repeat(5,1fr);gap:0;padding:6px 4px calc(6px + env(safe-area-inset-bottom));background:rgba(255,248,217,.97);backdrop-filter:blur(12px);border:0;border-top:1px solid var(--hair);overflow:visible}
+ .tabs{position:fixed;inset:auto 0 0 0;z-index:60;display:grid;grid-template-columns:repeat(6,1fr);gap:0;padding:6px 4px calc(6px + env(safe-area-inset-bottom));background:rgba(255,248,217,.97);backdrop-filter:blur(12px);border:0;border-top:1px solid var(--hair);overflow:visible}
  .tabs button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:56px;border:0;border-radius:12px;background:transparent;color:var(--muted);padding:6px 2px;font-size:11px;font-weight:600;line-height:1.2;word-break:keep-all;white-space:normal;text-align:center}
  .tabs button.active{background:var(--accent-soft);color:#000;border:0}
  #exitToast{bottom:96px}#appNotice{bottom:90px}
@@ -250,3 +250,21 @@ p,.sub,.notice,.preview,.guide,.callout,.note,summary,h1,h2,h3{text-wrap:pretty}
 html.ops-wait body{visibility:hidden}
 /* 성장추적 화면 틀: 내용이 뜨기 전 잠깐 보이던 검은 사각형 대신 바탕과 같은 연분홍으로 둡니다. */
 #growthFrame{background:var(--bg)!important;color-scheme:light}
+
+/* 핀볼 추첨 메뉴(pinball.js). 아이콘: Lucide 트로피(ISC 라이선스) */
+.tabs button[data-tab="pinball"]{--icon:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9H4.5a2.5 2.5 0 0 1 0-5H6'/%3E%3Cpath d='M18 9h1.5a2.5 2.5 0 0 0 0-5H18'/%3E%3Cpath d='M4 22h16'/%3E%3Cpath d='M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22'/%3E%3Cpath d='M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22'/%3E%3Cpath d='M18 2H6v7a6 6 0 0 0 12 0V2Z'/%3E%3C/svg%3E")}
+@media(max-width:999px){.tabs button{font-size:11.5px;padding:6px 1px}}
+#pinball .pb-check label{display:flex;align-items:center;gap:8px;min-height:44px;color:var(--text);font-size:15px}
+#pinball .pb-check input{width:22px;height:22px;accent-color:#d6578a}
+#pbStage canvas{display:block;width:100%;border:1px solid var(--hair);border-radius:12px;background:#fffaf0}
+.pb-stage-grid{display:grid;gap:14px;margin-top:10px}.pb-canvas-wrap{width:100%;max-width:440px;margin:0 auto;min-width:0}
+@media(min-width:900px){.pb-stage-grid{grid-template-columns:minmax(0,440px) minmax(0,1fr);align-items:start}.pb-canvas-wrap{margin:0}.pb-board{max-height:560px}}
+.pb-controls{display:flex;gap:8px;flex-wrap:wrap}
+.pb-board{list-style:none;padding:0;margin:8px 0 0;display:grid;gap:6px;max-height:320px;overflow:auto}
+.pb-board li{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--hair);border-radius:10px;background:#fff;font-size:15px}
+.pb-board li span{min-width:2.2em;color:var(--muted)}.pb-board li em{margin-left:auto;font-style:normal;color:var(--muted);font-size:13px}
+.pb-board li.pick{background:var(--accent-soft);border-color:var(--accent)}.pb-board li i{font-style:normal;font-weight:800;color:#b03a6a}
+#pbResult textarea{width:100%;font:inherit;font-size:16px;border:1px solid var(--line);border-radius:10px;background:var(--well);padding:10px;margin-top:6px}
+.pb-record{border:1px solid var(--hair);border-radius:12px;padding:10px 12px;margin-top:8px;background:var(--well)}
+.pb-record summary{display:flex;flex-direction:column;gap:2px;cursor:pointer}.pb-record summary span{color:var(--muted);font-size:14px}
+.pb-record ol{margin:8px 0 0 1.4em}
