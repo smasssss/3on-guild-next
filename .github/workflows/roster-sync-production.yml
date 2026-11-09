@@ -12,6 +12,7 @@ name: Promote roster sync to Production after a fresh Staging verification (user
 # Release 12 (user-approved 2026-11-08, Workers paid plan): VIP roster check one lookup per member (was ~16M D1 rows per save), VIP eligibility from Monday.
 # Release 13 (user-approved 2026-11-08 "웹 버그 수정 Production 배포 승인"): VIP check reads one row per member; a save D1 committed is reported as saved. The Monday 11:00 VIP rule waits for Monday.
 # Release 14 (user-approved 2026-11-08 "VIP 기록 되돌리기와 Production 배포 승인"): VIP points in force from Monday 11:00 KST; last week held until then.
+# Release 15 (user-approved 2026-11-09 "승인" for 핀볼 추첨 Production 배포): new 핀볼 추첨 menu (race marbles, 10 courses, admin-only records in their own 'pinball' kind) with CC0 chiptune music.
 on:
   push:
     branches: [claude/new-session-narazy]
@@ -48,6 +49,7 @@ jobs:
         run: |
           npx --no-install eslint lib/vip-weekly.ts lib/validate.ts app/api/state/route.ts app/api/carriage/vip/route.ts public/carriage-vip.js scripts/growth-auto-ui.mjs scripts/growth-roster-browser.mjs tests/vip-fixture.cjs tests/vip_*regression.cjs
           npx --no-install eslint lib/growth-roster.ts lib/growth.ts lib/growth-automation.ts app/api/growth/legacy/route.ts tests/growth_roster_regression.cjs tests/roster_restored_check.cjs tests/roster_sync_regression.cjs public/growth-auto.js
+          npx --no-install eslint lib/pinball.ts app/api/pinball/route.ts public/pinball.js tests/pinball_regression.cjs
           npx --no-install tsc --noEmit
           python tests/vip_release_guards.py
           python tests/weekly_release_guards.py
@@ -66,6 +68,7 @@ jobs:
           node tests/vip_weekly_import_regression.cjs
           node tests/save_recovery_regression.cjs
           node tests/vip_weekly_hold_regression.cjs
+          node tests/pinball_regression.cjs
           node tests/vip_sunday_regression.cjs
           node tests/weekly_input_regression.cjs
           node tests/vip_weekly_regression.cjs
