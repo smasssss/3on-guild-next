@@ -4,83 +4,95 @@
   "kind": "music",
   "title": "5 Chiptunes (Action)",
   "author": "SubspaceAudio",
-  "seconds": 14.7
+  "seconds": 13.9,
+  "label": "액션 칩튠 · 타이틀"
  },
  {
   "key": "bgm02",
   "kind": "music",
   "title": "5 Chiptunes (Action)",
   "author": "SubspaceAudio",
-  "seconds": 80.4
+  "seconds": 80.4,
+  "label": "액션 칩튠 · 1단계"
  },
  {
   "key": "bgm03",
   "kind": "music",
   "title": "5 Chiptunes (Action)",
   "author": "SubspaceAudio",
-  "seconds": 80.4
+  "seconds": 80.4,
+  "label": "액션 칩튠 · 2단계"
  },
  {
   "key": "bgm04",
   "kind": "music",
   "title": "5 Chiptunes (Action)",
   "author": "SubspaceAudio",
-  "seconds": 91.1
+  "seconds": 91.1,
+  "label": "액션 칩튠 · 3단계"
  },
  {
   "key": "bgm05",
   "kind": "music",
   "title": "We Are Prophet - Happy, Energetic Tune",
   "author": "TinyWorlds",
-  "seconds": 34.5
+  "seconds": 34.5,
+  "label": "신나는 행진"
  },
  {
   "key": "bgm06",
   "kind": "music",
   "title": "NES Shooter Music (5 tracks, 3 jingles)",
   "author": "SketchyLogic",
-  "seconds": 46.8
+  "seconds": 46.8,
+  "label": "우주 슈팅 · 화성"
  },
  {
   "key": "bgm07",
   "kind": "music",
   "title": "NES Shooter Music (5 tracks, 3 jingles)",
   "author": "SketchyLogic",
-  "seconds": 40.4
+  "seconds": 40.4,
+  "label": "우주 슈팅 · 수성"
  },
  {
   "key": "bgm08",
   "kind": "music",
   "title": "NES Shooter Music (5 tracks, 3 jingles)",
   "author": "SketchyLogic",
-  "seconds": 25.7
+  "seconds": 25.7,
+  "label": "우주 슈팅 · 금성"
  },
  {
   "key": "bgm09",
   "kind": "music",
   "title": "Free Fall",
   "author": "TAD",
-  "seconds": 92.2
+  "seconds": 92.2,
+  "label": "자유 낙하"
  },
  {
   "key": "bgm10",
   "kind": "music",
   "title": "Insert Coin",
   "author": "megupets",
-  "seconds": 51.3
+  "seconds": 51.3,
+  "label": "동전 넣기"
  },
  {
   "key": "goal",
   "kind": "sfx",
   "title": "10 8bit coin sounds",
   "author": "Luke.RUSTLTD",
-  "seconds": 3.2
+  "seconds": 3.2,
+  "label": "골인 동전 소리"
  },
  {
   "key": "win",
   "kind": "sfx",
   "title": "Victorious",
   "author": "SpiderDave",
-  "seconds": 88.6
+  "seconds": 9.0,
+  "label": "결과 축하 소리"
  }
 ]

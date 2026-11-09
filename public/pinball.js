@@ -120,11 +120,11 @@
  function startMusic(seed){
   stopMusic(true);if(!soundOn())return;const pick=$('pbTrack').value,music=tracks.filter(t=>t.kind==='music');
   const n=pick==='auto'?(music.length?1+parseInt(seed,16)%music.length:1):Number(pick);
-  const a=new Audio('/pinball-music/bgm'+String(n).padStart(2,'0')+'.mp3?v=1');a.loop=true;a.volume=.55;a.play().catch(()=>{});sound.bgm=a;
+  const a=new Audio('/pinball-music/bgm'+String(n).padStart(2,'0')+'.mp3?v=2');a.loop=true;a.volume=.55;a.play().catch(()=>{});sound.bgm=a;
  }
  function stopMusic(now){const a=sound.bgm;if(!a)return;clearInterval(sound.fade);if(now){a.pause();sound.bgm=null;return;}sound.fade=setInterval(()=>{a.volume=Math.max(0,a.volume-.05);if(a.volume<=0){a.pause();clearInterval(sound.fade);if(sound.bgm===a)sound.bgm=null;}},120);}
- function effect(name){if(!soundOn())return;const a=new Audio('/pinball-music/'+name+'.mp3?v=1');a.volume=.8;a.play().catch(()=>{});}
- async function loadTracks(){try{tracks=await (await fetch('/pinball-music/tracks.json?v=1')).json();}catch{tracks=[];}const sel=$('pbTrack');if(sel)sel.innerHTML='<option value="auto">추첨마다 자동</option>'+tracks.filter(t=>t.kind==='music').map((t,k)=>'<option value="'+(k+1)+'">'+(k+1)+'. '+esc(t.title)+'</option>').join('');}
+ function effect(name){if(!soundOn())return;const a=new Audio('/pinball-music/'+name+'.mp3?v=2');a.volume=.8;a.play().catch(()=>{});}
+ async function loadTracks(){try{tracks=await (await fetch('/pinball-music/tracks.json?v=2')).json();}catch{tracks=[];}const sel=$('pbTrack');if(sel)sel.innerHTML='<option value="auto">추첨마다 자동</option>'+tracks.filter(t=>t.kind==='music').map((t,k)=>'<option value="'+(k+1)+'">'+(k+1)+'. '+esc(t.label||t.title)+'</option>').join('');}
  const view=()=>typeof carriageVip!=='undefined'?carriageVip.view:null;
  function settings(){return {source:document.querySelector('input[name="pbSource"]:checked')?.value||'auto',threshold:Number(String($('pbThreshold').value).replace(/[^0-9]/g,''))||0,includeFixed:$('pbFixed').checked,mode:$('pbMode').value,count:Math.max(1,Number($('pbCount').value)||1),course:$('pbCourse').value,slow:$('pbSlow').checked,speed:Number($('pbSpeed').value)||1};}
  function roster(){

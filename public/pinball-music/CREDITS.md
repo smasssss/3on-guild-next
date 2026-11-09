@@ -14,3 +14,5 @@
 - `bgm10.mp3` — "Insert Coin" by megupets — CC0 — https://opengameart.org/content/insert-coin (원본 파일: Insert Coin_2.mp3)
 - `goal.mp3` — "10 8bit coin sounds" by Luke.RUSTLTD — CC0 — https://opengameart.org/content/10-8bit-coin-sounds (원본 파일: coin.mp3)
 - `win.mp3` — "Victorious" by SpiderDave — CC0 — https://opengameart.org/content/victorious (원본 파일: 29 Victorious 8-bit.ogg)
+
+사이트에 맞게 손본 점: 모두 한 채널 96kbps로 바꾸고 소리 크기를 맞췄습니다. 배경음악은 최대 2분으로 자르고 끝을 서서히 줄였습니다. `bgm01.mp3`는 끝의 무음을 빼서 반복이 자연스럽게, `win.mp3`는 앞 9초만 쓰고 끝을 서서히 줄였습니다.
