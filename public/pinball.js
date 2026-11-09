@@ -13,7 +13,7 @@
  function rng(seedHex){let a=parseInt(seedHex,16)>>>0;return ()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
  const COURSES_V1=['벚꽃 계곡','회오리 탑','별빛 계단','바람개비 언덕','솜사탕 미로','폭포 협곡','풍선 정원','시계탑 골목','무지개 다리','마차 대로'];
  // 코스 1판(처음 배포)은 옛 기록을 똑같이 다시 보여 주려고 그대로 둡니다. 새 추첨은 2판 코스를 씁니다.
- const LAYOUT=2;
+ const LAYOUT=3; // 3판(2026-11-10): 2판 코스에 반전 장치(경사로 중간 구멍·여닫이 바닥, 워프, 골 앞 방해 장치)를 더함
  const COURSES=['벚꽃 강줄기','회오리 경사로','별빛 계단','바람개비 언덕','솜사탕 미로','폭포 협곡','풍선 핀볼장','시계탑 톱니','무지개 바람길','마차 대로'];
  // 구간 만들기: 각 함수는 y0부터 구간을 만들고 구간 높이를 돌려줍니다.
  const S={
@@ -67,13 +67,28 @@
   [['wind',{n:3}],['maze',{n:2}],['split'],['wind',{n:3}]],
   [['ramps',{n:3}],['split'],['river',{len:420}],['stairs',{dir:1}],['stairs',{dir:-1}],['river',{tri:true,len:300}]],
  ];
- function buildV2(course,r,yStart){
-  const o=[],zones=[],sign=()=>r()<.5?1:-1,clampX=x=>Math.max(2,Math.min(W-2,x));
+ // 워프: '지름길'은 두 구간 앞으로, '되돌이'는 두 구간 뒤로 보냅니다(구슬마다 문 하나는 한 번만). 도착점은 구간 맨 위의 넓은 곳입니다.
+ function placePortals(o,portals,sections,r,spots){
+  const open=['pegs','garden','maze','wind','clock','windmills','split','ramps','river'],pr=15,last=sections.length-1;
+  const clear=(x,y)=>o.every(ob=>{if(ob.t==='c')return Math.hypot(x-ob.x,y-ob.y)>ob.r+pr+3;if(ob.t==='rot')return Math.hypot(x-ob.cx,y-ob.cy)>ob.len+pr+3;
+   const ex=ob.x2-ob.x1,ey=ob.y2-ob.y1,l2=ex*ex+ey*ey||1;let t=((x-ob.x1)*ex+(y-ob.y1)*ey)/l2;t=Math.max(0,Math.min(1,t));return Math.hypot(x-ob.x1-ex*t,y-ob.y1-ey*t)>pr+3;});
+  const put=(idx,kind,to)=>{const s=sections[idx],mine=spots.filter(p=>p.y0===s.y0);if(mine.length){const p=mine[Math.floor(r()*mine.length)];portals.push({x:p.x,y:p.y,r:pr,kind,ty:sections[to].y0+6});return true;}for(let k=0;k<80;k++){const x=70+r()*(W-140),y=s.y0+40+r()*Math.max(1,s.h-90);if(clear(x,y)){portals.push({x,y,r:pr,kind,ty:sections[to].y0+6});return true;}}return false;};
+  const firstHalf=sections.map((s,k)=>k).filter(k=>k<=last/2&&k+1<=last&&open.includes(sections[k].name)),secondHalf=sections.map((s,k)=>k).filter(k=>k>=Math.max(1,last/2)&&open.includes(sections[k].name));
+  // 후보 구간을 무작위 순서로 시도하고, 두 문은 서로 다른 구간에 둡니다.
+  const shuffle=a=>{for(let k=a.length-1;k>0;k--){const j=Math.floor(r()*(k+1));[a[k],a[j]]=[a[j],a[k]];}return a;};let used=-1;
+  for(const k of shuffle(firstHalf))if(put(k,'jump',Math.min(last,k+2))){used=k;break;}
+  for(const k of shuffle(secondHalf.filter(k=>k!==used)))if(put(k,'back',Math.max(0,k-2)))break;
+ }
+ function buildV2(course,r,yStart,v3=false){
+  const o=[],zones=[],portals=[],sections=[],spots=[],sign=()=>r()<.5?1:-1,clampX=x=>Math.max(2,Math.min(W-2,x));
   const seg=(x1,y1,x2,y2,e)=>{const s={t:'s',x1,y1,x2,y2};if(e!==undefined)s.e=e;o.push(s);};
   const poly=(p,e)=>{for(let k=1;k<p.length;k++)seg(p[k-1][0],p[k-1][1],p[k][0],p[k][1],e);};
   const peg=(x,y,rr=4,e=.55)=>o.push({t:'c',x,y,r:rr,e});
   const rot=(cx,cy,len,w,arms=2)=>o.push({t:'rot',cx,cy,len,w,a0:r()*6.28,arms});
   const swing=(cx,cy,len,amp,w,base)=>o.push({t:'rot',cx,cy,len,w,amp,a0:base,ph:r()*6.28,arms:1,e:.8,swing:true});
+  // 3판 경사로: 중간에 구멍. 절반은 늘 열린 구멍, 절반은 몇 초마다 열렸다 닫히는 바닥(여닫이)입니다.
+  const ramp=(xa,ya,xb,yb)=>{if(!v3){seg(xa,ya,xb,yb);return;}const L=Math.hypot(xb-xa,yb-ya),t1=.3+r()*.35,t2=t1+34/L,P=t=>[xa+(xb-xa)*t,ya+(yb-ya)*t],p1=P(t1),p2=P(t2);
+   seg(xa,ya,p1[0],p1[1]);seg(p2[0],p2[1],xb,yb);if(r()<.5)o.push({t:'s',x1:p1[0],y1:p1[1],x2:p2[0],y2:p2[1],gate:{p:2.2+r()*1.6,open:.8,ph:r()*3}});};
   // 핀 밭: 짝수 줄은 양끝 벽에 반쪽 핀(벽 타고 내려가는 길을 막음), 홀수 줄은 사이사이. 틈은 늘 구슬 지름 이상.
   const pegField=(x0,x1,y0,rows,gapY=38)=>{const m=Math.max(2,Math.floor((x1-x0)/40)),sp=(x1-x0)/m;for(let k=0;k<rows;k++){const yy=y0+k*gapY;if(k%2===0)for(let j=0;j<=m;j++){const edge=j===0||j===m;peg(x0+j*sp,yy,edge?10:4,edge?.6:.55);}else for(let j=0;j<m;j++)peg(x0+(j+.5)*sp,yy,4,.55);}};
   // 벽을 타고 내려가는 구슬을 안쪽으로 밀어 주는 짧은 경사
@@ -85,17 +100,21 @@
     for(let t=0;t<=len+1e-6;t+=step){L.push([clampX(cx(t)-hw),top+t]);Rt.push([clampX(cx(t)+hw),top+t]);}
     seg(0,y0+10,L[0][0],top);seg(W,y0+10,Rt[0][0],top);poly(L,.3);poly(Rt,.3);
     for(let t=period/4;t<len-20;t+=period/2)peg(cx(t),top+t,6,.7);
+   for(let t=period/2;t<len-40;t+=period/2)spots.push({y0,x:cx(t),y:top+t});
     return 60+len+40;},
    // 지그재그 경사로: 벽에서 벽으로 굴러가 반대편 구멍으로 떨어집니다.
    ramps(y0,{n=4}){let d=sign();const hole=54,drop=55;
-    for(let i=0;i<n;i++){const y=y0+30+i*100;if(d>0)seg(0,y,W-hole,y+drop);else seg(W,y,hole,y+drop);peg(W/2+d*(r()*60-30),y+drop/2-30,8,1.1);d=-d;}
+    for(let i=0;i<n;i++){const y=y0+30+i*100;if(d>0)ramp(0,y,W-hole,y+drop);else ramp(W,y,hole,y+drop);peg(W/2+d*(r()*60-30),y+drop/2-30,8,1.1);d=-d;}
     return 30+n*100+30;},
    // 계단: 한 칸씩 통통 튀며 한쪽으로 내려가고, 끝 구멍으로 떨어집니다.
    stairs(y0,{dir=1}){const n=7,gap=56,sw=(W-gap)/n,rise=24,pts=[];let x=dir>0?0:W,y=y0+20;pts.push([x,y]);
     for(let k=0;k<n;k++){x+=dir*sw;y+=8;pts.push([x,y]);if(k<n-1){y+=rise;pts.push([x,y]);}}
-    poly(pts,.3);return y-y0+60;},
+    if(!v3)poly(pts,.3);else{const trap=new Set();while(trap.size<2)trap.add(1+Math.floor(r()*5));
+     // 3판: 계단 두 칸은 몇 초마다 열리는 여닫이 바닥(열리면 아래 계단으로 지름길)
+     for(let k=1;k<pts.length;k++){const a=pts[k-1],c=pts[k],tread=(k-1)%2===0,step=(k-1)/2;if(tread&&trap.has(step))o.push({t:'s',x1:a[0],y1:a[1],x2:c[0],y2:c[1],e:.3,gate:{p:2+r()*1.5,open:.7,ph:r()*3}});else seg(a[0],a[1],c[0],c[1],.3);}}
+    return y-y0+60;},
    // 바람개비 사슬: 큰 바람개비 세 개를 경사로가 번갈아 이어 줍니다.
-   windmills(y0){const s=sign();rot(W*.32,y0+100,92,1.5*s,4);seg(0,y0+200,W*.58,y0+250);rot(W*.68,y0+320,92,-1.5*s,4);seg(W,y0+420,W*.42,y0+470);rot(W*.32,y0+540,92,1.5*s,4);return 660;},
+   windmills(y0){const s=sign();rot(W*.32,y0+100,92,1.5*s,4);ramp(0,y0+200,W*.58,y0+250);rot(W*.68,y0+320,92,-1.5*s,4);ramp(W,y0+420,W*.42,y0+470);rot(W*.32,y0+540,92,1.5*s,4);return 660;},
    // 구멍 미로: 층마다 구멍 위치가 달라 좌우로 굴러 구멍을 찾아 내려갑니다.
    maze(y0,{n=5}){for(let i=0;i<n;i++){const y=y0+30+i*90;
      if(r()<.4){const a=45+r()*90,b=W-45-r()*90,m=(a+b)/2;seg(0,y,a-22,y+28);seg(a+22,y+28,m,y);seg(m,y,b-22,y+28);seg(b+22,y+28,W,y);}
@@ -124,26 +143,34 @@
     const a0=pegLeft?mid:0,a1=pegLeft?W:mid;for(let k=0;k<3;k++){const yy=y0+95+k*100;if(k%2===0)seg(a0,yy,a1-42,yy+45);else seg(a1,yy,a0+42,yy+45);}
     return len+20;},
   };
-  let y=yStart;for(const [name,opt] of RECIPES2[(course-1)%RECIPES2.length])y+=T[name](y,opt||{});
-  return {o,zones,y};
+  let y=yStart;for(const [name,opt] of RECIPES2[(course-1)%RECIPES2.length]){const h=T[name](y,opt||{});sections.push({name,y0:y,h});y+=h;}
+  if(v3)placePortals(o,portals,sections,r,spots);
+  return {o,zones,y,portals};
  }
  const boards=new Map();
  function board(course=1,layout=LAYOUT){
   const key=course+'/'+layout;if(boards.has(key))return boards.get(key);
-  const r=rng((0x9E3779B1*course>>>0).toString(16));let o=[],zones=[],y=CHAMBER+20,theme=null;
+  const r=rng((0x9E3779B1*course>>>0).toString(16));let o=[],zones=[],portals=[],y=CHAMBER+20,theme=null;
   if(layout===1){
    for(const name of RECIPES[(course-1)%RECIPES.length])y+=S[name](o,y,r);
    // 벽과 원형 장애물 사이에 구슬보다 좁은 틈이 생기지 않게 합니다(끼임 방지).
    for(const ob of o)if(ob.t==='c'){if(ob.x-ob.r>0&&ob.x-ob.r<2*R+4)ob.x=0;if(W-ob.x-ob.r>0&&W-ob.x-ob.r<2*R+4)ob.x=W;}
-  }else{const built=buildV2(course,r,y);o=built.o;zones=built.zones;y=built.y;theme=THEMES[(course-1)%THEMES.length];}
+  }else{const built=buildV2(course,r,y,layout>=3);o=built.o;zones=built.zones;portals=built.portals;y=built.y;theme=THEMES[(course-1)%THEMES.length];}
+  // 3판 대기 문: 골 앞 깔때기 바닥이 몇 초마다 잠깐 열려, 먼저 온 구슬도 뒤따라온 구슬과 함께 다시 섞여 내려갑니다.
+  if(layout>=3){o.push({t:'s',x1:0,y1:y+20,x2:W/2-45,y2:y+70},{t:'s',x1:W/2-45,y1:y+70,x2:W/2+45,y2:y+70,gate:{p:3.6,open:1.4,ph:0},hold:true},{t:'s',x1:W/2+45,y1:y+70,x2:W,y2:y+20});y+=110;}
   const goalTop=y+20,goalY=goalTop+170,gap=36;
   o.push({t:'s',x1:0,y1:goalTop,x2:W/2-gap/2,y2:goalY},{t:'s',x1:W,y1:goalTop,x2:W/2+gap/2,y2:goalY});
+  // 3판 골 앞 방해 장치: 좌우로 미끄러지는 막대, 튕겨 내는 범퍼, 골 구멍 위 회전 막대(먼저 와도 바로 못 들어갈 수 있음)
+  if(layout>=3){o.push({t:'slide',x1:W/2-35,y1:goalTop+70,x2:W/2+35,y2:goalTop+70,amp:70,w:1.6,ph:r()*6.28,e:.6});
+   o.push({t:'c',x:100,y:goalTop+60,r:12,e:1.3},{t:'c',x:W-100,y:goalTop+60,r:12,e:1.3});
+   o.push({t:'rot',cx:W/2,cy:goalY-40,len:30,w:(r()<.5?-1:1)*2.2,a0:r()*6.28,arms:2,guard:true});}
   // 무거운 계산을 줄이려고 장애물을 높이 구간별로 나눠 둡니다.
-  const buckets=new Map();for(const ob of o){const ext=ob.t==='c'?ob.r+R:ob.t==='rot'?ob.len+R:R;const ys=ob.t==='s'?[Math.min(ob.y1,ob.y2)-ext,Math.max(ob.y1,ob.y2)+ext]:[(ob.y??ob.cy)-ext,(ob.y??ob.cy)+ext];for(let k=Math.floor(ys[0]/BUCKET);k<=Math.floor(ys[1]/BUCKET);k++){if(!buckets.has(k))buckets.set(k,[]);buckets.get(k).push(ob);}}
-  const b={W,R,course,layout,name:(layout===1?COURSES_V1:COURSES)[(course-1)%COURSES.length],obstacles:o,zones,theme,buckets,goalY,goalGap:gap,height:goalY+60,chamber:CHAMBER,mixFrames:MIX_FRAMES};
+  const buckets=new Map();for(const ob of o){const ext=ob.t==='c'?ob.r+R:ob.t==='rot'?ob.len+R:R;const ys=ob.t==='s'||ob.t==='slide'?[Math.min(ob.y1,ob.y2)-ext,Math.max(ob.y1,ob.y2)+ext]:[(ob.y??ob.cy)-ext,(ob.y??ob.cy)+ext];for(let k=Math.floor(ys[0]/BUCKET);k<=Math.floor(ys[1]/BUCKET);k++){if(!buckets.has(k))buckets.set(k,[]);buckets.get(k).push(ob);}}
+  const b={W,R,course,layout,name:(layout===1?COURSES_V1:COURSES)[(course-1)%COURSES.length],obstacles:o,zones,portals,theme,buckets,goalY,goalGap:gap,height:goalY+60,chamber:CHAMBER,mixFrames:MIX_FRAMES};
   boards.set(key,b);return b;
  }
  // 회전 막대는 계속 돌고(w), 시계추·플리퍼는 좌우로 흔들립니다(amp).
+ const gateOpen=(ob,t)=>((t+ob.gate.ph)%ob.gate.p)<ob.gate.open,slideAt=(ob,t)=>ob.amp*Math.sin(ob.w*t+ob.ph);
  const angleAt=(ob,t)=>ob.amp?ob.a0+ob.amp*Math.sin(ob.w*t+ob.ph):ob.a0+ob.w*t,spinAt=(ob,t)=>ob.amp?ob.amp*ob.w*Math.cos(ob.w*t+ob.ph):ob.w;
  function armsAt(ob,t){const a=angleAt(ob,t),out=[];for(let k=0;k<ob.arms;k++){const ang=a+k*Math.PI*2/ob.arms;out.push([ob.cx,ob.cy,ob.cx+Math.cos(ang)*ob.len,ob.cy+Math.sin(ang)*ob.len]);}return out;}
  function hitSegment(st,i,x1,y1,x2,y2,e,vxs,vys){
@@ -156,7 +183,7 @@
  function simulate(count,seedHex,course=1,layout=LAYOUT){
   const b=board(course,layout),rand=rng(seedHex),dt=1/(FPS*SUB),maxFrames=FPS*MAX_SECONDS,n=count;
   const st={x:new Float64Array(n),y:new Float64Array(n),vx:new Float64Array(n),vy:new Float64Array(n)},{x,y,vx,vy}=st;
-  const done=new Int32Array(n).fill(-1),slow=new Int32Array(n);
+  const done=new Int32Array(n).fill(-1),slow=new Int32Array(n),np=b.portals.length,used=new Uint8Array(n*np);
   // 출발 통 안에 무작위 배치(추첨 번호로 섞음)
   const cols=Math.floor((W-2*R)/(2*R+3));for(let i=0;i<n;i++){x[i]=R+2+(i%cols)*(2*R+3)+rand()*2;y[i]=CHAMBER-R-2-Math.floor(i/cols)*(2*R+3);vx[i]=(rand()-.5)*60;vy[i]=0;}
   const frames=[],order=[];let frame=0;const cell=2*R,grid=new Map();
@@ -174,10 +201,12 @@
      const list=b.buckets.get(Math.floor(y[i]/BUCKET));
      if(list)for(const ob of list){
       if(ob.t==='c'){const dx=x[i]-ob.x,dy=y[i]-ob.y,d2=dx*dx+dy*dy,m=R+ob.r;if(d2<m*m&&d2>1e-9){const d=Math.sqrt(d2),nx=dx/d,ny=dy/d;x[i]=ob.x+nx*m;y[i]=ob.y+ny*m;const vn=vx[i]*nx+vy[i]*ny;if(vn<0){vx[i]-=(1+ob.e)*vn*nx;vy[i]-=(1+ob.e)*vn*ny;vx[i]+=(rand()-.5)*20;}}}
-      else if(ob.t==='s')hitSegment(st,i,ob.x1,ob.y1,ob.x2,ob.y2,ob.e??.35);
+      else if(ob.t==='s'){if(!ob.gate||!gateOpen(ob,t))hitSegment(st,i,ob.x1,ob.y1,ob.x2,ob.y2,ob.e??.35);}
+      else if(ob.t==='slide'){const dx=slideAt(ob,t),sv=ob.amp*ob.w*Math.cos(ob.w*t+ob.ph);hitSegment(st,i,ob.x1+dx,ob.y1,ob.x2+dx,ob.y2,ob.e??.5,()=>sv,()=>0);}
       else{const om=spinAt(ob,t);for(const a of armsAt(ob,t))hitSegment(st,i,a[0],a[1],a[2],a[3],ob.e??.45,(px,py)=>-om*(py-ob.cy),(px)=>om*(px-ob.cx));}
      }
      const sp=Math.hypot(vx[i],vy[i]);if(sp>950){vx[i]*=950/sp;vy[i]*=950/sp;}
+     if(!mixing)for(let p=0;p<np;p++){const q=b.portals[p];if(used[i*np+p])continue;const dx=x[i]-q.x,dy=y[i]-q.y;if(dx*dx+dy*dy<q.r*q.r){used[i*np+p]=1;x[i]=40+rand()*(W-80);y[i]=q.ty;vx[i]=(rand()-.5)*80;vy[i]=0;}}
      if(!mixing&&y[i]>b.goalY+R){done[i]=frame;order.push(i);}
     }
     grid.clear();for(let i=0;i<n;i++){if(done[i]>=0)continue;const key=Math.floor(x[i]/cell)*100000+Math.floor(y[i]/cell);const l=grid.get(key);if(l)l.push(i);else grid.set(key,[i]);}
@@ -199,7 +228,7 @@
   const picks=mode==='first'?order.slice(0,count):order.slice(order.length-count);
   return {list,sim,order,picks};
  }
- const engine={simulate,run,board,armsAt,angleAt,COURSES,LAYOUT};
+ const engine={simulate,run,board,armsAt,angleAt,gateOpen,slideAt,COURSES,LAYOUT};
  if(typeof module!=='undefined'&&module.exports){module.exports=engine;return;}
  root.pinballEngine=engine;
 
@@ -252,9 +281,12 @@
   for(const z of b.zones){if(z.y1<top||z.y0>bottom)continue;ctx.fillStyle=th.zone;ctx.fillRect(0,z.y0,b.W,z.y1-z.y0);ctx.fillStyle=th.arm;ctx.globalAlpha=.45;ctx.font='bold 16px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';const dir=z.ax>0?1:-1,shift=((t*60*dir)%60+60)%60;for(let yy=z.y0+18;yy<z.y1;yy+=34)for(let xx=-60+shift;xx<b.W+60;xx+=60)ctx.fillText(dir>0?'›':'‹',xx,yy);ctx.globalAlpha=1;}
   for(const ob of b.obstacles){
    if(ob.t==='c'){if(ob.y<top||ob.y>bottom)continue;ctx.fillStyle=ob.e>1?th.bump:th.peg;ctx.beginPath();ctx.arc(ob.x,ob.y,ob.r,0,7);ctx.fill();if(ob.e>1){ctx.strokeStyle=th.ring;ctx.lineWidth=2;ctx.stroke();}}
-   else if(ob.t==='s'){if(Math.max(ob.y1,ob.y2)<top||Math.min(ob.y1,ob.y2)>bottom)continue;ctx.strokeStyle=ob.e>1?th.ring:th.wall;ctx.lineWidth=ob.e>1?6:4;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(ob.x1,ob.y1);ctx.lineTo(ob.x2,ob.y2);ctx.stroke();}
-   else{if(ob.cy+ob.len<top||ob.cy-ob.len>bottom)continue;ctx.strokeStyle=th.arm;ctx.lineWidth=ob.swing?7:5;ctx.lineCap='round';for(const a of armsAt(ob,t)){ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(a[2],a[3]);ctx.stroke();}ctx.fillStyle=th.ring;ctx.beginPath();ctx.arc(ob.cx,ob.cy,ob.swing?6:4,0,7);ctx.fill();}
+   else if(ob.t==='s'){if(Math.max(ob.y1,ob.y2)<top||Math.min(ob.y1,ob.y2)>bottom)continue;if(ob.gate){const op=gateOpen(ob,t);ctx.strokeStyle=th.ring;ctx.globalAlpha=op?.35:1;ctx.setLineDash(op?[3,4]:[]);ctx.lineWidth=op?2:6;}else{ctx.strokeStyle=ob.e>1?th.ring:th.wall;ctx.lineWidth=ob.e>1?6:4;}ctx.lineCap='round';ctx.beginPath();ctx.moveTo(ob.x1,ob.y1);ctx.lineTo(ob.x2,ob.y2);ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;if(ob.hold){ctx.fillStyle=th.text;ctx.font='bold 10px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(gateOpen(ob,t)?'대기 문 열림!':'대기 문',(ob.x1+ob.x2)/2,ob.y1+16);}}
+   else if(ob.t==='slide'){if(ob.y1<top||ob.y1>bottom)continue;const dx=slideAt(ob,t);ctx.strokeStyle=th.arm;ctx.lineWidth=8;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(ob.x1+dx,ob.y1);ctx.lineTo(ob.x2+dx,ob.y2);ctx.stroke();}
+   else{if(ob.cy+ob.len<top||ob.cy-ob.len>bottom)continue;ctx.strokeStyle=ob.guard?'#e5484d':th.arm;ctx.lineWidth=ob.swing?7:5;ctx.lineCap='round';for(const a of armsAt(ob,t)){ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(a[2],a[3]);ctx.stroke();}ctx.fillStyle=th.ring;ctx.beginPath();ctx.arc(ob.cx,ob.cy,ob.swing?6:4,0,7);ctx.fill();}
   }
+  // 워프 문: 초록 '지름길', 빨강 '되돌이'
+  for(const q of b.portals||[]){if(q.y<top||q.y>bottom)continue;const c=q.kind==='jump'?'#22a565':'#e5484d';ctx.save();ctx.translate(q.x,q.y);ctx.rotate(t*3*(q.kind==='jump'?1:-1));ctx.strokeStyle=c;ctx.lineWidth=3;ctx.setLineDash([6,4]);ctx.beginPath();ctx.arc(0,0,q.r,0,7);ctx.stroke();ctx.setLineDash([]);ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,q.r-6,0,7);ctx.stroke();ctx.restore();ctx.fillStyle=c;ctx.font='bold 10px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(q.kind==='jump'?'지름길 ↓':'되돌이 ↑',q.x,q.y+q.r+9);}
   if(Math.floor(f)<b.mixFrames){ctx.strokeStyle='#d6578a';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(0,b.chamber);ctx.lineTo(b.W,b.chamber);ctx.stroke();}
   ctx.fillStyle='#ffe0ea';ctx.fillRect(b.W/2-b.goalGap/2,b.goalY,b.goalGap,28);ctx.fillStyle='#000';ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('골',b.W/2,b.goalY+14);
   ctx.font='bold 8px sans-serif';
