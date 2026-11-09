@@ -13,6 +13,7 @@ name: Promote roster sync to Production after a fresh Staging verification (user
 # Release 13 (user-approved 2026-11-08 "웹 버그 수정 Production 배포 승인"): VIP check reads one row per member; a save D1 committed is reported as saved. The Monday 11:00 VIP rule waits for Monday.
 # Release 14 (user-approved 2026-11-08 "VIP 기록 되돌리기와 Production 배포 승인"): VIP points in force from Monday 11:00 KST; last week held until then.
 # Release 15 (user-approved 2026-11-09 "승인" for 핀볼 추첨 Production 배포): new 핀볼 추첨 menu (race marbles, 10 courses, admin-only records in their own 'pinball' kind) with CC0 chiptune music.
+# Release 16 (user-approved 2026-11-10 "핀볼 새 코스 Production 배포 승인"): 핀볼 추첨 course layout 2 (ten distinct courses, side channels closed), camera follows the current likely winner; old records replay on layout 1.
 on:
   push:
     branches: [claude/new-session-narazy]
