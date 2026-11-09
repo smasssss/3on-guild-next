@@ -1,5 +1,6 @@
 name: Find free (CC0) chiptune music for 핀볼 추첨 (read-only)
 # 2026-11-10: the user asked to find ~10 free upbeat 8-bit tracks on the web and add them.
+# Rerun 1: print only CC0 pages and their main audio files.
 on:
   push:
     branches: [claude/new-session-narazy]

@@ -16,7 +16,9 @@ def scan(slug,depth):
     files=sorted(set(re.findall(r'https://opengameart\.org/sites/default/files/[^"\'<> ]+\.(?:mp3|ogg|wav|zip)',t)))
     title=html.unescape((re.search(r'<title>(.*?)</title>',t,re.S) or [None,''])[1]).split('|')[0].strip()
     tags=' '.join(re.findall(r'/art-search-advanced\?field_art_tags_tid=([^"&]+)',t))[:120]
-    print('PAGE',slug,'|',title,'|',lic(t),'|',tags);[print('  FILE',f) for f in files]
+    files=[f for f in files if '/styles/' not in f and '/audio_preview/' not in f and f.endswith(('.mp3','.ogg'))]
+    L=lic(t)
+    if 'CC0' in L and files:print('PAGE',slug,'|',title,'|',tags[:60]);[print('  FILE',f.rsplit('/',1)[1]) for f in files]
     if depth>0:
         for s in re.findall(r'href="/content/([a-z0-9-]+)"',t)[:40]:scan(s,depth-1)
 for s in seeds:scan(s,1 if s.startswith(('cc0-','audio-cc0')) else 0)
