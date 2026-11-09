@@ -9,7 +9,7 @@ await page.waitForFunction(()=>typeof shared!=='undefined'&&shared.ready&&typeof
 const out=await page.evaluate(min=>{
  document.getElementById('vipSearch').value='';renderCarriageVipResults();
  const rows=[...document.querySelectorAll('#vipResults .viprow')].map(r=>{
-  const name=r.querySelector('.vip-main b').textContent.trim(),info=r.querySelector('.vip-main span').textContent.trim(),pill=r.querySelector('.vip-main .pill:last-of-type').textContent.trim(),top=!!r.querySelector('.pill.good')&&r.querySelector('.vip-main b').nextSibling?.textContent?.includes('오늘')||r.innerHTML.includes('오늘 추천');
+  const name=r.querySelector('.vip-main b').textContent.trim(),spans=[...r.querySelectorAll('.vip-main span')],info=(spans.find(x=>x.textContent.includes('길드전'))||{textContent:''}).textContent.trim(),pill=spans[spans.length-1].textContent.trim(),top=spans.some(x=>x.textContent.trim()==='오늘 추천');
   const points=Number((info.match(/길드전 ([\d,]+)점/)||[])[1]?.replace(/,/g,'')||0);return {name,info,pill,points,top};});
  return {records:state.records.length,week:carriageVip.view.active?.appliesOn,threshold:carriageVip.view.threshold,rows:rows.map((r,i)=>({...r,screen:i+1})).filter(r=>r.points>=min)};
 },MIN);
