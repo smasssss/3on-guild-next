@@ -13,7 +13,7 @@
  function rng(seedHex){let a=parseInt(seedHex,16)>>>0;return ()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
  const COURSES_V1=['벚꽃 계곡','회오리 탑','별빛 계단','바람개비 언덕','솜사탕 미로','폭포 협곡','풍선 정원','시계탑 골목','무지개 다리','마차 대로'];
  // 코스 1판(처음 배포)은 옛 기록을 똑같이 다시 보여 주려고 그대로 둡니다. 새 추첨은 2판 코스를 씁니다.
- const LAYOUT=3; // 3판(2026-11-10): 2판 코스에 반전 장치(경사로 중간 구멍·여닫이 바닥, 워프, 골 앞 방해 장치)를 더함
+ const LAYOUT=4; // 4판(2026-11-10): 지름길 없음, 길목의 되돌이(5명마다 2초 쉼)와 옆길, 반발 장치 추가, 코스 약 2배. / 3판(2026-11-10): 2판 코스에 반전 장치(경사로 중간 구멍·여닫이 바닥, 워프, 골 앞 방해 장치)를 더함
  const COURSES=['벚꽃 강줄기','회오리 경사로','별빛 계단','바람개비 언덕','솜사탕 미로','폭포 협곡','풍선 핀볼장','시계탑 톱니','무지개 바람길','마차 대로'];
  // 구간 만들기: 각 함수는 y0부터 구간을 만들고 구간 높이를 돌려줍니다.
  const S={
@@ -79,7 +79,8 @@
   for(const k of shuffle(firstHalf))if(put(k,'jump',Math.min(last,k+2))){used=k;break;}
   for(const k of shuffle(secondHalf.filter(k=>k!==used)))if(put(k,'back',Math.max(0,k-2)))break;
  }
- function buildV2(course,r,yStart,v3=false){
+ function buildV2(course,r,yStart,ver=2){
+  const v3=ver>=3,v4=ver>=4;
   const o=[],zones=[],portals=[],sections=[],spots=[],sign=()=>r()<.5?1:-1,clampX=x=>Math.max(2,Math.min(W-2,x));
   const seg=(x1,y1,x2,y2,e)=>{const s={t:'s',x1,y1,x2,y2};if(e!==undefined)s.e=e;o.push(s);};
   const poly=(p,e)=>{for(let k=1;k<p.length;k++)seg(p[k-1][0],p[k-1][1],p[k][0],p[k][1],e);};
@@ -104,7 +105,7 @@
     return 60+len+40;},
    // 지그재그 경사로: 벽에서 벽으로 굴러가 반대편 구멍으로 떨어집니다.
    ramps(y0,{n=4}){let d=sign();const hole=54,drop=55;
-    for(let i=0;i<n;i++){const y=y0+30+i*100;if(d>0)ramp(0,y,W-hole,y+drop);else ramp(W,y,hole,y+drop);peg(W/2+d*(r()*60-30),y+drop/2-30,8,1.1);d=-d;}
+    for(let i=0;i<n;i++){const y=y0+30+i*100;if(d>0)ramp(0,y,W-hole,y+drop);else ramp(W,y,hole,y+drop);peg(W/2+d*(r()*60-30),y+drop/2-30,v4?10:8,v4?1.3:1.1);d=-d;}
     return 30+n*100+30;},
    // 계단: 한 칸씩 통통 튀며 한쪽으로 내려가고, 끝 구멍으로 떨어집니다.
    stairs(y0,{dir=1}){const n=7,gap=56,sw=(W-gap)/n,rise=24,pts=[];let x=dir>0?0:W,y=y0+20;pts.push([x,y]);
@@ -119,8 +120,18 @@
    maze(y0,{n=5}){for(let i=0;i<n;i++){const y=y0+30+i*90;
      if(r()<.4){const a=45+r()*90,b=W-45-r()*90,m=(a+b)/2;seg(0,y,a-22,y+28);seg(a+22,y+28,m,y);seg(m,y,b-22,y+28);seg(b+22,y+28,W,y);}
      else{const h=50+r()*(W-100);seg(0,y,h-23,y+30);seg(W,y,h+23,y+30);}
-     if(i<n-1)peg(W*(.25+.5*r()),y+60,6,.8);}
+     if(i<n-1)peg(W*(.25+.5*r()),y+60,v4?9:6,v4?1.3:.8);}
     return 30+n*90+20;},
+   // 4판 되돌이 길목: 위쪽은 범퍼 구간, 아래는 좁은 길목에 되돌이 문. 걸린 구슬은 오른쪽 옆길 맨 위로 올라가
+   // 옆길(벽으로 막힘)을 따라 내려오므로 같은 문에 다시 걸리지 않습니다. 문은 5명을 보내면 2초 쉽니다.
+   detour(y0){const h=560,L=W-38,cx=L/2;
+    seg(W,y0-6,L,y0+14);seg(L,y0+14,L,y0+h-70);
+    for(let y=y0+50;y<y0+h-110;y+=56){seg(L,y,L+14,y+12);seg(W,y+28,W-14,y+40);}
+    seg(0,y0+30,40,y0+90,1.25);seg(0,y0+170,40,y0+230,1.25);
+    [[.25,.75],[.5],[.2,.8]].forEach((row,k)=>row.forEach(fx=>peg(L*fx+(r()-.5)*14,y0+60+k*75,13+r()*3,1.3)));
+    seg(0,y0+300,cx-36,y0+400);seg(L,y0+300,cx+36,y0+400);seg(cx-36,y0+400,cx-36,y0+440);seg(cx+36,y0+400,cx+36,y0+440);
+    portals.push({x:cx,y:y0+422,r:22,kind:'back',tx:W-19,ty:y0+30,limit:5,off:2});
+    return h;},
    // 핀 밭
    pegs(y0,{rows=5}){pegField(0,W,y0+30,rows);return 30+rows*38+20;},
    // 핀볼장: 큰 범퍼, 양옆 튕김판, 아래 플리퍼 두 개.
@@ -130,11 +141,11 @@
     return h+10;},
    // 시계탑: 맞물려 도는 톱니 두 개와 가운데 큰 시계추.
    clock(y0,{gears=true}){const s=sign();let y=y0;if(gears){rot(W*.29,y0+105,78,1.2*s,6);rot(W*.71,y0+105,78,-1.2*s,6);y+=210;}
-    guards(y0,y-y0+190);swing(W/2,y+20,125,1.05,2,Math.PI/2);peg(W*.16,y+130,8,.8);peg(W*.84,y+130,8,.8);
+    guards(y0,y-y0+190);swing(W/2,y+20,125,1.05,2,Math.PI/2);peg(W*.16,y+130,v4?11:8,v4?1.3:.8);peg(W*.84,y+130,v4?11:8,v4?1.3:.8);
     return y-y0+190;},
    // 바람 띠: 띠마다 바람 방향이 바뀌어 구슬이 좌우로 쓸려 갑니다. 벽 쪽은 경사판이 안으로 되돌립니다.
    wind(y0,{n=3}){let d=sign();for(let i=0;i<n;i++){const y=y0+20+i*160;zones.push({y0:y,y1:y+140,ax:d*950});
-     for(let k=0;k<2;k++)for(let x=70+((i+k)%2)*30;x<=W-70;x+=60)peg(x,y+40+k*55,5,.6);
+     for(let k=0;k<2;k++)for(let x=70+((i+k)%2)*30,j=0;x<=W-70;x+=60,j++)peg(x,y+40+k*55,v4&&j%2?8:5,v4&&j%2?1.25:.6);
      if(d>0)seg(W,y+20,W-50,y+85);else seg(0,y+20,50,y+85);d=-d;}
     return 20+n*160+10;},
    // 갈림길: 가운데 회전 막대가 좌우로 나누고, 한쪽은 핀 길, 다른 쪽은 경사 길입니다.
@@ -143,8 +154,10 @@
     const a0=pegLeft?mid:0,a1=pegLeft?W:mid;for(let k=0;k<3;k++){const yy=y0+95+k*100;if(k%2===0)seg(a0,yy,a1-42,yy+45);else seg(a1,yy,a0+42,yy+45);}
     return len+20;},
   };
-  let y=yStart;for(const [name,opt] of RECIPES2[(course-1)%RECIPES2.length]){const h=T[name](y,opt||{});sections.push({name,y0:y,h});y+=h;}
-  if(v3)placePortals(o,portals,sections,r,spots);
+  // 4판 코스: 원래 구간들 → 범퍼 핀볼장 → 되돌이 길목 → 원래 구간들 한 번 더(약 2배 길이)
+  const base=RECIPES2[(course-1)%RECIPES2.length],recipe=v4?[...base,['garden'],['detour'],...base]:base;
+  let y=yStart;for(const [name,opt] of recipe){const h=T[name](y,opt||{});sections.push({name,y0:y,h});y+=h;}
+  if(v3&&!v4)placePortals(o,portals,sections,r,spots);
   return {o,zones,y,portals};
  }
  const boards=new Map();
@@ -155,7 +168,7 @@
    for(const name of RECIPES[(course-1)%RECIPES.length])y+=S[name](o,y,r);
    // 벽과 원형 장애물 사이에 구슬보다 좁은 틈이 생기지 않게 합니다(끼임 방지).
    for(const ob of o)if(ob.t==='c'){if(ob.x-ob.r>0&&ob.x-ob.r<2*R+4)ob.x=0;if(W-ob.x-ob.r>0&&W-ob.x-ob.r<2*R+4)ob.x=W;}
-  }else{const built=buildV2(course,r,y,layout>=3);o=built.o;zones=built.zones;portals=built.portals;y=built.y;theme=THEMES[(course-1)%THEMES.length];}
+  }else{const built=buildV2(course,r,y,layout);o=built.o;zones=built.zones;portals=built.portals;y=built.y;theme=THEMES[(course-1)%THEMES.length];}
   // 3판 대기 문: 골 앞 깔때기 바닥이 몇 초마다 잠깐 열려, 먼저 온 구슬도 뒤따라온 구슬과 함께 다시 섞여 내려갑니다.
   if(layout>=3){o.push({t:'s',x1:0,y1:y+20,x2:W/2-45,y2:y+70},{t:'s',x1:W/2-45,y1:y+70,x2:W/2+45,y2:y+70,gate:{p:3.6,open:1.4,ph:0},hold:true},{t:'s',x1:W/2+45,y1:y+70,x2:W,y2:y+20});y+=110;}
   const goalTop=y+20,goalY=goalTop+170,gap=36;
@@ -181,9 +194,9 @@
   if(vn<0){vx[i]-=(1+e)*vn*nx;vy[i]-=(1+e)*vn*ny;}
  }
  function simulate(count,seedHex,course=1,layout=LAYOUT){
-  const b=board(course,layout),rand=rng(seedHex),dt=1/(FPS*SUB),maxFrames=FPS*MAX_SECONDS,n=count;
+  const b=board(course,layout),rand=rng(seedHex),dt=1/(FPS*SUB),maxFrames=FPS*(layout>=4?300:MAX_SECONDS),n=count;
   const st={x:new Float64Array(n),y:new Float64Array(n),vx:new Float64Array(n),vy:new Float64Array(n)},{x,y,vx,vy}=st;
-  const done=new Int32Array(n).fill(-1),slow=new Int32Array(n),np=b.portals.length,used=new Uint8Array(n*np);
+  const done=new Int32Array(n).fill(-1),slow=new Int32Array(n),np=b.portals.length,used=new Uint8Array(n*np),pCount=new Int32Array(np),pOff=new Float64Array(np),portalLog=b.portals.map(()=>({hits:[],off:[]}));
   // 출발 통 안에 무작위 배치(추첨 번호로 섞음)
   const cols=Math.floor((W-2*R)/(2*R+3));for(let i=0;i<n;i++){x[i]=R+2+(i%cols)*(2*R+3)+rand()*2;y[i]=CHAMBER-R-2-Math.floor(i/cols)*(2*R+3);vx[i]=(rand()-.5)*60;vy[i]=0;}
   const frames=[],order=[];let frame=0;const cell=2*R,grid=new Map();
@@ -206,7 +219,9 @@
       else{const om=spinAt(ob,t);for(const a of armsAt(ob,t))hitSegment(st,i,a[0],a[1],a[2],a[3],ob.e??.45,(px,py)=>-om*(py-ob.cy),(px)=>om*(px-ob.cx));}
      }
      const sp=Math.hypot(vx[i],vy[i]);if(sp>950){vx[i]*=950/sp;vy[i]*=950/sp;}
-     if(!mixing)for(let p=0;p<np;p++){const q=b.portals[p];if(used[i*np+p])continue;const dx=x[i]-q.x,dy=y[i]-q.y;if(dx*dx+dy*dy<q.r*q.r){used[i*np+p]=1;x[i]=40+rand()*(W-80);y[i]=q.ty;vx[i]=(rand()-.5)*80;vy[i]=0;}}
+     if(!mixing)for(let p=0;p<np;p++){const q=b.portals[p];if(used[i*np+p])continue;if(q.limit&&t<pOff[p])continue;const dx=x[i]-q.x,dy=y[i]-q.y;if(dx*dx+dy*dy<q.r*q.r){used[i*np+p]=1;
+      if(q.limit){x[i]=q.tx;y[i]=q.ty;vx[i]=(rand()-.5)*40;vy[i]=0;portalLog[p].hits.push(frame);if(++pCount[p]>=q.limit){pCount[p]=0;pOff[p]=t+q.off;portalLog[p].off.push([frame,frame+Math.ceil(q.off*FPS)]);}}
+      else{x[i]=40+rand()*(W-80);y[i]=q.ty;vx[i]=(rand()-.5)*80;vy[i]=0;}}}
      if(!mixing&&y[i]>b.goalY+R){done[i]=frame;order.push(i);}
     }
     grid.clear();for(let i=0;i<n;i++){if(done[i]>=0)continue;const key=Math.floor(x[i]/cell)*100000+Math.floor(y[i]/cell);const l=grid.get(key);if(l)l.push(i);else grid.set(key,[i]);}
@@ -219,7 +234,7 @@
   }
   const timedOut=order.length<n;
   if(timedOut){const rest=[];for(let i=0;i<n;i++)if(done[i]<0)rest.push(i);rest.sort((a,c)=>y[c]-y[a]||a-c);for(const i of rest){done[i]=frame;order.push(i);}}
-  return {board:b,order,finish:Array.from(done),frames,timedOut};
+  return {board:b,order,finish:Array.from(done),frames,timedOut,portalLog};
  }
  // 참가자는 회원 번호 순으로 고정해 같은 추첨 번호면 같은 결과가 나오게 합니다.
  function run(participants,seed,mode,count,course=1,layout=LAYOUT){
@@ -286,7 +301,9 @@
    else{if(ob.cy+ob.len<top||ob.cy-ob.len>bottom)continue;ctx.strokeStyle=ob.guard?'#e5484d':th.arm;ctx.lineWidth=ob.swing?7:5;ctx.lineCap='round';for(const a of armsAt(ob,t)){ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(a[2],a[3]);ctx.stroke();}ctx.fillStyle=th.ring;ctx.beginPath();ctx.arc(ob.cx,ob.cy,ob.swing?6:4,0,7);ctx.fill();}
   }
   // 워프 문: 초록 '지름길', 빨강 '되돌이'
-  for(const q of b.portals||[]){if(q.y<top||q.y>bottom)continue;const c=q.kind==='jump'?'#22a565':'#e5484d';ctx.save();ctx.translate(q.x,q.y);ctx.rotate(t*3*(q.kind==='jump'?1:-1));ctx.strokeStyle=c;ctx.lineWidth=3;ctx.setLineDash([6,4]);ctx.beginPath();ctx.arc(0,0,q.r,0,7);ctx.stroke();ctx.setLineDash([]);ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,q.r-6,0,7);ctx.stroke();ctx.restore();ctx.fillStyle=c;ctx.font='bold 10px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(q.kind==='jump'?'지름길 ↓':'되돌이 ↑',q.x,q.y+q.r+9);}
+  (b.portals||[]).forEach((q,p)=>{if(q.y<top||q.y>bottom)return;let label=q.kind==='jump'?'지름길 ↓':'되돌이 ↑',c=q.kind==='jump'?'#22a565':'#e5484d';
+   const log=res.sim.portalLog?.[p];if(q.limit&&log){const fr=Math.floor(f),off=log.off.find(([a,z])=>fr>=a&&fr<z),resets=log.off.filter(([a])=>a<=fr).length,hits=log.hits.filter(h=>h<=fr).length-resets*q.limit;
+    if(off){c='#9aa0a6';label='쉬는 중 '+Math.ceil((off[1]-fr)/FPS)+'초';}else label='되돌이 ↑ '+hits+'/'+q.limit;}ctx.save();ctx.translate(q.x,q.y);ctx.rotate(t*3*(q.kind==='jump'?1:-1));ctx.strokeStyle=c;ctx.lineWidth=3;ctx.setLineDash([6,4]);ctx.beginPath();ctx.arc(0,0,q.r,0,7);ctx.stroke();ctx.setLineDash([]);ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,q.r-6,0,7);ctx.stroke();ctx.restore();ctx.fillStyle=c;ctx.font='bold 10px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(label,q.x,q.y+q.r+9);});
   if(Math.floor(f)<b.mixFrames){ctx.strokeStyle='#d6578a';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(0,b.chamber);ctx.lineTo(b.W,b.chamber);ctx.stroke();}
   ctx.fillStyle='#ffe0ea';ctx.fillRect(b.W/2-b.goalGap/2,b.goalY,b.goalGap,28);ctx.fillStyle='#000';ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('골',b.W/2,b.goalY+14);
   ctx.font='bold 8px sans-serif';
