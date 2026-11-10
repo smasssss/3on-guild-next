@@ -3,6 +3,7 @@
 // 2026-11-10 코스 2판: 새 추첨은 2판 코스, 판 번호 없는 옛 기록은 1판 코스로 처음과 똑같이 다시 계산되어야 합니다.
 // 2026-11-10 코스 3판(사용자 요청 '빨리 오면 빨리 들어간다는 공식을 깨 줘'): 반전 장치를 더하고, 2판 기록도 2판 그대로 다시 계산되어야 합니다.
 // 2026-11-10 코스 4판(사용자 요청): 지름길 없음, 길목 되돌이(5명 보내면 2초 쉼)와 옆길, 반발 장치 추가, 코스 약 2배. 3판 기록은 3판 그대로.
+// 2026-11-10 5판(사용자 요청 '같은 명단이면 뽑히는 사람이 자주 겹친다'): 출발 자리·번호 순서를 매번 무작위로 섞어 특정 회원이 유리하지 않게. 4판 기록은 4판 그대로.
 const assert=require('node:assert/strict'),fs=require('node:fs'),crypto=require('node:crypto');
 const m={exports:{}};new Function('module',fs.readFileSync('public/pinball.js','utf8'))(m);const engine=m.exports;
 const f=require('./vip-fixture.cjs')(),route=f.load('app/api/pinball/route.ts'),store=f.load('lib/store.ts'),lib=f.load('lib/pinball.ts');
@@ -24,7 +25,13 @@ const post=(body,auth=true)=>route.POST(new Request(origin+'/api/pinball',{metho
  const v3=[];for(let c=1;c<=10;c++){const r=engine.run(plain(40),'1a2b3c4d','first',3,c,3);v3.push(r.order.join(',')+'|'+r.sim.frames.length);}
  assert.equal(crypto.createHash('sha256').update(v3.join('/')).digest('hex'),'7a6a6b7143a589b39346a06125d25563993dac452d03ee203a4df9e588c1eebe','layout 3 replays exactly as deployed in Release 17');
  assert.notDeepEqual(engine.run(plain(40),'1a2b3c4d','first',3,1,3).order,engine.run(plain(40),'1a2b3c4d','first',3,1,2).order,'layout 3 differs from layout 2');
- assert.equal(engine.LAYOUT,4,'new draws use layout 4');
+ const v4=[];for(let c=1;c<=10;c++){const r=engine.run(plain(40),'1a2b3c4d','first',3,c,4);v4.push(r.order.join(',')+'|'+r.sim.frames.length);}
+ assert.equal(crypto.createHash('sha256').update(v4.join('/')).digest('hex'),'5ca7e01f3ac484798f18784668c90b699d87494b1f89d0ea6423a691d54bc12d','layout 4 replays exactly as deployed in Release 18');
+ assert.equal(engine.LAYOUT,5,'new draws use layout 5');
+ // 5판 공정성: 같은 20명으로 2번 코스를 150번 돌려 먼저 들어온 3명에 뽑힌 횟수가 고르게 퍼져야 합니다(카이제곱 45 미만; 4판은 회원 번호 0이 유리했음).
+ {const ps=plain(20),cnt=new Map(ps.map(p=>[p.memberId,0]));for(let k=0;k<150;k++){const seed=((k*2654435761+12345)>>>0).toString(16).padStart(8,'0');for(const id of engine.run(ps,seed,'first',3,2).picks)cnt.set(id,cnt.get(id)+1);}
+  const exp=150*3/20,chi=[...cnt.values()].reduce((a,x)=>a+(x-exp)**2/exp,0);assert.ok(chi<45,'picks spread fairly (chi-square '+chi.toFixed(1)+')');}
+ {const a=engine.run(plain(20),'0000abcd','first',3,2),b=engine.run(plain(20),'0000abce','first',3,2);assert.notDeepEqual(a.list.map(p=>p.memberId),b.list.map(p=>p.memberId),'member order is shuffled per draw');}
  // 4판: 지름길 없음, 되돌이는 길목 하나(5명마다 2초 쉼, 옆길로 보냄), 코스 길이 약 2배
  for(let c=1;c<=10;c++){const b=engine.board(c),b2=engine.board(c,2);assert.ok(b.portals.every(q=>q.kind==='back'),'course '+c+' has no shortcut');assert.equal(b.portals.length,1);
   assert.equal(b.portals[0].limit,5);assert.equal(b.portals[0].off,2);assert.ok(b.portals[0].tx>b.W-38,'sent to the side lane');assert.ok(b.height>=1.8*b2.height,'course '+c+' about twice as long');}
@@ -49,7 +56,7 @@ const post=(body,auth=true)=>route.POST(new Request(origin+'/api/pinball',{metho
  assert.throws(()=>lib.validateDraw({...draw,course:11}),/코스/);assert.throws(()=>lib.validateDraw({...draw,source:'manual'}),/쓰지 않습니다/);
  assert.equal(lib.validateDraw({...draw,source:'manual',threshold:0}).source,'manual','direct selection is recorded as such');
  assert.equal(lib.validateDraw({...draw,layout:2}).layout,2,'layout 2 is recorded');assert.equal(lib.validateDraw({...draw,layout:3}).layout,3,'layout 3 is recorded');assert.equal('layout' in lib.validateDraw(draw),false,'old records stay layout 1');
- assert.equal(lib.validateDraw({...draw,layout:4}).layout,4,'layout 4 is recorded');assert.throws(()=>lib.validateDraw({...draw,layout:5}),/코스 판/);
+ assert.equal(lib.validateDraw({...draw,layout:4}).layout,4,'layout 4 is recorded');assert.equal(lib.validateDraw({...draw,layout:5}).layout,5,'layout 5 is recorded');assert.throws(()=>lib.validateDraw({...draw,layout:6}),/코스 판/);
  // 저장: 관리자만, 백업 포함, 누구나 조회
  assert.equal((await post({revision:0,mutation:'a'.repeat(32),draw},false)).status,401,'not an administrator');
  f.sql.prepare('INSERT INTO credentials VALUES(?,?,?,?,?)').run(await store.hash(token),'password-session-v1','admin',await store.hash(f.env.ADMIN_PASSWORD_HASH),Date.now()+86400000);

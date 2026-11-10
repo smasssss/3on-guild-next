@@ -13,7 +13,7 @@
  function rng(seedHex){let a=parseInt(seedHex,16)>>>0;return ()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
  const COURSES_V1=['벚꽃 계곡','회오리 탑','별빛 계단','바람개비 언덕','솜사탕 미로','폭포 협곡','풍선 정원','시계탑 골목','무지개 다리','마차 대로'];
  // 코스 1판(처음 배포)은 옛 기록을 똑같이 다시 보여 주려고 그대로 둡니다. 새 추첨은 2판 코스를 씁니다.
- const LAYOUT=4; // 4판(2026-11-10): 지름길 없음, 길목의 되돌이(5명마다 2초 쉼)와 옆길, 반발 장치 추가, 코스 약 2배. / 3판(2026-11-10): 2판 코스에 반전 장치(경사로 중간 구멍·여닫이 바닥, 워프, 골 앞 방해 장치)를 더함
+ const LAYOUT=5; // 5판(2026-11-10): 4판 코스 그대로, 출발 자리를 추첨 번호로 무작위 배정하고 더 세게 섞음. 4판: 4판(2026-11-10): 지름길 없음, 길목의 되돌이(5명마다 2초 쉼)와 옆길, 반발 장치 추가, 코스 약 2배. / 3판(2026-11-10): 2판 코스에 반전 장치(경사로 중간 구멍·여닫이 바닥, 워프, 골 앞 방해 장치)를 더함
  const COURSES=['벚꽃 강줄기','회오리 경사로','별빛 계단','바람개비 언덕','솜사탕 미로','폭포 협곡','풍선 핀볼장','시계탑 톱니','무지개 바람길','마차 대로'];
  // 구간 만들기: 각 함수는 y0부터 구간을 만들고 구간 높이를 돌려줍니다.
  const S={
@@ -197,15 +197,19 @@
   const b=board(course,layout),rand=rng(seedHex),dt=1/(FPS*SUB),maxFrames=FPS*(layout>=4?300:MAX_SECONDS),n=count;
   const st={x:new Float64Array(n),y:new Float64Array(n),vx:new Float64Array(n),vy:new Float64Array(n)},{x,y,vx,vy}=st;
   const done=new Int32Array(n).fill(-1),slow=new Int32Array(n),np=b.portals.length,used=new Uint8Array(n*np),pCount=new Int32Array(np),pOff=new Float64Array(np),portalLog=b.portals.map(()=>({hits:[],off:[]}));
-  // 출발 통 안에 무작위 배치(추첨 번호로 섞음)
-  const cols=Math.floor((W-2*R)/(2*R+3));for(let i=0;i<n;i++){x[i]=R+2+(i%cols)*(2*R+3)+rand()*2;y[i]=CHAMBER-R-2-Math.floor(i/cols)*(2*R+3);vx[i]=(rand()-.5)*60;vy[i]=0;}
+  // 출발 통 안에 배치. 4판까지는 회원 번호 순서대로 자리가 정해져(같은 명단이면 같은 자리) 일부 자리가 유리했습니다.
+  // 5판부터는 추첨 번호로 자리를 무작위로 섞어 누가 어느 자리에서 출발할지 매번 달라집니다(2026-11-10 사용자 요청).
+  const cols=Math.floor((W-2*R)/(2*R+3)),slot=Array.from({length:n},(_,i)=>i);
+  if(layout>=5)for(let k=n-1;k>0;k--){const j=Math.floor(rand()*(k+1));[slot[k],slot[j]]=[slot[j],slot[k]];}
+  for(let i=0;i<n;i++){const s=slot[i];x[i]=R+2+(s%cols)*(2*R+3)+rand()*2;y[i]=CHAMBER-R-2-Math.floor(s/cols)*(2*R+3);vx[i]=(rand()-.5)*(layout>=5?240:60);vy[i]=0;}
+  const shake=layout>=5?4200:2600;
   const frames=[],order=[];let frame=0;const cell=2*R,grid=new Map();
   while(order.length<n&&frame<maxFrames){
    const mixing=frame<MIX_FRAMES;
    for(let s=0;s<SUB;s++){
     const t=(frame*SUB+s)*dt;
     for(let i=0;i<n;i++){if(done[i]>=0)continue;
-     if(mixing){vx[i]+=(rand()-.5)*2600*dt;vy[i]+=((rand()-.5)*2600-G*.2)*dt;}else vy[i]+=G*dt;
+     if(mixing){vx[i]+=(rand()-.5)*shake*dt;vy[i]+=((rand()-.5)*shake-G*.2)*dt;}else vy[i]+=G*dt;
      if(!mixing)for(const z of b.zones)if(y[i]>=z.y0&&y[i]<z.y1)vx[i]+=z.ax*dt;
      x[i]+=vx[i]*dt;y[i]+=vy[i]*dt;
      if(x[i]<R){x[i]=R;vx[i]=Math.abs(vx[i])*.6;}if(x[i]>W-R){x[i]=W-R;vx[i]=-Math.abs(vx[i])*.6;}
@@ -239,6 +243,8 @@
  // 참가자는 회원 번호 순으로 고정해 같은 추첨 번호면 같은 결과가 나오게 합니다.
  function run(participants,seed,mode,count,course=1,layout=LAYOUT){
   const list=participants.slice().sort((a,b)=>a.memberId.localeCompare(b.memberId));
+  // 5판: 회원 번호 순서 자체를 추첨 번호로 섞습니다. 출발 자리뿐 아니라 부딪힘 계산 순서 같은 '번호 순서'의 영향도 매번 달라집니다.
+  if(layout>=5){const mix=rng(((parseInt(seed,16)^0x5bd1e995)>>>0).toString(16));for(let k=list.length-1;k>0;k--){const j=Math.floor(mix()*(k+1));[list[k],list[j]]=[list[j],list[k]];}}
   const sim=simulate(list.length,seed,course,layout),order=sim.order.map(i=>list[i].memberId);
   const picks=mode==='first'?order.slice(0,count):order.slice(order.length-count);
   return {list,sim,order,picks};
