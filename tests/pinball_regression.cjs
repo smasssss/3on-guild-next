@@ -31,6 +31,11 @@ const post=(body,auth=true)=>route.POST(new Request(origin+'/api/pinball',{metho
  // 5판 공정성: 같은 20명으로 2번 코스를 150번 돌려 먼저 들어온 3명에 뽑힌 횟수가 고르게 퍼져야 합니다(카이제곱 45 미만; 4판은 회원 번호 0이 유리했음).
  {const ps=plain(20),cnt=new Map(ps.map(p=>[p.memberId,0]));for(let k=0;k<150;k++){const seed=((k*2654435761+12345)>>>0).toString(16).padStart(8,'0');for(const id of engine.run(ps,seed,'first',3,2).picks)cnt.set(id,cnt.get(id)+1);}
   const exp=150*3/20,chi=[...cnt.values()].reduce((a,x)=>a+(x-exp)**2/exp,0);assert.ok(chi<45,'picks spread fairly (chi-square '+chi.toFixed(1)+')');}
+ // 5판 섞기: 출발 통 회오리 바람 2초(4판까지는 2.5초), 출발 직전에는 처음 자리와 거의 상관없이 섞여 있어야 합니다.
+ assert.equal(engine.board(7).mixFrames,120,'mixing lasts 2 seconds');assert.equal(engine.board(7,4).mixFrames,150,'layout 4 keeps 2.5 seconds');
+ {const r=engine.run(plain(100),'0badc0de','first',3,7),f0=r.sim.frames[0],f1=r.sim.frames[119],key=(f,i)=>f[2*i+1]*1000+f[2*i];
+  const rank=f=>new Map([...Array(100).keys()].sort((a,c)=>key(f,a)-key(f,c)).map((i,k)=>[i,k]));const a=rank(f0),c=rank(f1);let d=0;for(let i=0;i<100;i++)d+=(a.get(i)-c.get(i))**2;
+  assert.ok(Math.abs(1-6*d/(100*9999))<.3,'balls are well mixed before the start');}
  {const a=engine.run(plain(20),'0000abcd','first',3,2),b=engine.run(plain(20),'0000abce','first',3,2);assert.notDeepEqual(a.list.map(p=>p.memberId),b.list.map(p=>p.memberId),'member order is shuffled per draw');}
  // 4판: 지름길 없음, 되돌이는 길목 하나(5명마다 2초 쉼, 옆길로 보냄), 코스 길이 약 2배
  for(let c=1;c<=10;c++){const b=engine.board(c),b2=engine.board(c,2);assert.ok(b.portals.every(q=>q.kind==='back'),'course '+c+' has no shortcut');assert.equal(b.portals.length,1);

@@ -9,7 +9,7 @@
 
  // ---------- 계산(화면과 무관, 같은 입력이면 같은 결과) ----------
  // 경주형 코스: 출발 통에서 섞은 뒤 문이 열리고, 회전 막대·바람개비·범퍼·경사·핀 구간을 지나 골로 들어갑니다.
- const W=360,R=8,FPS=60,SUB=3,G=900,MAX_SECONDS=180,MIX_FRAMES=150,CHAMBER=150,BUCKET=120;
+ const W=360,R=8,FPS=60,SUB=3,G=900,MAX_SECONDS=180,MIX_FRAMES=150,MIX_FRAMES_V5=120,CHAMBER=150,BUCKET=120;
  function rng(seedHex){let a=parseInt(seedHex,16)>>>0;return ()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
  const COURSES_V1=['벚꽃 계곡','회오리 탑','별빛 계단','바람개비 언덕','솜사탕 미로','폭포 협곡','풍선 정원','시계탑 골목','무지개 다리','마차 대로'];
  // 코스 1판(처음 배포)은 옛 기록을 똑같이 다시 보여 주려고 그대로 둡니다. 새 추첨은 2판 코스를 씁니다.
@@ -179,7 +179,7 @@
    o.push({t:'rot',cx:W/2,cy:goalY-40,len:30,w:(r()<.5?-1:1)*2.2,a0:r()*6.28,arms:2,guard:true});}
   // 무거운 계산을 줄이려고 장애물을 높이 구간별로 나눠 둡니다.
   const buckets=new Map();for(const ob of o){const ext=ob.t==='c'?ob.r+R:ob.t==='rot'?ob.len+R:R;const ys=ob.t==='s'||ob.t==='slide'?[Math.min(ob.y1,ob.y2)-ext,Math.max(ob.y1,ob.y2)+ext]:[(ob.y??ob.cy)-ext,(ob.y??ob.cy)+ext];for(let k=Math.floor(ys[0]/BUCKET);k<=Math.floor(ys[1]/BUCKET);k++){if(!buckets.has(k))buckets.set(k,[]);buckets.get(k).push(ob);}}
-  const b={W,R,course,layout,name:(layout===1?COURSES_V1:COURSES)[(course-1)%COURSES.length],obstacles:o,zones,portals,theme,buckets,goalY,goalGap:gap,height:goalY+60,chamber:CHAMBER,mixFrames:MIX_FRAMES};
+  const b={W,R,course,layout,name:(layout===1?COURSES_V1:COURSES)[(course-1)%COURSES.length],obstacles:o,zones,portals,theme,buckets,goalY,goalGap:gap,height:goalY+60,chamber:CHAMBER,mixFrames:layout>=5?MIX_FRAMES_V5:MIX_FRAMES};
   boards.set(key,b);return b;
  }
  // 회전 막대는 계속 돌고(w), 시계추·플리퍼는 좌우로 흔들립니다(amp).
@@ -202,14 +202,18 @@
   const cols=Math.floor((W-2*R)/(2*R+3)),slot=Array.from({length:n},(_,i)=>i);
   if(layout>=5)for(let k=n-1;k>0;k--){const j=Math.floor(rand()*(k+1));[slot[k],slot[j]]=[slot[j],slot[k]];}
   for(let i=0;i<n;i++){const s=slot[i];x[i]=R+2+(s%cols)*(2*R+3)+rand()*2;y[i]=CHAMBER-R-2-Math.floor(s/cols)*(2*R+3);vx[i]=(rand()-.5)*(layout>=5?240:60);vy[i]=0;}
-  const shake=layout>=5?4200:2600;
+  const shake=2600;
   const frames=[],order=[];let frame=0;const cell=2*R,grid=new Map();
   while(order.length<n&&frame<maxFrames){
-   const mixing=frame<MIX_FRAMES;
+   const mixing=frame<b.mixFrames;
    for(let s=0;s<SUB;s++){
     const t=(frame*SUB+s)*dt;
     for(let i=0;i<n;i++){if(done[i]>=0)continue;
-     if(mixing){vx[i]+=(rand()-.5)*shake*dt;vy[i]+=((rand()-.5)*shake-G*.2)*dt;}else vy[i]+=G*dt;
+     // 5판 섞기(2026-11-10 사용자 요청): 출발 통에 2초 동안 회오리 바람. 가운데는 위로 솟구치고, 좌우는 안쪽·아래로 불어
+     // 바닥 가운데로 모인 구슬이 다시 솟구치며 계속 뒤섞입니다.
+     if(mixing&&layout>=5){const dx=x[i]-W/2,jx=(rand()-.5)*1400*dt,jy=(rand()-.5)*1400*dt;
+      if(Math.abs(dx)<W*.17){vx[i]+=jx-dx*4*dt;vy[i]+=(G-3300)*dt+jy;}else{vx[i]+=(dx>0?-1:1)*1700*dt+jx;vy[i]+=(G+500)*dt+jy;}}
+     else if(mixing){vx[i]+=(rand()-.5)*shake*dt;vy[i]+=((rand()-.5)*shake-G*.2)*dt;}else vy[i]+=G*dt;
      if(!mixing)for(const z of b.zones)if(y[i]>=z.y0&&y[i]<z.y1)vx[i]+=z.ax*dt;
      x[i]+=vx[i]*dt;y[i]+=vy[i]*dt;
      if(x[i]<R){x[i]=R;vx[i]=Math.abs(vx[i])*.6;}if(x[i]>W-R){x[i]=W-R;vx[i]=-Math.abs(vx[i])*.6;}
@@ -329,6 +333,9 @@
   (b.portals||[]).forEach((q,p)=>{if(q.y<top||q.y>bottom)return;let label=q.kind==='jump'?'지름길 ↓':'되돌이 ↑',c=q.kind==='jump'?'#22a565':'#e5484d';
    const log=res.sim.portalLog?.[p];if(q.limit&&log){const fr=Math.floor(f),off=log.off.find(([a,z])=>fr>=a&&fr<z),resets=log.off.filter(([a])=>a<=fr).length,hits=log.hits.filter(h=>h<=fr).length-resets*q.limit;
     if(off){c='#9aa0a6';label='쉬는 중 '+Math.ceil((off[1]-fr)/FPS)+'초';}else label='되돌이 ↑ '+hits+'/'+q.limit;}ctx.save();ctx.translate(q.x,q.y);ctx.rotate(t*3*(q.kind==='jump'?1:-1));ctx.strokeStyle=c;ctx.lineWidth=3;ctx.setLineDash([6,4]);ctx.beginPath();ctx.arc(0,0,q.r,0,7);ctx.stroke();ctx.setLineDash([]);ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,q.r-6,0,7);ctx.stroke();ctx.restore();ctx.fillStyle=c;ctx.font='bold 10px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(label,q.x,q.y+q.r+9);});
+  // 5판: 출발 통 회오리 바람 표시(가운데 위로, 좌우는 안쪽 아래로)
+  if(Math.floor(f)<b.mixFrames&&b.layout>=5){ctx.save();ctx.globalAlpha=.4;ctx.fillStyle=th.arm;ctx.font='bold 18px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';const mv=(t*120)%40;
+   for(let yy=b.chamber-10-mv;yy>8;yy-=40)ctx.fillText('↑',b.W/2,yy);for(let yy=20+mv/2;yy<b.chamber-10;yy+=40){ctx.fillText('↘',b.W*.16,yy);ctx.fillText('↙',b.W*.84,yy);}ctx.restore();}
   if(Math.floor(f)<b.mixFrames){ctx.strokeStyle='#d6578a';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(0,b.chamber);ctx.lineTo(b.W,b.chamber);ctx.stroke();}
   ctx.fillStyle='#ffe0ea';ctx.fillRect(b.W/2-b.goalGap/2,b.goalY,b.goalGap,28);ctx.fillStyle='#000';ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('골',b.W/2,b.goalY+14);
   ctx.font='bold 8px sans-serif';
@@ -337,8 +344,9 @@
   // 왼쪽 위 실시간 순위(골인한 순서, 그다음 골에 가까운 순서)
   ctx.setTransform(scale,0,0,scale,0,0);const live=[];for(let k=0;k<res.sim.order.length&&live.length<10;k++){const i=res.sim.order[k];if(finish[i]<=f)live.push(i);}
   if(live.length<10){const rest=[];for(let i=0;i<n;i++)if(finish[i]>f)rest.push(i);rest.sort((a,c)=>pos[2*c+1]-pos[2*a+1]||a-c);for(const i of rest){if(live.length>=10)break;live.push(i);}}
-  ctx.fillStyle='rgba(255,255,255,.88)';ctx.fillRect(4,4,118,14+live.length*12);ctx.textAlign='left';ctx.font='bold 9px sans-serif';
-  live.forEach((i,k)=>{ctx.fillStyle=finish[i]<=f?'#b03a6a':'#000';ctx.fillText((k+1)+'. '+list[i].nickname.slice(0,10),10,14+k*12);});
+  // 섞는 동안에는 순위가 의미 없어 순위표를 감춥니다(출발 통이 잘 보이게).
+  if(Math.floor(f)>=b.mixFrames){ctx.fillStyle='rgba(255,255,255,.88)';ctx.fillRect(4,4,118,14+live.length*12);ctx.textAlign='left';ctx.font='bold 9px sans-serif';
+  live.forEach((i,k)=>{ctx.fillStyle=finish[i]<=f?'#b03a6a':'#000';ctx.fillText((k+1)+'. '+list[i].nickname.slice(0,10),10,14+k*12);});}
   if(Math.floor(f)<b.mixFrames){ctx.fillStyle='rgba(0,0,0,.75)';ctx.font='bold 14px sans-serif';ctx.textAlign='center';ctx.fillText('섞는 중…',b.W/2,viewH-20);}
  }
  function confetti(){const c=$('pbConfetti'),ctx=c.getContext('2d'),w=c.width=c.clientWidth*devicePixelRatio,h=c.height=c.clientHeight*devicePixelRatio,bits=Array.from({length:120},()=>({x:Math.random()*w,y:-Math.random()*h,v:2+Math.random()*4,s:4+Math.random()*6,c:palette[Math.floor(Math.random()*palette.length)],a:Math.random()*6}));let k=0;(function tick(){ctx.clearRect(0,0,w,h);for(const b of bits){b.y+=b.v*devicePixelRatio;b.a+=.1;ctx.fillStyle=b.c;ctx.fillRect(b.x+Math.sin(b.a)*8,b.y,b.s,b.s*.6);}if(++k<240&&!$('pbPopup').hidden)requestAnimationFrame(tick);else ctx.clearRect(0,0,w,h);})();}
@@ -376,7 +384,7 @@
  function finishPlay(result,meta){
   const names=result.picks.map(id=>result.list.find(p=>p.memberId===id).nickname),title=(meta.mode==='first'?'먼저':'늦게')+' 들어온 '+result.picks.length+'명';
   $('pbResult').hidden=false;$('pbResultTitle').textContent=title+' · 추첨 번호 '+meta.seed+(result.sim.timedOut?' · 시간 초과로 남은 구슬은 골에 가까운 순서':'');$('pbResultText').value=names.join('\n');
-  $('pbPopupNames').innerHTML=names.map(n=>'<li>'+esc(n)+'</li>').join('');$('pbPopupTitle').textContent=title;$('pbPopup').hidden=false;confetti();stopMusic(false);effect('win');
+  $('pbPopupNames').innerHTML=names.map(n=>'<li>'+esc(n)+'</li>').join('');$('pbPopupTitle').textContent=title;$('pbPopup').hidden=false;confetti();stopMusic(true);effect('win');
  }
  async function api(path,options){return typeof sharedRequest==='function'?sharedRequest(path,options):(await fetch(path,{cache:'no-store'})).json();}
  async function loadRecords(){try{records=await api('/api/pinball');}catch(e){records={revision:0,draws:[],error:e.message};}renderRecords();}
