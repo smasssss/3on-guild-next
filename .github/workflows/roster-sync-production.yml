@@ -17,6 +17,7 @@ name: Promote roster sync to Production after a fresh Staging verification (user
 # Release 17 (user-approved 2026-11-10 "핀볼 반전 프로덕션 배포 승인"): 핀볼 추첨 layout 3 twists (ramp holes and trapdoors, shortcut/send-back warps, holding gate and goal guards); layout 1 and 2 records replay unchanged.
 # Release 18 (user-approved 2026-11-10 "핀볼 4판 Production 배포 승인"): 핀볼 추첨 layout 4 (no shortcut warps, one send-back gate at a choke point resting 2s after every 5 balls with a side lane, more bouncy obstacles, courses about twice as long); layouts 1-3 replay unchanged.
 # Release 19 (user-approved 2026-11-10 "관리자 확인 수정 Production 배포 승인"): an administrator check started from another screen (carriage VIP, pinball) stays on that screen instead of opening the settings page.
+# Release 20 (user-approved 2026-11-10 "핀볼 섞기 수정 Production 배포 승인"): 핀볼 추첨 layout 5 shuffles starting spots and member order per draw and shakes harder (no member favoured); layouts 1-4 replay unchanged.
 on:
   push:
     branches: [claude/new-session-narazy]
