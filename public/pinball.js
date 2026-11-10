@@ -261,15 +261,33 @@
  const palette=['#f59ab8','#6cc58e','#f2b84b','#7fb3ec','#b994ee','#f39168','#58cfc6','#e58ed2','#a5cc5a','#ef9f7b'];
  let records={revision:0,draws:[]},playing=null,manual=new Set(),manualTouched=false,tracks=[];
  // 소리(모두 CC0 공개 저작물, 출처는 /pinball-music/CREDITS.md). 휴대폰은 누르는 순간에만 소리를 낼 수 있어 시작 버튼에서 켭니다.
- const sound={bgm:null,fade:null};
+ // 2026-11-10: 휴대폰(특히 아이폰)에서 효과음(new Audio)이 나면 배경음악이 끊기는 문제 → 웹 오디오 한 곳에서 음악과 효과음을 섞어 냅니다.
+ // 음악은 소리 버퍼를 끊김 없이 반복하고, 아이폰 무음 스위치에도 들리도록 재생용 오디오 세션을 요청합니다.
+ const sound={ctx:null,bgm:null,want:false,token:0,buffers:new Map()};
  function soundOn(){return !!$('pbSound')?.checked;}
- function startMusic(seed){
-  stopMusic(true);if(!soundOn())return;const pick=$('pbTrack').value,music=tracks.filter(t=>t.kind==='music');
-  const n=pick==='auto'?(music.length?1+parseInt(seed,16)%music.length:1):Number(pick);
-  const a=new Audio('/pinball-music/bgm'+String(n).padStart(2,'0')+'.mp3?v=2');a.loop=true;a.volume=.55;a.play().catch(()=>{});sound.bgm=a;
+ function audioCtx(){
+  if(!sound.ctx){const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;try{if(navigator.audioSession)navigator.audioSession.type='playback';}catch{/* 지원하지 않는 브라우저 */}sound.ctx=new AC();}
+  if(sound.ctx.state!=='running')sound.ctx.resume().catch(()=>{});return sound.ctx;
  }
- function stopMusic(now){const a=sound.bgm;if(!a)return;clearInterval(sound.fade);if(now){a.pause();sound.bgm=null;return;}sound.fade=setInterval(()=>{a.volume=Math.max(0,a.volume-.05);if(a.volume<=0){a.pause();clearInterval(sound.fade);if(sound.bgm===a)sound.bgm=null;}},120);}
- function effect(name){if(!soundOn())return;const a=new Audio('/pinball-music/'+name+'.mp3?v=2');a.volume=.8;a.play().catch(()=>{});}
+ function soundBuffer(name){
+  if(sound.buffers.has(name))return sound.buffers.get(name);
+  const c=sound.ctx,p=fetch('/pinball-music/'+name+'.mp3?v=2').then(r=>{if(!r.ok)throw Error('sound');return r.arrayBuffer();}).then(b=>new Promise((ok,no)=>c.decodeAudioData(b,ok,no)));
+  sound.buffers.set(name,p);p.catch(()=>sound.buffers.delete(name));return p;
+ }
+ function startMusic(seed){
+  stopMusic(true);if(!soundOn())return;const c=audioCtx();if(!c)return;
+  const pick=$('pbTrack').value,music=tracks.filter(t=>t.kind==='music'),n=pick==='auto'?(music.length?1+parseInt(seed,16)%music.length:1):Number(pick);
+  const token=++sound.token;sound.want=true;soundBuffer('goal');soundBuffer('win');
+  soundBuffer('bgm'+String(n).padStart(2,'0')).then(buf=>{if(token!==sound.token||!soundOn())return;const src=c.createBufferSource(),g=c.createGain();src.buffer=buf;src.loop=true;g.gain.value=.55;src.connect(g);g.connect(c.destination);src.start();sound.bgm={src,g};}).catch(()=>{});
+ }
+ function stopMusic(now){
+  sound.token++;sound.want=false;const m=sound.bgm,c=sound.ctx;if(!m||!c)return;sound.bgm=null;
+  try{if(now)m.src.stop();else{const t=c.currentTime;m.g.gain.setValueAtTime(m.g.gain.value,t);m.g.gain.linearRampToValueAtTime(0,t+1.4);m.src.stop(t+1.5);}}catch{/* 이미 멈춤 */}
+ }
+ function effect(name){
+  if(!soundOn()||!sound.ctx)return;const c=sound.ctx;
+  soundBuffer(name).then(buf=>{const src=c.createBufferSource(),g=c.createGain();src.buffer=buf;g.gain.value=.8;src.connect(g);g.connect(c.destination);src.start();}).catch(()=>{});
+ }
  async function loadTracks(){try{tracks=await (await fetch('/pinball-music/tracks.json?v=2')).json();}catch{tracks=[];}const sel=$('pbTrack');if(sel)sel.innerHTML='<option value="auto">추첨마다 자동</option>'+tracks.filter(t=>t.kind==='music').map((t,k)=>'<option value="'+(k+1)+'">'+(k+1)+'. '+esc(t.label||t.title)+'</option>').join('');}
  const view=()=>typeof carriageVip!=='undefined'?carriageVip.view:null;
  function settings(){return {source:document.querySelector('input[name="pbSource"]:checked')?.value||'auto',threshold:Number(String($('pbThreshold').value).replace(/[^0-9]/g,''))||0,includeFixed:$('pbFixed').checked,mode:$('pbMode').value,count:Math.max(1,Number($('pbCount').value)||1),course:$('pbCourse').value,slow:$('pbSlow').checked,speed:Number($('pbSpeed').value)||1};}
@@ -325,7 +343,7 @@
  function confetti(){const c=$('pbConfetti'),ctx=c.getContext('2d'),w=c.width=c.clientWidth*devicePixelRatio,h=c.height=c.clientHeight*devicePixelRatio,bits=Array.from({length:120},()=>({x:Math.random()*w,y:-Math.random()*h,v:2+Math.random()*4,s:4+Math.random()*6,c:palette[Math.floor(Math.random()*palette.length)],a:Math.random()*6}));let k=0;(function tick(){ctx.clearRect(0,0,w,h);for(const b of bits){b.y+=b.v*devicePixelRatio;b.a+=.1;ctx.fillStyle=b.c;ctx.fillRect(b.x+Math.sin(b.a)*8,b.y,b.s,b.s*.6);}if(++k<240&&!$('pbPopup').hidden)requestAnimationFrame(tick);else ctx.clearRect(0,0,w,h);})();}
  function play(result,meta){
   if(playing)playing.stop=true;
-  if(!sound.bgm)startMusic(meta.seed);
+  if(!sound.bgm&&!sound.want)startMusic(meta.seed);
   const box=$('pbStage'),canvas=$('pbCanvas'),ctx=canvas.getContext('2d'),b=result.sim.board,list=result.list;
   box.hidden=false;box.scrollIntoView({behavior:'smooth',block:'start'});
   const pickIdx=result.picks.map(id=>list.findIndex(p=>p.memberId===id)),hit=new Set(pickIdx),finish=result.sim.finish,order=result.sim.order,frames=result.sim.frames;
