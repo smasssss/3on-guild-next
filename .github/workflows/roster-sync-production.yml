@@ -15,6 +15,7 @@ name: Promote roster sync to Production after a fresh Staging verification (user
 # Release 15 (user-approved 2026-11-09 "승인" for 핀볼 추첨 Production 배포): new 핀볼 추첨 menu (race marbles, 10 courses, admin-only records in their own 'pinball' kind) with CC0 chiptune music.
 # Release 16 (user-approved 2026-11-10 "핀볼 새 코스 Production 배포 승인"): 핀볼 추첨 course layout 2 (ten distinct courses, side channels closed), camera follows the current likely winner; old records replay on layout 1.
 # Release 17 (user-approved 2026-11-10 "핀볼 반전 프로덕션 배포 승인"): 핀볼 추첨 layout 3 twists (ramp holes and trapdoors, shortcut/send-back warps, holding gate and goal guards); layout 1 and 2 records replay unchanged.
+# Release 18 (user-approved 2026-11-10 "핀볼 4판 Production 배포 승인"): 핀볼 추첨 layout 4 (no shortcut warps, one send-back gate at a choke point resting 2s after every 5 balls with a side lane, more bouncy obstacles, courses about twice as long); layouts 1-3 replay unchanged.
 on:
   push:
     branches: [claude/new-session-narazy]
