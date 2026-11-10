@@ -256,6 +256,7 @@
 
  // ---------- 화면 ----------
  const $=id=>document.getElementById(id);
+ const PLAY_RATE=.8; // 화면 재생 기본 속도(계산 결과는 그대로, 보이는 속도만 4/5)
  const fmtN=n=>Number(n).toLocaleString('ko-KR');
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const palette=['#f59ab8','#6cc58e','#f2b84b','#7fb3ec','#b994ee','#f39168','#58cfc6','#e58ed2','#a5cc5a','#ef9f7b'];
@@ -355,8 +356,10 @@
   // 지금 순위로 본 당첨 유력 공(골인한 수와 남은 공의 높이로 판단, 결과를 미리 보지 않음)
   const likely=(pos,fi)=>{const k=result.picks.length,n=list.length;if(meta.mode==='first'&&doneCount>=k)return undefined;const rest=[];for(let i=0;i<n;i++)if(finish[i]>fi)rest.push(i);if(!rest.length)return undefined;rest.sort((a,c)=>pos[2*c+1]-pos[2*a+1]||a-c);return rest[meta.mode==='first'?0:Math.min(rest.length-1,Math.max(0,n-k-doneCount))];};
   $('pbSkip').onclick=()=>{f=frames.length-1;};
-  function tick(){
-   if(st.stop)return;const fi=Math.min(Math.floor(f),frames.length-1),pos=frames[fi];
+  // 2026-11-10: 화면 새로고침 횟수(60번/120번)와 상관없이 실제 시간으로 진행하고, 기본 속도는 4/5로 조금 늦춥니다(사용자 요청).
+  let last=null;
+  function tick(now){
+   if(st.stop)return;const dt=last===null?0:Math.min(.1,Math.max(0,(now-last)/1000));last=now;const fi=Math.min(Math.floor(f),frames.length-1),pos=frames[fi];
    while(doneCount<order.length&&finish[order[doneCount]]<=fi)doneCount++;
    const guess=fi<b.mixFrames?undefined:likely(pos,fi);if(guess!==cand){cand=guess;candAt=fi;}
    // 순위가 잠깐 뒤집힐 때마다 흔들리지 않게 1/3초 이상 유지될 때 옮깁니다.
@@ -366,7 +369,7 @@
    while(shown<order.length&&finish[order[shown]]<=fi){const i=order[shown],p=list[i];const li=document.createElement('li');li.className=hit.has(i)?'pick':'';li.innerHTML='<span>'+(shown+1)+'</span><b>'+esc(p.nickname)+'</b>'+(hit.has(i)?'<i>당첨</i>':'');$('pbBoard').prepend(li);shown++;if(hit.has(i)&&f<frames.length-1)effect('goal');}
    if(fi>=frames.length-1&&shown>=order.length){finishPlay(result,meta);return;}
    const opt=settings(),near=target!==undefined&&pos[2*target+1]>b.goalY-240&&fi>=b.mixFrames;
-   f+=opt.speed*(opt.slow&&near?.3:1);requestAnimationFrame(tick);
+   f+=opt.speed*PLAY_RATE*(opt.slow&&near?.3:1)*dt*FPS;requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
  }
