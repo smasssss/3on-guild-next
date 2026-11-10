@@ -222,10 +222,13 @@ function nextBaseAfter(){const names=rotationNames();return names[(state.pointer
 function currentWeekRecords(){const k=weekKey(new Date());return state.records.filter(r=>r.weekKey===k).sort((a,b)=>a.date.localeCompare(b.date))}
 function recordForDate(s){return state.records.find(r=>r.date===s)}
 
-let pendingAdminPush=true;
+let pendingAdminPush=true,adminGateStay=false;
 function adminOK(){return shared.authVerified&&!!sharedToken()}
-function showAdminGate(push=true){
-  pendingAdminPush=push;
+// 2026-11-10 사용자 요청: 마차 VIP 고르기·핀볼 추첨 등 다른 화면에서 관리자 확인을 하면 관리설정으로 넘어가지 않고 보던 화면에 그대로 둡니다.
+// 관리설정 탭을 눌러 연 경우(stay=false)만 인증 뒤 관리설정으로 갑니다.
+function showAdminGate(push=true,stay=false){
+  pendingAdminPush=push;adminGateStay=stay;
+  document.getElementById('loginBtn').textContent=stay?'관리자 확인':'관리설정 열기';
   const gate=document.getElementById('loginGate');
   document.getElementById('loginerr').textContent='';
   document.getElementById('pw').value='';
@@ -271,12 +274,14 @@ function initLogin(){
       if(attempt!==adminLoginAttempt)return;
       if(r.scheme!=='3on-password-session-v1'||!/^[a-f0-9]{64}$/.test(r.token)||!Number.isSafeInteger(r.expires)||r.expires<=Date.now())throw Error('관리자 인증 응답을 확인할 수 없습니다.');
       sessionStorage.setItem('3on_admin_session_v2',JSON.stringify(r));shared.authVerified=true;sharedArmExpiry();hideAdminGate();sharedStatus('');
-      if(canyonPendingAction){const action=canyonPendingAction;canyonPendingAction=null;activateTab('canyon',false);action();}else activateTab('settings',pendingAdminPush);
+      if(canyonPendingAction){const action=canyonPendingAction;canyonPendingAction=null;activateTab('canyon',false);action();}
+      else if(adminGateStay){adminGateStay=false;showNotice('관리자 확인이 끝났습니다. 보던 화면에서 이어서 진행해 주세요.');}
+      else activateTab('settings',pendingAdminPush);
     }catch(e){if(attempt===adminLoginAttempt){document.getElementById('loginerr').textContent=e.message;field.value='';field.focus();}}
     finally{button.disabled=false;}
   };
   document.getElementById('loginBtn').onclick=submit;
-  document.getElementById('loginCancel').onclick=()=>{adminLoginAttempt++;canyonPendingAction=null;hideAdminGate();clearExitWarning();};
+  document.getElementById('loginCancel').onclick=()=>{adminLoginAttempt++;canyonPendingAction=null;adminGateStay=false;hideAdminGate();clearExitWarning();};
   document.getElementById('pw').addEventListener('keydown',e=>{if(e.key==='Enter')submit();});
 }
 
@@ -529,7 +534,7 @@ function bindVipMaintenance(){
 }
 
 // Keep the approved storage key and all saved records across releases.
-function ensureAdmin(){if(adminOK())return true;showAdminGate(true);return false}
+function ensureAdmin(){if(adminOK())return true;showAdminGate(false,currentTab!=='settings');return false}
 /* Legacy commitOperations uses the shared persistence adapter below. */
 function bindProduction(){
   document.getElementById('editRotationFromCarriage').onclick=()=>{if(!ensureAdmin())return;activateTab('settings',true);beginRotationEdit();document.getElementById('rotationEditor').scrollIntoView({block:'start'});};
