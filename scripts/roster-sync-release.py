@@ -95,9 +95,11 @@ class Release(roster.Release):
         super().fixture_cleanup()
 
 # User-approved permanent VIP exclusions (sub-accounts), added only after the code is verified.
-# Each entry: member ID, game ID, nickname. 야생야옹찌 is not registered yet; its member ID is the
+# Each entry: member ID, game ID, nickname (member and game IDs checked against Production on 2026-11-11). 야생야옹찌 was not registered at first; its member ID is the
 # deterministic automatic ID for its game ID, so the exclusion applies from its first registration.
-NEW_EXCLUSIONS=[('game_50373046_481129718055','481129718055','꧁두리꧂'),('game_50373046_480502743335','480502743335','꿀보맘'),('game_50373046_443174928679','443174928679','야생야옹찌')]
+NEW_EXCLUSIONS=[('game_50373046_481129718055','481129718055','꧁두리꧂'),('game_50373046_480502743335','480502743335','꿀보맘'),('game_50373046_443174928679','443174928679','야생야옹찌'),
+ # 2026-11-11 사용자 결정: 야생야옹요, 포세이돈(게임 닉네임 끝에 보이지 않는 빈칸 문자 \u3164)도 영구 제외.
+ ('game_50373046_492322431271','492322431271','야생야옹요'),('game_50373046_491422236967','491422236967','포세이돈\u3164')]
 def add_exclusions(self):
     import datetime,uuid
     base.PHASE='permanent exclusion update'

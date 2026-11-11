@@ -19,6 +19,7 @@ name: Promote roster sync to Production after a fresh Staging verification (user
 # Release 19 (user-approved 2026-11-10 "관리자 확인 수정 Production 배포 승인"): an administrator check started from another screen (carriage VIP, pinball) stays on that screen instead of opening the settings page.
 # Release 20 (user-approved 2026-11-10 "핀볼 섞기 수정 Production 배포 승인"): 핀볼 추첨 layout 5 shuffles starting spots and member order per draw and shakes harder (no member favoured); layouts 1-4 replay unchanged.
 # Release 21 (user-approved 2026-11-10 "핀볼 전체 수정 Production 배포 승인"): Release 20 first run stopped at the Staging version check (Cloudflare 404, nothing changed). Ships layout 5 shuffle with a 2-second swirl wind in the start box, Web Audio music and effects (no cut-outs, music stops at the result), and real-time playback at 4/5 speed on every screen refresh rate.
+# Release 22 (user-approved 2026-11-11 "VIP 영구 제외 추가 Production 반영 승인"): adds 야생야옹요 and 포세이돈 to the permanent VIP exclusions after a backup; no code change.
 on:
   push:
     branches: [claude/new-session-narazy]
@@ -261,7 +262,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: python scripts/roster-sync-release.py verify production
-      - name: Add the user-approved permanent VIP exclusions (꧁두리꧂, 꿀보맘, 야생야옹찌) after a backup
+      - name: Add the user-approved permanent VIP exclusions (꧁두리꧂, 꿀보맘, 야생야옹찌, 야생야옹요, 포세이돈) after a backup
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
