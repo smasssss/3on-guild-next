@@ -8,7 +8,7 @@ function picker(members,records,points,carry={},baseline){
  const nodes={vipSearch:{value:''},vipResults:{innerHTML:''}};
  const ctx={console,Date,Number,Set,Map,JSON,Promise,crypto,VERIFIED_IDENTITIES:{},aliases:{},window:{addEventListener(){}},document:{getElementById:id=>nodes[id],querySelectorAll:()=>[]},GROWTH:{members:[],archivedMembers:[]},state:{vipExcludedMembers:{},records,...(baseline?{vipBaseline:baseline}:{})},vipRecordCanonical:r=>r.vipCanonical,labelOfMember:m=>m.displayName||m.name,vipTotalCount:n=>(carry[n]||0)+records.filter(r=>r.vipCanonical===n).length,carryConflict:()=>false,escapeLabel:s=>String(s),fmt:n=>Number(n).toLocaleString('ko-KR'),memberByCanonical(){},memberByLabel(){}};
  vm.createContext(ctx);vm.runInContext(fs.readFileSync('public/carriage-vip.js','utf8'),ctx);
- ctx.view={week:'2026-11-02',roster:{sourceAsOf:1},active:{appliesOn:'2026-11-02',rows:Object.entries(points).map(([memberId,p])=>({memberId,points:p}))},members:members.map(([id,ok,reason,joinedOn])=>({memberId:id,canonical:id,nickname:id,current:true,joinedOn:joinedOn||null,eligibility:{eligible:ok,reason:reason||'eligible'}}))};
+ ctx.view={week:'2026-11-02',roster:{sourceAsOf:1},active:{appliesOn:'2026-11-02',rows:Object.entries(points).map(([memberId,p])=>({memberId,points:p}))},members:members.map(([id,ok,reason,joinedOn,rejoinedOn])=>({memberId:id,canonical:id,nickname:id,current:true,joinedOn:joinedOn||null,rejoinedOn:rejoinedOn||null,eligibility:{eligible:ok,reason:reason||'eligible'}}))};
  vm.runInContext('carriageVip.view=view',ctx);ctx.renderCarriageVipResults();
  const html=nodes.vipResults.innerHTML;return {ids:[...html.matchAll(/data-vip="([^"]+)"/g)].map(m=>m[1]),html,ctx};
 }
@@ -44,10 +44,15 @@ assert.deepEqual(r.ids,['ok','low']);assert(r.html.includes('누적 2회')&&r.ht
 // Returning member: history keyed by the same identity (memberId/canonical) is linked again.
 r=picker([['back',true],['fresh',true]],[ride('back','2026-09-01'),ride('back','2026-09-20')],{back:E,fresh:E});
 assert(r.html.includes('누적 2회'));assert.deepEqual(r.ids,['back','fresh'],'a brand-new member no longer jumps ahead of a long wait');
+// Returning member (2026-11-12 user decision): the VIP count carries on, but the last VIP counts from the day they came back.
+r=picker([['back',true,'eligible','2026-11-03','2026-11-03'],['waiting',true]],[ride('back','2026-09-01'),ride('back','2026-09-20'),ride('waiting','2026-10-15')],{back:E,waiting:E});
+assert.deepEqual(r.ids,['waiting','back']);assert(r.html.includes('누적 2회')&&r.html.includes('(재가입)'));
+r=picker([['back',true,'eligible','2026-11-03','2026-11-03'],['later',true]],[ride('back','2026-09-01'),ride('back','2026-11-06'),ride('later','2026-11-05')],{back:E,later:E});
+assert.deepEqual(r.ids,['later','back'],'a VIP after coming back counts from that ride');assert(!r.html.includes('(재가입)'));
 // Fixed drivers and permanent exclusions are listed last with their reason, never recommended.
 r=picker([['rot',false,'rotation'],['perm',false,'permanent'],['ok',true]],[],{rot:E*2,perm:E*2,ok:E});
 assert.equal(r.ids[0],'ok');assert(r.html.includes('고정 마차장')&&r.html.includes('영구 제외'));
 // Same data always gives the same order.
 const a=picker([['x',true],['y',true],['z',true]],[ride('x','2026-10-01')],{x:E,y:E,z:E}).ids,b=picker([['z',true],['y',true],['x',true]],[ride('x','2026-10-01')],{x:E,y:E,z:E}).ids;
 assert.deepEqual(a,b);
-console.log('PASS: VIP queue — 0 VIPs count as one VIP on their join day (or this week when unknown) or stored baseline, oldest last VIP first (dateless count oldest), fewer VIPs, points, memberId; recommendation; exclusions last with reasons; history kept; deterministic');
+console.log('PASS: VIP queue — 0 VIPs count as one VIP on their join day (or this week when unknown) or stored baseline, returning members keep their count and queue from the return day, oldest last VIP first (dateless count oldest), fewer VIPs, points, memberId; recommendation; exclusions last with reasons; history kept; deterministic');

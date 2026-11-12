@@ -3,7 +3,7 @@ const carriageVip={view:null,loading:null,hour:null,draft:null,error:''};
 const vipReason={permanent:'영구 제외',rotation:'고정 마차장',membership:'현재 소속·동일인 확인 필요',score_low:'점수 미달',unavailable:'자료 확인 필요'};
 function carriageMembers(){
  const all=new Map([...(GROWTH.archivedMembers||[]),...GROWTH.members].map(m=>[m.member_id,{...m,observedToday:false}]));
- for(const r of carriageVip.view?.members||[]){const before=all.get(r.memberId);all.set(r.memberId,{...before,member_id:r.memberId,name:before?.name||r.canonical,displayName:r.nickname,rank:r.rank,level:r.level,joinedOn:r.joinedOn||null,observedToday:r.current});}
+ for(const r of carriageVip.view?.members||[]){const before=all.get(r.memberId);all.set(r.memberId,{...before,member_id:r.memberId,name:before?.name||r.canonical,displayName:r.nickname,rank:r.rank,level:r.level,joinedOn:r.joinedOn||null,rejoinedOn:r.rejoinedOn||null,observedToday:r.current});}
  return [...all.values()];
 }
 function carriageVipStatus(m){
@@ -35,7 +35,9 @@ function carriageVipBaseline(m,status,raw){
 function carriageVipHistory(m,status){
  const dates=state.records.filter(r=>vipRecordCanonical(r)===m.name).map(r=>r.date).sort(),raw=vipTotalCount(m.name),ride=dates.length?dates[dates.length-1]:null;
  const base=carriageVipBaseline(m,status===undefined?carriageVipStatus(m):status,raw);
- return {count:raw+(base?1:0),last:base&&(!ride||base>ride)?base:ride,baseline:base};
+ // 다시 들어온 사람: 횟수는 이어 가고, 마지막 VIP는 다시 들어온 날보다 이르지 않게 봅니다(그 뒤에 받으면 그 날짜).
+ const last=[ride,base,raw+(base?1:0)>0?m.rejoinedOn:null].filter(Boolean).sort().pop()||null;
+ return {count:raw+(base?1:0),last,baseline:base,rejoined:!!m.rejoinedOn&&last===m.rejoinedOn&&last!==ride&&last!==base};
 }
 function carriageVipFillBaseline(){
  for(const m of carriageMembers()){
@@ -60,7 +62,7 @@ function renderCarriageVipResults(){
  // The picker shows only the member list; week/score/roster details are not shown (user request 2026-11-05).
  document.getElementById('vipResults').innerHTML=arr.map(x=>{
   const {m,count,last,status}=x,reason=vipReason[status.reason]||'',points=carriagePoints(m);
-  return `<div class="viprow"><div class="vip-main"><b>${escapeLabel(labelOfMember(m))}</b>${x===top?' <span class="pill good">오늘 추천</span>':''}<br><span>길드전 ${points===null?'미확인':fmt(points)+'점'} · 누적 ${count}회 · 마지막 VIP ${count?carriageDaysAgo(last)+(x.baseline&&last===x.baseline&&!state.records.some(r=>r.date===last&&vipRecordCanonical(r)===m.name)?'(기준)':''):'없음'}</span><br><span class="pill ${status.eligible?'good':'warn'}">${status.eligible?'대상':reason}</span></div><div class="vip-actions"><span class="vip-count ${count===0?'zero':''}">VIP ${count}회${carryConflict(m.name)?' · 확인 필요':''}</span><div class="vip-pick-buttons"><button class="smallbtn" data-leader="${escapeLabel(m.member_id)}">마차장</button><button class="smallbtn" data-vip="${escapeLabel(m.member_id)}" ${status.eligible?'':'disabled aria-disabled="true"'} title="${reason}">VIP</button></div></div></div>`;
+  return `<div class="viprow"><div class="vip-main"><b>${escapeLabel(labelOfMember(m))}</b>${x===top?' <span class="pill good">오늘 추천</span>':''}<br><span>길드전 ${points===null?'미확인':fmt(points)+'점'} · 누적 ${count}회 · 마지막 VIP ${count?carriageDaysAgo(last)+(x.rejoined?'(재가입)':x.baseline&&last===x.baseline&&!state.records.some(r=>r.date===last&&vipRecordCanonical(r)===m.name)?'(기준)':''):'없음'}</span><br><span class="pill ${status.eligible?'good':'warn'}">${status.eligible?'대상':reason}</span></div><div class="vip-actions"><span class="vip-count ${count===0?'zero':''}">VIP ${count}회${carryConflict(m.name)?' · 확인 필요':''}</span><div class="vip-pick-buttons"><button class="smallbtn" data-leader="${escapeLabel(m.member_id)}">마차장</button><button class="smallbtn" data-vip="${escapeLabel(m.member_id)}" ${status.eligible?'':'disabled aria-disabled="true"'} title="${reason}">VIP</button></div></div></div>`;
  }).join('')+(arr.length?'':'<p class="sub">현재 선택 가능한 명단이 없습니다. 자동수집 명단·연결 상태를 확인해 주세요.</p>');
  document.querySelectorAll('[data-leader]').forEach(b=>b.onclick=()=>{const m=carriageMembers().find(m=>m.member_id===b.dataset.leader&&m.observedToday);if(!m)return;mode='insert';leaderSelectionDirty=true;renderForm();document.getElementById('leaderSelect').value=m.name;renderPreview();});
  document.querySelectorAll('[data-vip]').forEach(b=>b.onclick=()=>{const m=carriageMembers().find(m=>m.member_id===b.dataset.vip);if(!m||!carriageVipStatus(m).eligible)return;selectedVip=labelOfMember(m);selectedVipCanonical=m.name;document.getElementById('vipModal').classList.remove('show');renderForm();});
