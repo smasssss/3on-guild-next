@@ -3,7 +3,7 @@ const carriageVip={view:null,loading:null,hour:null,draft:null,error:''};
 const vipReason={permanent:'영구 제외',rotation:'고정 마차장',membership:'현재 소속·동일인 확인 필요',score_low:'점수 미달',unavailable:'자료 확인 필요'};
 function carriageMembers(){
  const all=new Map([...(GROWTH.archivedMembers||[]),...GROWTH.members].map(m=>[m.member_id,{...m,observedToday:false}]));
- for(const r of carriageVip.view?.members||[]){const before=all.get(r.memberId);all.set(r.memberId,{...before,member_id:r.memberId,name:before?.name||r.canonical,displayName:r.nickname,rank:r.rank,level:r.level,observedToday:r.current});}
+ for(const r of carriageVip.view?.members||[]){const before=all.get(r.memberId);all.set(r.memberId,{...before,member_id:r.memberId,name:before?.name||r.canonical,displayName:r.nickname,rank:r.rank,level:r.level,joinedOn:r.joinedOn||null,observedToday:r.current});}
  return [...all.values()];
 }
 function carriageVipStatus(m){
@@ -25,10 +25,12 @@ function carriageInfo(label){
 // (count-only history without dates counts as oldest), fewer VIPs, higher points; memberId breaks ties.
 // 2026-11-12 사용자 결정: VIP 0회인 사람이 들어오자마자 줄 맨 앞에 서지 않도록 '기준 1회'를 둡니다.
 // 저장된 기준(state.vipBaseline[회원 번호]=날짜)은 그 날짜에 VIP 1회를 받은 것으로 칩니다(실제 운행 기록은 바꾸지 않음).
-// 아직 기준이 없는 0회 회원은 자격이 생긴 주의 적용 월요일에 1회 받은 것으로 보고, 관리자가 마차 기록을 저장할 때 그 날짜를 남깁니다.
+// 아직 기준이 없는 0회 회원(신규 인원)은 가입한 날(처음 명단에 등록된 날)에 1회 받은 것으로 보고, 관리자가 마차 기록을 저장할 때 그 날짜를 남깁니다.
+// 가입한 날을 모르면 지금 적용 중인 주의 월요일로 봅니다.
+function carriageVipJoinDate(m){return m.joinedOn||carriageVip.view?.active?.appliesOn||null;}
 function carriageVipBaseline(m,status,raw){
  const saved=state.vipBaseline?.[m.member_id];if(saved)return saved;
- return raw===0&&status?.eligible&&carriageVip.view?.active?.appliesOn?carriageVip.view.active.appliesOn:null;
+ return raw===0&&status?.eligible?carriageVipJoinDate(m):null;
 }
 function carriageVipHistory(m,status){
  const dates=state.records.filter(r=>vipRecordCanonical(r)===m.name).map(r=>r.date).sort(),raw=vipTotalCount(m.name),ride=dates.length?dates[dates.length-1]:null;
@@ -36,10 +38,9 @@ function carriageVipHistory(m,status){
  return {count:raw+(base?1:0),last:base&&(!ride||base>ride)?base:ride,baseline:base};
 }
 function carriageVipFillBaseline(){
- const active=carriageVip.view?.active?.appliesOn;if(!active)return;
  for(const m of carriageMembers()){
   if(!m.observedToday||state.vipBaseline?.[m.member_id]||!carriageVipStatus(m).eligible||vipTotalCount(m.name)!==0)continue;
-  state.vipBaseline={...(state.vipBaseline||{}),[m.member_id]:active};
+  const day=carriageVipJoinDate(m);if(day)state.vipBaseline={...(state.vipBaseline||{}),[m.member_id]:day};
  }
 }
 // 마차 기록을 저장할 때 아직 남기지 않은 기준 날짜를 함께 저장합니다(저장 자체는 원래 방식 그대로).
