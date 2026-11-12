@@ -20,6 +20,7 @@ name: Promote roster sync to Production after a fresh Staging verification (user
 # Release 20 (user-approved 2026-11-10 "핀볼 섞기 수정 Production 배포 승인"): 핀볼 추첨 layout 5 shuffles starting spots and member order per draw and shakes harder (no member favoured); layouts 1-4 replay unchanged.
 # Release 21 (user-approved 2026-11-10 "핀볼 전체 수정 Production 배포 승인"): Release 20 first run stopped at the Staging version check (Cloudflare 404, nothing changed). Ships layout 5 shuffle with a 2-second swirl wind in the start box, Web Audio music and effects (no cut-outs, music stops at the result), and real-time playback at 4/5 speed on every screen refresh rate.
 # Release 22 (user-approved 2026-11-11 "VIP 영구 제외 추가 Production 반영 승인"): adds 야생야옹요 and 포세이돈 to the permanent VIP exclusions after a backup; no code change.
+# Release 23 (user-approved 2026-11-12 "VIP 기준 1회 Production 반영 승인"): VIP queue baseline. Current 0-VIP members count as one VIP on 2026-11-12 (one-time, after a backup); new members count one VIP on their join day; returning members keep their count and queue from the return day.
 on:
   push:
     branches: [claude/new-session-narazy]
@@ -75,6 +76,7 @@ jobs:
           node tests/vip_weekly_import_regression.cjs
           node tests/save_recovery_regression.cjs
           node tests/vip_weekly_hold_regression.cjs
+          node tests/vip_baseline_regression.cjs
           node tests/pinball_regression.cjs
           node tests/vip_sunday_regression.cjs
           node tests/weekly_input_regression.cjs
@@ -267,6 +269,18 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: python scripts/roster-sync-release.py add-exclusions production
+      - name: One-time VIP baseline (user-approved 2026-11-12) - list current 0-VIP members on the live page (read-only)
+        run: |
+          npm install --prefix "$RUNNER_TEMP/pw" --no-audit --no-fund --ignore-scripts playwright-core@1.56.1
+          cp scripts/vip-baseline-targets.mjs "$RUNNER_TEMP/pw/targets.mjs"
+          CHROME_BIN="$(command -v google-chrome)" node "$RUNNER_TEMP/pw/targets.mjs" "$RUNNER_TEMP/baseline-targets.json"
+      - name: One-time VIP baseline - count those members as one VIP on 2026-11-12 after a backup
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          BASELINE_ON: '2026-11-12'
+          BASELINE_TARGETS: ${{ runner.temp }}/baseline-targets.json
+        run: python scripts/roster-sync-release.py add-baseline production
       - name: Roll back only this run's Production code if verification fails
         if: failure()
         env:
