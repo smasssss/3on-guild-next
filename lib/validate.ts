@@ -19,6 +19,8 @@ export function validate(kind:string,data:any){
     if(data.vipExcludedMembers!==undefined){if(!obj(data.vipExcludedMembers))bad();for(const [key,value]of Object.entries(data.vipExcludedMembers))if(!key||key.length>200||['__proto__','constructor','prototype'].includes(key)||value!==1)bad();}
     for(const r of data.records){if(!obj(r)||typeof r.id!=='string'||r.id.length>200||ids.has(r.id)||!date(r.date)||!date(r.weekKey)||!['base','insert'].includes(r.type)||typeof r.leader!=='string')bad();ids.add(r.id);}
     for(const r of data.records)if(r.vipMemberId!==undefined&&(typeof r.vipMemberId!=='string'||!r.vipMemberId||r.vipMemberId.length>200||['__proto__','constructor','prototype'].includes(r.vipMemberId)))bad();
+    // 2026-11-12: VIP 기준 1회(회원 번호 → 날짜). 실제 운행 기록과 별도로 '그 날짜에 1회 받은 것'으로 칩니다.
+    if(data.vipBaseline!==undefined){if(!obj(data.vipBaseline))bad();for(const [key,value]of Object.entries(data.vipBaseline))if(!key||key.length>200||['__proto__','constructor','prototype'].includes(key)||!date(value))bad();}
     if(data.vipThreshold!==undefined&&(!Number.isSafeInteger(data.vipThreshold)||data.vipThreshold<1||data.vipThreshold>9_999_999_999))bad();
     for(const field of ['vipCarry','vipResolution'])if(data[field]!==undefined){if(!obj(data[field]))bad();for(const [k,v]of Object.entries(data[field]))if(['__proto__','constructor','prototype'].includes(k)||!Number.isSafeInteger(Number(v))||Number(v)<0)bad();}
   }else if(kind==='power'){

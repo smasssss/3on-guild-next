@@ -23,10 +23,27 @@ function carriageInfo(label){
 }
 // VIP queue (2026-11-05): 0 VIPs first (higher points first); then oldest last VIP first
 // (count-only history without dates counts as oldest), fewer VIPs, higher points; memberId breaks ties.
-function carriageVipHistory(m){
- const dates=state.records.filter(r=>vipRecordCanonical(r)===m.name).map(r=>r.date).sort();
- return {count:vipTotalCount(m.name),last:dates.length?dates[dates.length-1]:null};
+// 2026-11-12 사용자 결정: VIP 0회인 사람이 들어오자마자 줄 맨 앞에 서지 않도록 '기준 1회'를 둡니다.
+// 저장된 기준(state.vipBaseline[회원 번호]=날짜)은 그 날짜에 VIP 1회를 받은 것으로 칩니다(실제 운행 기록은 바꾸지 않음).
+// 아직 기준이 없는 0회 회원은 자격이 생긴 주의 적용 월요일에 1회 받은 것으로 보고, 관리자가 마차 기록을 저장할 때 그 날짜를 남깁니다.
+function carriageVipBaseline(m,status,raw){
+ const saved=state.vipBaseline?.[m.member_id];if(saved)return saved;
+ return raw===0&&status?.eligible&&carriageVip.view?.active?.appliesOn?carriageVip.view.active.appliesOn:null;
 }
+function carriageVipHistory(m,status){
+ const dates=state.records.filter(r=>vipRecordCanonical(r)===m.name).map(r=>r.date).sort(),raw=vipTotalCount(m.name),ride=dates.length?dates[dates.length-1]:null;
+ const base=carriageVipBaseline(m,status===undefined?carriageVipStatus(m):status,raw);
+ return {count:raw+(base?1:0),last:base&&(!ride||base>ride)?base:ride,baseline:base};
+}
+function carriageVipFillBaseline(){
+ const active=carriageVip.view?.active?.appliesOn;if(!active)return;
+ for(const m of carriageMembers()){
+  if(!m.observedToday||state.vipBaseline?.[m.member_id]||!carriageVipStatus(m).eligible||vipTotalCount(m.name)!==0)continue;
+  state.vipBaseline={...(state.vipBaseline||{}),[m.member_id]:active};
+ }
+}
+// 마차 기록을 저장할 때 아직 남기지 않은 기준 날짜를 함께 저장합니다(저장 자체는 원래 방식 그대로).
+if(typeof saveState==='function'){const saveStateOriginal=saveState;saveState=async function(...args){try{carriageVipFillBaseline();}catch{/* 기준 기록은 저장을 막지 않음 */}return saveStateOriginal.apply(this,args);};}
 function carriageVipOrder(a,b){
  const pa=carriagePoints(a.m)??0,pb=carriagePoints(b.m)??0,byId=String(a.m.member_id).localeCompare(String(b.m.member_id));
  if((a.count===0)!==(b.count===0))return a.count===0?-1:1;
@@ -36,13 +53,13 @@ function carriageVipOrder(a,b){
 function carriageDaysAgo(d){if(!d)return '기록 날짜 없음';const today=new Date(Date.now()+9*3_600_000).toISOString().slice(0,10);const n=Math.round((Date.parse(today)-Date.parse(d))/86_400_000);return n<=0?'오늘':n+'일 전';}
 function renderCarriageVipResults(){
  const q=(document.getElementById('vipSearch').value||'').toLowerCase();
- const all=carriageMembers().filter(m=>m.observedToday===true&&(m.name+' '+labelOfMember(m)).toLowerCase().includes(q)).map(m=>({m,...carriageVipHistory(m),status:carriageVipStatus(m)}));
+ const all=carriageMembers().filter(m=>m.observedToday===true&&(m.name+' '+labelOfMember(m)).toLowerCase().includes(q)).map(m=>{const status=carriageVipStatus(m);return {m,...carriageVipHistory(m,status),status};});
  const arr=[...all.filter(x=>x.status.eligible).sort(carriageVipOrder),...all.filter(x=>!x.status.eligible).sort(carriageVipOrder)].slice(0,100);
  const top=arr.find(x=>x.status.eligible);
  // The picker shows only the member list; week/score/roster details are not shown (user request 2026-11-05).
  document.getElementById('vipResults').innerHTML=arr.map(x=>{
   const {m,count,last,status}=x,reason=vipReason[status.reason]||'',points=carriagePoints(m);
-  return `<div class="viprow"><div class="vip-main"><b>${escapeLabel(labelOfMember(m))}</b>${x===top?' <span class="pill good">오늘 추천</span>':''}<br><span>길드전 ${points===null?'미확인':fmt(points)+'점'} · 누적 ${count}회 · 마지막 VIP ${count?carriageDaysAgo(last):'없음'}</span><br><span class="pill ${status.eligible?'good':'warn'}">${status.eligible?'대상':reason}</span></div><div class="vip-actions"><span class="vip-count ${count===0?'zero':''}">VIP ${count}회${carryConflict(m.name)?' · 확인 필요':''}</span><div class="vip-pick-buttons"><button class="smallbtn" data-leader="${escapeLabel(m.member_id)}">마차장</button><button class="smallbtn" data-vip="${escapeLabel(m.member_id)}" ${status.eligible?'':'disabled aria-disabled="true"'} title="${reason}">VIP</button></div></div></div>`;
+  return `<div class="viprow"><div class="vip-main"><b>${escapeLabel(labelOfMember(m))}</b>${x===top?' <span class="pill good">오늘 추천</span>':''}<br><span>길드전 ${points===null?'미확인':fmt(points)+'점'} · 누적 ${count}회 · 마지막 VIP ${count?carriageDaysAgo(last)+(x.baseline&&last===x.baseline&&!state.records.some(r=>r.date===last&&vipRecordCanonical(r)===m.name)?'(기준)':''):'없음'}</span><br><span class="pill ${status.eligible?'good':'warn'}">${status.eligible?'대상':reason}</span></div><div class="vip-actions"><span class="vip-count ${count===0?'zero':''}">VIP ${count}회${carryConflict(m.name)?' · 확인 필요':''}</span><div class="vip-pick-buttons"><button class="smallbtn" data-leader="${escapeLabel(m.member_id)}">마차장</button><button class="smallbtn" data-vip="${escapeLabel(m.member_id)}" ${status.eligible?'':'disabled aria-disabled="true"'} title="${reason}">VIP</button></div></div></div>`;
  }).join('')+(arr.length?'':'<p class="sub">현재 선택 가능한 명단이 없습니다. 자동수집 명단·연결 상태를 확인해 주세요.</p>');
  document.querySelectorAll('[data-leader]').forEach(b=>b.onclick=()=>{const m=carriageMembers().find(m=>m.member_id===b.dataset.leader&&m.observedToday);if(!m)return;mode='insert';leaderSelectionDirty=true;renderForm();document.getElementById('leaderSelect').value=m.name;renderPreview();});
  document.querySelectorAll('[data-vip]').forEach(b=>b.onclick=()=>{const m=carriageMembers().find(m=>m.member_id===b.dataset.vip);if(!m||!carriageVipStatus(m).eligible)return;selectedVip=labelOfMember(m);selectedVipCanonical=m.name;document.getElementById('vipModal').classList.remove('show');renderForm();});

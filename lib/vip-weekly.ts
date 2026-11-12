@@ -120,6 +120,9 @@ type Ride = {id:string;vip?:string;vipCanonical?:string;vipMemberId?:string};
 export function protectExclusions(previous:Carriage,next:Carriage){
  const saved=previous.vipExcludedMembers||{};
  if(Object.keys(saved).length)next.vipExcludedMembers={...next.vipExcludedMembers,...saved};
+ // VIP 기준 1회(2026-11-12)도 한번 정해지면 화면 저장으로 지우거나 바꾸지 않습니다.
+ const baseline=(previous as {vipBaseline?:Record<string,string>}).vipBaseline||{};
+ if(Object.keys(baseline).length)(next as {vipBaseline?:Record<string,string>}).vipBaseline={...(next as {vipBaseline?:Record<string,string>}).vipBaseline,...baseline};
 }
 export function validateAssignments(previous:{records:Ride[]},next:{records:Ride[]}&Carriage,members:Member[],weekly:Weekly|null,now=Date.now()){
  const assigned:Member[]=[];

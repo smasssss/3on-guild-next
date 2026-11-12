@@ -130,6 +130,40 @@ def add_exclusions(self):
     print('Permanent exclusions: '+str(len(before))+' kept, '+str(len(added))+' added')
 Release.add_exclusions=add_exclusions
 
+# One-time VIP baseline (user decision 2026-11-12): current members with 0 VIPs count as one VIP on that date.
+# Targets come from the live page's own count (scripts/vip-baseline-targets.mjs). Only runs on BASELINE_ON (KST);
+# existing baselines, ride records and every other field are kept.
+def add_baseline(self):
+    import datetime,uuid,os
+    base.PHASE='VIP baseline update'
+    assert self.target=='production'
+    day=os.environ.get('BASELINE_ON','');today=(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(hours=9)).date().isoformat()
+    if day!=today:print('VIP baseline: skipped (only on '+day+' KST)');return
+    targets=json.loads(open(os.environ['BASELINE_TARGETS']).read())['targets']
+    vip=json.loads(self.public('/api/carriage/vip'));current={m['memberId'] for m in vip['members'] if m['current']}
+    assert set(targets)<=current,'Baseline target is not a current member'
+    row=self.query("SELECT revision,payload FROM documents WHERE kind='carriage'")[0]
+    data=json.loads(row['payload']);before=dict(data.get('vipBaseline') or {})
+    rotation={e['memberId'] for e in data.get('rotationMembers') or []};excluded=data.get('vipExcludedMembers') or {}
+    assert not any(t in rotation or excluded.get(t)==1 for t in targets),'Fixed drivers and permanent exclusions are never baselined'
+    added=[t for t in targets if t not in before]
+    self.save('baseline-before.json',{'revision':row['revision'],'baseline':before,'targets':targets})
+    if added:
+        data['vipBaseline']={**before,**{t:today for t in added}}
+        payload=json.dumps(data,ensure_ascii=False,separators=(',',':'));stamp=datetime.datetime.now(datetime.timezone.utc).isoformat().replace('+00:00','Z');mutation=uuid.uuid4().hex
+        result=self.api('POST','/d1/database/'+self.database+'/query',{'batch':[
+            {'sql':"INSERT INTO backups(mutation,kind,revision,payload,saved_at,actor) SELECT ?,kind,revision,payload,?,? FROM documents WHERE kind='carriage' AND revision=?",'params':[mutation,stamp,'roster-sync-release',row['revision']]},
+            {'sql':"UPDATE documents SET payload=?,revision=revision+1,updated_at=?,actor=?,last_mutation=? WHERE kind='carriage' AND revision=? AND payload=?",'params':[payload,stamp,'roster-sync-release',mutation,row['revision'],row['payload']]}]})
+        assert all(r.get('success',True) for r in result)
+    after=self.query("SELECT revision,payload FROM documents WHERE kind='carriage'")[0];saved=json.loads(after['payload'])
+    assert after['revision']==row['revision']+(1 if added else 0),'Carriage changed concurrently; nothing else was written'
+    assert all(saved['vipBaseline'].get(k)==v for k,v in before.items()),'Existing baselines preserved'
+    assert all(saved['vipBaseline'].get(t) in (today,before.get(t)) for t in targets)
+    assert {k:v for k,v in saved.items() if k!='vipBaseline'}=={k:v for k,v in data.items() if k!='vipBaseline'},'Only the baseline changed'
+    self.save('baseline-after.json',{'revision':after['revision'],'added':added,'date':today})
+    print('VIP baseline: '+str(len(before))+' kept, '+str(len(added))+' set to '+today)
+Release.add_baseline=add_baseline
+
 if __name__=='__main__':
     try:
         action,target=sys.argv[1:3];base.PHASE=action;r=Release(target)

@@ -55,4 +55,31 @@ class Exclusions(unittest.TestCase):
   with tempfile.TemporaryDirectory() as d:
    r,_=self.release(d,'staging')
    with self.assertRaises(AssertionError):r.add_exclusions()
+class Baseline(unittest.TestCase):
+ # One-time VIP baseline (user decision 2026-11-12): only listed current members, only on the given KST day, with backup.
+ def release(self,d,targets,current,day=None):
+  import datetime
+  r,carriage=Exclusions.release(self,d)
+  r.public=lambda path,**k:json.dumps({'members':[{'memberId':m,'current':True} for m in current]})
+  carriage['rotationMembers']=[{'memberId':'driver','name':'driver'}]
+  r.sql.execute("UPDATE documents SET payload=? WHERE kind='carriage'",[json.dumps(carriage)]);r.sql.commit()
+  path=os.path.join(d,'targets.json');open(path,'w').write(json.dumps({'targets':targets}))
+  os.environ['BASELINE_TARGETS']=path;os.environ['BASELINE_ON']=day or (datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(hours=9)).date().isoformat()
+  return r,carriage
+ def test_sets_only_targets_to_today_with_backup_and_is_idempotent(self):
+  with tempfile.TemporaryDirectory() as d:
+   r,carriage=self.release(d,['a','b'],['a','b','c']);r.add_baseline()
+   row=r.query("SELECT revision,payload FROM documents WHERE kind='carriage'")[0];saved=json.loads(row['payload'])
+   self.assertEqual(row['revision'],8);self.assertEqual(set(saved['vipBaseline']),{'a','b'});self.assertEqual(len(set(saved['vipBaseline'].values())),1)
+   self.assertEqual({k:v for k,v in saved.items() if k!='vipBaseline'},carriage,'only the baseline changed')
+   self.assertEqual(json.loads(r.query("SELECT payload FROM backups WHERE kind='carriage' AND revision=7")[0]['payload']),carriage,'previous carriage document backed up')
+   r.add_baseline();self.assertEqual(r.query("SELECT revision FROM documents WHERE kind='carriage'")[0]['revision'],8,'second run changes nothing')
+ def test_refuses_non_members_drivers_and_other_days(self):
+  with tempfile.TemporaryDirectory() as d:
+   r,_=self.release(d,['gone'],['a'])
+   with self.assertRaises(AssertionError):r.add_baseline()
+   r,_=self.release(d,['driver'],['driver'])
+   with self.assertRaises(AssertionError):r.add_baseline()
+   r,_=self.release(d,['a'],['a'],day='2000-01-01');r.add_baseline()
+   self.assertEqual(r.query("SELECT revision FROM documents WHERE kind='carriage'")[0]['revision'],7,'skipped on another day')
 if __name__=='__main__':unittest.main()
