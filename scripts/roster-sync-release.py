@@ -137,8 +137,11 @@ def add_baseline(self):
     import datetime,uuid,os
     base.PHASE='VIP baseline update'
     assert self.target=='production'
-    day=os.environ.get('BASELINE_ON','');today=(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(hours=9)).date().isoformat()
-    if day!=today:print('VIP baseline: skipped (only on '+day+' KST)');return
+    # BASELINE_ON is the date to record (the day the user asked, KST); the step runs only that day or the next
+    # (a release can start just after midnight), so a later release never repeats it.
+    day=os.environ.get('BASELINE_ON','');now=(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(hours=9)).date()
+    if not day or not 0<=(now-datetime.date.fromisoformat(day)).days<=1:print('VIP baseline: skipped (only on '+day+' KST or the next day)');return
+    today=day
     targets=json.loads(open(os.environ['BASELINE_TARGETS']).read())['targets']
     vip=json.loads(self.public('/api/carriage/vip'));current={m['memberId'] for m in vip['members'] if m['current']}
     assert set(targets)<=current,'Baseline target is not a current member'
