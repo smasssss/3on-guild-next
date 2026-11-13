@@ -167,6 +167,13 @@ def add_baseline(self):
     print('VIP baseline: '+str(len(before))+' kept, '+str(len(added))+' set to '+today)
 Release.add_baseline=add_baseline
 
+# 2026-11-13: report (names only) whether the live Worker has the tracker key; the collector falls back to .gg without it.
+def tracker_key(self):
+    base.PHASE='tracker key check'
+    names=[b['name'] for b in self.worker_api('/settings').get('bindings',[]) if b.get('type')=='secret_text']
+    print('Tracker API key on the live Worker: '+('yes' if 'TRACKER_API_KEY' in names else 'no (collection keeps using lastasylum.gg)'))
+Release.tracker_key=tracker_key
+
 if __name__=='__main__':
     try:
         action,target=sys.argv[1:3];base.PHASE=action;r=Release(target)

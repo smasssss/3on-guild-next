@@ -124,7 +124,9 @@ class Release:
             'identity':self.query('SELECT key,value,updated_at FROM growth_meta ORDER BY key'),
             'published_observations':self.query('SELECT COUNT(*) n FROM growth_observations'),
             'crons':self.crons(),'vars':digest([b for b in cfg['bindings'] if b['type']=='plain_text']),
-            'secrets':sorted(b['name'] for b in cfg['bindings'] if b['type']=='secret_text'),
+            # TRACKER_API_KEY (2026-11-13, roster source) is added by the user in the dashboard and carried into new versions;
+            # it is left out so its arrival is not read as a change. Every other secret must stay exactly the same.
+            'secrets':sorted(b['name'] for b in cfg['bindings'] if b['type']=='secret_text' and b['name']!='TRACKER_API_KEY'),
             'worker_settings':self.preserved_settings(cfg),'public_route':self.worker_api('/subdomain'),
             'compatibility_date':cfg['compatibility_date'],'compatibility_flags':cfg.get('compatibility_flags',[])}
 
