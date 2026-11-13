@@ -1,6 +1,16 @@
 import { completeRoster, reuseUnlessChanged } from './growth-roster';
 // Deterministic Workers/D1 pipeline. No AI service or connector is used here.
 export const ALLIANCE_URL='https://lastasylum.gg/api/alliance/50373046';
+// 2026-11-13 사용자 결정: 명단은 Last Asylum Tracker 공개 API(키 필요)에서 받습니다. .gg보다 실제 게임 명단에 빨리 맞습니다.
+// 키(TRACKER_API_KEY)가 없거나 트래커가 실패하면 그 시간에는 예전처럼 .gg에서 받습니다. 받은 자료는 .gg와 같은 모양으로 바꿔 저장합니다.
+export const TRACKER_URL='https://api.lastasylumtracker.com/v1/alliances/50373046';
+export function fromTracker(j:any){
+  if(!j||Number(j.union_id)!==50373046||!Array.isArray(j.members))throw Error('WRONG_ALLIANCE');
+  const sec=(v:any)=>v==null||!Number.isFinite(Number(v))?null:Math.floor(Number(v));
+  return {id:50373046,server:Number(j.sid),tag:String(j.abbr),members:Number(j.member_count),power:Number(j.power),asOf:sec(j.updated_at),source:'lastasylumtracker',
+    roster:j.members.map((m:any)=>({id:String(m.uid),name:m.nick_name,power:m.power,castle:m.lv,rank:Number.isInteger(m.rank_code)&&m.rank_code>100&&m.rank_code<=105?m.rank_code-100:null,
+      activity:m.active??null,kills:m.kills??null,joined:sec(m.joined_at)===null?null:sec(m.joined_at)!*1000}))};
+}
 export const COLLECT_CRON='0 * * * *';
 export const CLOSE_CRON='10 15 * * *';
 // One account Cron slot; only the hourly tick and 15:10 UTC do work.
@@ -15,7 +25,7 @@ export function scheduledAction(cron:string,time:number){
 const HOUR=3_600_000, DAY=24*HOUR;
 type Row={id:string;name:string;power:number;castle:number;rank:number|null;activity:number|null;kills:number|null;joined:number|null};
 type Snapshot={id:string;server:number;tag:string;members:number;power:number;asOf:number;roster:Row[]};
-type AutoEnv={DB?:D1Database;GROWTH_AUTO_MODE?:string};
+type AutoEnv={DB?:D1Database;GROWTH_AUTO_MODE?:string;TRACKER_API_KEY?:string};
 export const kstDate=(ms:number)=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(ms);
 export const cutoffFor=(date:string)=>Date.parse(date+'T00:00:00+09:00')+DAY;
 const canonical=(x:any):string=>x===null||typeof x!=='object'?JSON.stringify(x):Array.isArray(x)?'['+x.map(canonical).join(',')+']':'{'+Object.keys(x).sort().map(k=>JSON.stringify(k)+':'+canonical(x[k])).join(',')+'}';
@@ -179,10 +189,21 @@ export async function collect(env:AutoEnv,triggerKind='cron',now=Date.now(),fetc
   if(!reservation)return {status:'throttled_or_paused'};
   await stmt(db,"INSERT INTO growth_auto_runs(run_id,trigger_kind,called_at,status) VALUES(?,?,?,'calling')",runId,triggerKind,now).run();
   try{
-    const response=await fetcher(ALLIANCE_URL,{headers:{Accept:'application/json','User-Agent':'3ON-Guild/1.0 (295/50373046; authorized hourly collection)'},redirect:'manual',signal:AbortSignal.timeout(25_000)});
-    if(!response.ok)throw Error('HTTP_'+response.status);
-    const raw=await response.text();if(new TextEncoder().encode(raw).length>1_000_000)throw Error('RESPONSE_TOO_LARGE');
-    const received=Date.now();await stmt(db,"UPDATE growth_auto_runs SET status='received',received_at=?,http_status=?,raw_json=?,raw_hash=? WHERE run_id=?",received,response.status,raw,await digest(raw),runId).run();
+    const agent='3ON-Guild/1.0 (295/50373046; authorized hourly collection)';let response:Response|null=null,raw='',trackerError='';
+    if(env.TRACKER_API_KEY){
+      try{
+        const r=await fetcher(TRACKER_URL,{headers:{Accept:'application/json','User-Agent':agent,Authorization:'Bearer '+env.TRACKER_API_KEY},redirect:'manual',signal:AbortSignal.timeout(25_000)});
+        if(!r.ok)throw Error('TRACKER_HTTP_'+r.status);
+        const text=await r.text();if(new TextEncoder().encode(text).length>1_000_000)throw Error('TRACKER_RESPONSE_TOO_LARGE');
+        const converted=fromTracker(JSON.parse(text));validateSnapshot(structuredClone(converted),now);raw=JSON.stringify(converted);response=r;
+      }catch(e){trackerError=(e as Error).message.slice(0,120);}
+    }
+    if(!response){
+      response=await fetcher(ALLIANCE_URL,{headers:{Accept:'application/json','User-Agent':agent},redirect:'manual',signal:AbortSignal.timeout(25_000)});
+      if(!response.ok)throw Error('HTTP_'+response.status+(trackerError?' / tracker '+trackerError:''));
+      raw=await response.text();if(new TextEncoder().encode(raw).length>1_000_000)throw Error('RESPONSE_TOO_LARGE');
+    }
+    const received=Date.now();await stmt(db,"UPDATE growth_auto_runs SET status='received',received_at=?,http_status=?,raw_json=?,raw_hash=?,error=? WHERE run_id=?",received,response.status,raw,await digest(raw),trackerError?'tracker fallback: '+trackerError:null,runId).run();
     return await ingestStored(db,runId);
   }catch(e){
     const error=(e as Error).message.slice(0,300);
