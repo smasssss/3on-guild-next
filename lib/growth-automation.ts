@@ -189,21 +189,33 @@ export async function collect(env:AutoEnv,triggerKind='cron',now=Date.now(),fetc
   if(!reservation)return {status:'throttled_or_paused'};
   await stmt(db,"INSERT INTO growth_auto_runs(run_id,trigger_kind,called_at,status) VALUES(?,?,?,'calling')",runId,triggerKind,now).run();
   try{
-    const agent='3ON-Guild/1.0 (295/50373046; authorized hourly collection)';let response:Response|null=null,raw='',trackerError='';
+    const agent='3ON-Guild/1.0 (295/50373046; authorized hourly collection)';let trackerSnap:any=null,trackerStatus=0,trackerError='';
     if(env.TRACKER_API_KEY){
       try{
         const r=await fetcher(TRACKER_URL,{headers:{Accept:'application/json','User-Agent':agent,Authorization:'Bearer '+env.TRACKER_API_KEY},redirect:'manual',signal:AbortSignal.timeout(25_000)});
         if(!r.ok)throw Error('TRACKER_HTTP_'+r.status);
         const text=await r.text();if(new TextEncoder().encode(text).length>1_000_000)throw Error('TRACKER_RESPONSE_TOO_LARGE');
-        const converted=fromTracker(JSON.parse(text));validateSnapshot(structuredClone(converted),now);raw=JSON.stringify(converted);response=r;
+        const converted=fromTracker(JSON.parse(text));validateSnapshot(structuredClone(converted),now);trackerSnap=converted;trackerStatus=r.status;
       }catch(e){trackerError=(e as Error).message.slice(0,120);}
     }
-    if(!response){
-      response=await fetcher(ALLIANCE_URL,{headers:{Accept:'application/json','User-Agent':agent},redirect:'manual',signal:AbortSignal.timeout(25_000)});
-      if(!response.ok)throw Error('HTTP_'+response.status+(trackerError?' / tracker '+trackerError:''));
-      raw=await response.text();if(new TextEncoder().encode(raw).length>1_000_000)throw Error('RESPONSE_TOO_LARGE');
-    }
-    const received=Date.now();await stmt(db,"UPDATE growth_auto_runs SET status='received',received_at=?,http_status=?,raw_json=?,raw_hash=?,error=? WHERE run_id=?",received,response.status,raw,await digest(raw),trackerError?'tracker fallback: '+trackerError:null,runId).run();
+    // 2026-11-14 사용자 결정: 트래커 길드 목록이 한 명(전각 빈칸 이름)을 빠뜨린 일이 있어, 키가 있어도 .gg를 함께 받아
+    // 트래커에 없는 길드원은 .gg 정보로 채웁니다. 한쪽이 실패하면 다른 쪽만 씁니다(한 시간에 두 곳을 각각 한 번씩).
+    let ggText='',ggStatus=0,ggError='';
+    try{
+      const r=await fetcher(ALLIANCE_URL,{headers:{Accept:'application/json','User-Agent':agent},redirect:'manual',signal:AbortSignal.timeout(25_000)});
+      ggStatus=r.status;if(!r.ok)throw Error('HTTP_'+r.status);
+      ggText=await r.text();if(new TextEncoder().encode(ggText).length>1_000_000)throw Error('RESPONSE_TOO_LARGE');
+      if(trackerSnap)validateSnapshot(JSON.parse(ggText),now);
+    }catch(e){ggError=(e as Error).message.slice(0,120);ggText='';}
+    let raw:string,status:number,note:string|null=null;
+    if(trackerSnap&&ggText){
+      const gg=JSON.parse(ggText),ids=new Set(trackerSnap.roster.map((r:any)=>r.id)),extra=gg.roster.filter((r:any)=>!ids.has(String(r.id)));
+      const roster=[...trackerSnap.roster,...extra];
+      raw=JSON.stringify({...trackerSnap,members:roster.length,roster,source:extra.length?'lastasylumtracker+gg':'lastasylumtracker',filledFromGg:extra.map((r:any)=>String(r.id))});status=trackerStatus;
+    }else if(trackerSnap){raw=JSON.stringify(trackerSnap);status=trackerStatus;note='gg unavailable: '+ggError;}
+    else if(ggText){raw=ggText;status=ggStatus;note=trackerError?'tracker fallback: '+trackerError:null;}
+    else throw Error((ggError||'GG_FAILED')+(trackerError?' / tracker '+trackerError:''));
+    const received=Date.now();await stmt(db,"UPDATE growth_auto_runs SET status='received',received_at=?,http_status=?,raw_json=?,raw_hash=?,error=? WHERE run_id=?",received,status,raw,await digest(raw),note,runId).run();
     return await ingestStored(db,runId);
   }catch(e){
     const error=(e as Error).message.slice(0,300);
@@ -333,7 +345,7 @@ async function automaticStatusFresh(db:D1Database,admin=false){
     if(m.power==null){m.power=p.power;m.level=p.level;m.rank=p.rank;m.delta=0;m.last_valid_kind='previous_confirmed_record';m.observed_date=p.observed_date;}
   }
   const counts=await first(db,"SELECT COUNT(*) calls FROM growth_auto_runs WHERE trigger_kind<>'fixture' AND status<>'not_dispatched'");
-  const changes=await all(db,`SELECT e.kind,e.game_id,e.member_id,e.source_as_of,e.before_json,e.after_json,e.status,m.display_name FROM growth_auto_events e LEFT JOIN growth_members m USING(member_id) WHERE e.kind IN ('nickname','rank','new','departure_candidate','roster_join','roster_leave') ORDER BY e.created_at DESC LIMIT 30`);
+  const changes=await all(db,`SELECT e.kind,e.game_id,e.member_id,e.source_as_of,e.before_json,e.after_json,e.status,m.display_name FROM growth_auto_events e LEFT JOIN growth_members m USING(member_id) WHERE e.kind IN ('nickname','rank','new','departure_candidate','roster_join','roster_leave') AND e.status<>'void' ORDER BY e.created_at DESC LIMIT 30`);
   // One latest confirmed rename per active game ID, independent of the recent-event limit.
   // Full event history stays intact for auditing and identity recovery.
   const nicknameChanges=await all(db,`WITH latest AS (

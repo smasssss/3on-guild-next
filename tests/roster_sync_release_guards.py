@@ -85,4 +85,21 @@ class Baseline(unittest.TestCase):
    self.assertEqual(json.loads(r.query("SELECT payload FROM documents WHERE kind='carriage'")[0]['payload'])['vipBaseline'],{'a':yesterday},'records the asked day even just after midnight')
    r,_=self.release(d,['a'],['a'],day='2000-01-01');r.add_baseline()
    self.assertEqual(r.query("SELECT revision FROM documents WHERE kind='carriage'")[0]['revision'],7,'skipped on a later day')
+class FalseLeave(unittest.TestCase):
+ def test_marks_only_that_departure_void_and_keeps_the_row(self):
+  with tempfile.TemporaryDirectory() as d:
+   r,_=Exclusions.release(self,d)
+   def api(method,path,body):
+    with r.sql:
+     r.sql.execute(body['sql'],body['params'])
+    return [{'success':True}]
+   r.api=api
+   ins="INSERT INTO growth_auto_events(event_id,kind,game_id,member_id,source_as_of,created_at,status) VALUES(?,?,?,?,?,1,'recorded')"
+   r.sql.execute(ins,['x1','roster_leave','307460940071','game_50373046_307460940071',1794571227000]);r.sql.execute(ins,['x2','roster_leave','999','other',1794571227000]);r.sql.execute(ins,['x3','departure_candidate','307460940071','m',1794571227000]);r.sql.commit()
+   r.void_false_leaves();r.void_false_leaves()
+   rows={x['event_id']:x for x in r.query('SELECT event_id,status,reason FROM growth_auto_events')}
+   self.assertEqual(rows['x1']['status'],'void');self.assertIn('트래커 길드 목록 누락',rows['x1']['reason']);self.assertEqual(rows['x1']['reason'].count('트래커'),1,'second run changes nothing')
+   self.assertEqual(rows['x2']['status'],'recorded');self.assertEqual(rows['x3']['status'],'recorded')
+   r2,_=Exclusions.release(self,d,'staging')
+   with self.assertRaises(AssertionError):r2.void_false_leaves()
 if __name__=='__main__':unittest.main()

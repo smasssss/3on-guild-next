@@ -18,6 +18,11 @@ const dropped=doc({});w.protectExclusions(doc({vipBaseline:{a:'2026-11-12'}}),dr
  const ev=f.sql.prepare("INSERT INTO growth_auto_events(event_id,kind,game_id,member_id,source_as_of,created_at,status) VALUES(?,?,?,?,?,?,'recorded')");
  ev.run('l1','roster_leave','game-bob','bob',Date.parse('2026-11-07T03:00:00Z'),1);ev.run('j1','roster_join','game-bob','bob',Date.parse('2026-11-10T03:00:00Z'),1);
  ev.run('j2','roster_join','game-cara','cara',Date.parse('1970-01-01T05:00:00Z'),1);
+ // dan dropped out of a few collections for under a day (a collection glitch); eve's departure was marked void.
+ f.seedMember('dan','Dan');f.observe('new','dan','Dan');f.seedMember('eve','Eve');f.observe('new','eve','Eve');
+ ev.run('l3','roster_leave','game-dan','dan',Date.parse('2026-11-13T11:00:00Z'),1);ev.run('j3','roster_join','game-dan','dan',Date.parse('2026-11-13T20:00:00Z'),1);
+ f.sql.prepare("INSERT INTO growth_auto_events(event_id,kind,game_id,member_id,source_as_of,created_at,status) VALUES('l4','roster_leave','game-eve','eve',?,1,'void')").run(Date.parse('2026-11-13T11:00:00Z'));
+ ev.run('j4','roster_join','game-eve','eve',Date.parse('2026-11-15T03:00:00Z'),1);
  const route=f.load('app/api/carriage/vip/route.ts'),body=await (await route.GET(new Request('http://localhost:8790/api/carriage/vip'))).json();
  assert.ok(body.members.length>0,JSON.stringify(body).slice(0,200));
  for(const m of body.members)assert.ok(m.joinedOn===null||/^\d{4}-\d{2}-\d{2}$/.test(m.joinedOn),m.memberId);
@@ -25,5 +30,6 @@ const dropped=doc({});w.protectExclusions(doc({vipBaseline:{a:'2026-11-12'}}),dr
  const by=id=>body.members.find(m=>m.memberId===id);
  assert.equal(by('bob').rejoinedOn,'2026-11-10','left and came back: return day');assert.equal(by('bob').joinedOn,'2026-11-10');
  assert.equal(by('cara').rejoinedOn,null,'a first join is not a return');assert.equal(by('alice').rejoinedOn,null);
+ assert.equal(by('dan').rejoinedOn,null,'missing for under a day is not a return');assert.equal(by('eve').rejoinedOn,null,'a departure marked void is ignored');
  console.log('PASS: VIP baseline is validated, kept on every save and only ever added; the VIP list reports join days');
 })().catch(e=>{console.error(e);process.exitCode=1;});

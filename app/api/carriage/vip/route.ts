@@ -15,11 +15,12 @@ export async function GET(req:Request){try{
  const kst=(v:number|string|null)=>{const t=typeof v==='number'?v:Date.parse(String(v));return Number.isFinite(t)?new Date(t+9*3_600_000).toISOString().slice(0,10):null;};
  const registered=new Map((await database.prepare('SELECT member_id,MIN(created_at) first FROM growth_external_ids GROUP BY member_id').all<{member_id:string;first:number|string|null}>()).results.map(r=>[r.member_id,kst(r.first)]));
  // 다시 들어온 사람(2026-11-12 사용자 결정): VIP 횟수는 이어 가고, 마지막 VIP는 다시 들어온 날로 봅니다.
- // 명단 합류(roster_join)가 그 전의 명단 이탈(roster_leave) 뒤에 있거나, 처음 등록보다 이틀 이상 늦으면 다시 들어온 것입니다.
- const moves=(await database.prepare("SELECT member_id,kind,MAX(source_as_of) at FROM growth_auto_events WHERE kind IN ('roster_join','roster_leave') AND member_id IS NOT NULL GROUP BY member_id,kind").all<{member_id:string;kind:string;at:number}>()).results;
+ // 명단 합류(roster_join)가 그 전의 명단 이탈(roster_leave)보다 하루 이상 뒤에 있어야 다시 들어온 것입니다(2026-11-14 사용자 결정:
+ // 잠깐 빠졌다 돌아온 수집 오류는 재가입이 아님). 수집 오류로 확인돼 무효(void) 표시한 이탈 기록은 보지 않습니다.
+ const moves=(await database.prepare("SELECT member_id,kind,MAX(source_as_of) at FROM growth_auto_events WHERE kind IN ('roster_join','roster_leave') AND member_id IS NOT NULL AND status<>'void' GROUP BY member_id,kind").all<{member_id:string;kind:string;at:number}>()).results;
  const lastJoin=new Map(moves.filter(r=>r.kind==='roster_join').map(r=>[r.member_id,r.at])),lastLeave=new Map(moves.filter(r=>r.kind==='roster_leave').map(r=>[r.member_id,r.at]));
  const joinOf=(id:string)=>{const at=lastJoin.get(id),first=registered.get(id)??null;if(at===undefined)return {joinedOn:first,rejoinedOn:null};const day=kst(at),left=lastLeave.get(id);
-  const back=(left!==undefined&&left<at)||(!!first&&!!day&&Date.parse(day)-Date.parse(first)>=2*86_400_000);return {joinedOn:back?day:(first??day),rejoinedOn:back?day:null};};
+  const back=left!==undefined&&at-left>=86_400_000;return {joinedOn:back?day:(first??day),rejoinedOn:back?day:null};};
  return response(req,{schema:'3on-vip-weekly-v1',threshold:thresholdOf(carriage.data as {vipThreshold?:number}),timezone:'Asia/Seoul',serverTime:new Date(now).toISOString(),revision:document.revision,...view,scoreMembers,roster:{snapshotId:roster.snapshotId,sourceAsOf:roster.sourceAsOf,receivedAt:roster.receivedAt},rosterPending:roster.pending,snapshotAdded:roster.snapshotAdded,members:roster.members.map(m=>({...m,...joinOf(m.memberId),eligibility:eligibility(m,carriage.data as {vipExcludedMembers?:Record<string,number>},view.active,now)}))});
  }catch{return response(req,{error:'마차 명단·주간 점수를 확인하지 못했습니다. VIP 선택을 보류합니다.'},503);}}
 export async function POST(req:Request){

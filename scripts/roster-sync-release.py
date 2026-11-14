@@ -174,6 +174,25 @@ def tracker_key(self):
     print('Tracker API key on the live Worker: '+('yes' if 'TRACKER_API_KEY' in names else 'no (collection keeps using lastasylum.gg)'))
 Release.tracker_key=tracker_key
 
+# 2026-11-14 user decision: 망　고 (game 307460940071) was recorded as leaving on 2026-11-13 20:00 KST only because the
+# tracker's alliance list missed the name (full-width space). That departure is marked void with a note; nothing is deleted.
+FALSE_LEAVES=[('307460940071','2026-11-13T10:00:00Z','2026-11-14T23:59:59Z')]
+def void_false_leaves(self):
+    import datetime
+    base.PHASE='false departure note'
+    assert self.target=='production'
+    ms=lambda t:int(datetime.datetime.fromisoformat(t.replace('Z','+00:00')).timestamp()*1000)
+    for game,start,end in FALSE_LEAVES:
+        rows=self.query("SELECT event_id,status FROM growth_auto_events WHERE game_id=? AND kind='roster_leave' AND source_as_of BETWEEN ? AND ?",[game,ms(start),ms(end)])
+        assert len(rows)<=2,'Unexpected departure records'
+        todo=[r['event_id'] for r in rows if r['status']!='void']
+        for event in todo:
+            self.api('POST','/d1/database/'+self.database+'/query',{'sql':"UPDATE growth_auto_events SET status='void',reason=COALESCE(reason,'')||? WHERE event_id=? AND status<>'void'",'params':[' / 트래커 길드 목록 누락(전각 빈칸 이름)으로 생긴 잘못된 탈퇴 기록 - 2026-11-14 확인, 기록은 보존',event]})
+        after=self.query("SELECT COUNT(*) n FROM growth_auto_events WHERE game_id=? AND kind='roster_leave' AND source_as_of BETWEEN ? AND ? AND status<>'void'",[game,ms(start),ms(end)])[0]['n']
+        assert after==0
+        print('False departure note: '+str(len(rows))+' found, '+str(len(todo))+' marked void')
+Release.void_false_leaves=void_false_leaves
+
 if __name__=='__main__':
     try:
         action,target=sys.argv[1:3];base.PHASE=action;r=Release(target)
