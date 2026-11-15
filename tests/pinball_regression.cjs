@@ -27,7 +27,17 @@ const post=(body,auth=true)=>route.POST(new Request(origin+'/api/pinball',{metho
  assert.notDeepEqual(engine.run(plain(40),'1a2b3c4d','first',3,1,3).order,engine.run(plain(40),'1a2b3c4d','first',3,1,2).order,'layout 3 differs from layout 2');
  const v4=[];for(let c=1;c<=10;c++){const r=engine.run(plain(40),'1a2b3c4d','first',3,c,4);v4.push(r.order.join(',')+'|'+r.sim.frames.length);}
  assert.equal(crypto.createHash('sha256').update(v4.join('/')).digest('hex'),'5ca7e01f3ac484798f18784668c90b699d87494b1f89d0ea6423a691d54bc12d','layout 4 replays exactly as deployed in Release 18');
- assert.equal(engine.LAYOUT,5,'new draws use layout 5');
+ const v5=[];for(let c=1;c<=10;c++){const r=engine.run(plain(40),'1a2b3c4d','first',3,c,5);v5.push(r.order.join(',')+'|'+r.sim.frames.length);}
+ assert.equal(crypto.createHash('sha256').update(v5.join('/')).digest('hex'),'38c3113ac4f33824dcfc255b3fe37604427e303eed432fd04b33273f86984613','layout 5 replays exactly as deployed');
+ // 2026-11-15 6판(사용자 요청): 반발 강화와 반발 세기 선택, 대기 문을 코스 중간으로, 플리퍼가 세게 쳐올림, 양쪽 벽 튕김 범퍼, 골 앞 십자 회전 막대.
+ assert.equal(engine.LAYOUT,6,'new draws use layout 6');
+ for(let c=1;c<=10;c++){const b=engine.board(c);const hold=b.obstacles.find(o=>o.hold);assert.ok(hold.y1>b.goalY*.35&&hold.y1<b.goalY*.65,'course '+c+' holding gate in the middle');
+  assert.equal(b.obstacles.filter(o=>o.hold).length,1);assert.equal(b.obstacles.find(o=>o.guard).arms,4,'cross spinner before the goal');
+  assert.ok(b.obstacles.some(o=>o.flip)&&b.obstacles.filter(o=>o.wall).length>=6,'course '+c+' fast flippers and wall bumpers');}
+ {const f=engine.board(7).obstacles.find(o=>o.flip),a0=engine.angleAt(f,f.flip.p-f.flip.ph+0.001),a1=engine.angleAt(f,f.flip.p-f.flip.ph+0.07);assert.ok(Math.abs(a1-a0)>0.9,'flippers strike within 0.07 seconds');}
+ for(const bounce of [0.8,1,1.3,1.6])for(const c of [2,6,7]){const r=engine.run(people(100),'b0b0'+String(c).padStart(4,'0'),'first',3,c,6,bounce);assert.equal(r.sim.timedOut,false,'course '+c+' bounce '+bounce+' finishes');}
+ assert.notDeepEqual(engine.run(plain(40),'1a2b3c4d','first',3,2,6,1).order,engine.run(plain(40),'1a2b3c4d','first',3,2,6,1.6).order,'bounce changes the race');
+ assert.deepEqual(engine.run(plain(40),'1a2b3c4d','first',3,2,5,1.6).order,engine.run(plain(40),'1a2b3c4d','first',3,2,5).order,'older layouts ignore bounce');
  // 5판 공정성: 같은 20명으로 2번 코스를 150번 돌려 먼저 들어온 3명에 뽑힌 횟수가 고르게 퍼져야 합니다(카이제곱 45 미만; 4판은 회원 번호 0이 유리했음).
  {const ps=plain(20),cnt=new Map(ps.map(p=>[p.memberId,0]));for(let k=0;k<150;k++){const seed=((k*2654435761+12345)>>>0).toString(16).padStart(8,'0');for(const id of engine.run(ps,seed,'first',3,2).picks)cnt.set(id,cnt.get(id)+1);}
   const exp=150*3/20,chi=[...cnt.values()].reduce((a,x)=>a+(x-exp)**2/exp,0);assert.ok(chi<45,'picks spread fairly (chi-square '+chi.toFixed(1)+')');}
@@ -61,7 +71,7 @@ const post=(body,auth=true)=>route.POST(new Request(origin+'/api/pinball',{metho
  assert.throws(()=>lib.validateDraw({...draw,course:11}),/코스/);assert.throws(()=>lib.validateDraw({...draw,source:'manual'}),/쓰지 않습니다/);
  assert.equal(lib.validateDraw({...draw,source:'manual',threshold:0}).source,'manual','direct selection is recorded as such');
  assert.equal(lib.validateDraw({...draw,layout:2}).layout,2,'layout 2 is recorded');assert.equal(lib.validateDraw({...draw,layout:3}).layout,3,'layout 3 is recorded');assert.equal('layout' in lib.validateDraw(draw),false,'old records stay layout 1');
- assert.equal(lib.validateDraw({...draw,layout:4}).layout,4,'layout 4 is recorded');assert.equal(lib.validateDraw({...draw,layout:5}).layout,5,'layout 5 is recorded');assert.throws(()=>lib.validateDraw({...draw,layout:6}),/코스 판/);
+ assert.equal(lib.validateDraw({...draw,layout:4}).layout,4,'layout 4 is recorded');assert.equal(lib.validateDraw({...draw,layout:5}).layout,5,'layout 5 is recorded');assert.equal(lib.validateDraw({...draw,layout:6,bounce:1.3}).bounce,1.3,'bounce is recorded');assert.throws(()=>lib.validateDraw({...draw,layout:6,bounce:2}),/반발/);assert.throws(()=>lib.validateDraw({...draw,layout:5,bounce:1.3}),/반발/);assert.throws(()=>lib.validateDraw({...draw,layout:7}),/코스 판/);
  // 저장: 관리자만, 백업 포함, 누구나 조회
  assert.equal((await post({revision:0,mutation:'a'.repeat(32),draw},false)).status,401,'not an administrator');
  f.sql.prepare('INSERT INTO credentials VALUES(?,?,?,?,?)').run(await store.hash(token),'password-session-v1','admin',await store.hash(f.env.ADMIN_PASSWORD_HASH),Date.now()+86400000);

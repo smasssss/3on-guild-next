@@ -13,7 +13,7 @@
  function rng(seedHex){let a=parseInt(seedHex,16)>>>0;return ()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
  const COURSES_V1=['벚꽃 계곡','회오리 탑','별빛 계단','바람개비 언덕','솜사탕 미로','폭포 협곡','풍선 정원','시계탑 골목','무지개 다리','마차 대로'];
  // 코스 1판(처음 배포)은 옛 기록을 똑같이 다시 보여 주려고 그대로 둡니다. 새 추첨은 2판 코스를 씁니다.
- const LAYOUT=5; // 5판(2026-11-10): 4판 코스 그대로, 출발 자리를 추첨 번호로 무작위 배정하고 더 세게 섞음. 4판: 4판(2026-11-10): 지름길 없음, 길목의 되돌이(5명마다 2초 쉼)와 옆길, 반발 장치 추가, 코스 약 2배. / 3판(2026-11-10): 2판 코스에 반전 장치(경사로 중간 구멍·여닫이 바닥, 워프, 골 앞 방해 장치)를 더함
+ const LAYOUT=6; // 6판(2026-11-15): 반발 강화와 반발 세기 선택, 대기 문을 코스 중간으로, 플리퍼가 세게 쳐올림, 양쪽 벽 튕김 범퍼, 골 앞 십자 회전 막대. 5판: 5판(2026-11-10): 4판 코스 그대로, 출발 자리를 추첨 번호로 무작위 배정하고 더 세게 섞음. 4판: 4판(2026-11-10): 지름길 없음, 길목의 되돌이(5명마다 2초 쉼)와 옆길, 반발 장치 추가, 코스 약 2배. / 3판(2026-11-10): 2판 코스에 반전 장치(경사로 중간 구멍·여닫이 바닥, 워프, 골 앞 방해 장치)를 더함
  const COURSES=['벚꽃 강줄기','회오리 경사로','별빛 계단','바람개비 언덕','솜사탕 미로','폭포 협곡','풍선 핀볼장','시계탑 톱니','무지개 바람길','마차 대로'];
  // 구간 만들기: 각 함수는 y0부터 구간을 만들고 구간 높이를 돌려줍니다.
  const S={
@@ -80,13 +80,15 @@
   for(const k of shuffle(secondHalf.filter(k=>k!==used)))if(put(k,'back',Math.max(0,k-2)))break;
  }
  function buildV2(course,r,yStart,ver=2){
-  const v3=ver>=3,v4=ver>=4;
+  const v3=ver>=3,v4=ver>=4,v6=ver>=6;
   const o=[],zones=[],portals=[],sections=[],spots=[],sign=()=>r()<.5?1:-1,clampX=x=>Math.max(2,Math.min(W-2,x));
   const seg=(x1,y1,x2,y2,e)=>{const s={t:'s',x1,y1,x2,y2};if(e!==undefined)s.e=e;o.push(s);};
   const poly=(p,e)=>{for(let k=1;k<p.length;k++)seg(p[k-1][0],p[k-1][1],p[k][0],p[k][1],e);};
   const peg=(x,y,rr=4,e=.55)=>o.push({t:'c',x,y,r:rr,e});
   const rot=(cx,cy,len,w,arms=2)=>o.push({t:'rot',cx,cy,len,w,a0:r()*6.28,arms});
   const swing=(cx,cy,len,amp,w,base)=>o.push({t:'rot',cx,cy,len,w,amp,a0:base,ph:r()*6.28,arms:1,e:.8,swing:true});
+  // 6판 플리퍼(2026-11-15 사용자 요청): 느리게 흔들지 않고, 몇 초마다 순식간에 쳐올려 공을 위로 날려 보냅니다. dir은 쳐올리는 방향.
+  const flipper=(cx,cy,len,base,dir)=>o.push({t:'rot',cx,cy,len,w:0,a0:base,arms:1,e:.9,swing:true,flip:{dir,amp:.95,p:1.3+r()*.7,ph:r()*2}});
   // 3판 경사로: 중간에 구멍. 절반은 늘 열린 구멍, 절반은 몇 초마다 열렸다 닫히는 바닥(여닫이)입니다.
   const ramp=(xa,ya,xb,yb)=>{if(!v3){seg(xa,ya,xb,yb);return;}const L=Math.hypot(xb-xa,yb-ya),t1=.3+r()*.35,t2=t1+34/L,P=t=>[xa+(xb-xa)*t,ya+(yb-ya)*t],p1=P(t1),p2=P(t2);
    seg(xa,ya,p1[0],p1[1]);seg(p2[0],p2[1],xb,yb);if(r()<.5)o.push({t:'s',x1:p1[0],y1:p1[1],x2:p2[0],y2:p2[1],gate:{p:2.2+r()*1.6,open:.8,ph:r()*3}});};
@@ -128,20 +130,22 @@
     seg(W,y0-6,L,y0+14);seg(L,y0+14,L,y0+h-70);
     for(let y=y0+50;y<y0+h-110;y+=56){seg(L,y,L+14,y+12);seg(W,y+28,W-14,y+40);}
     seg(0,y0+30,40,y0+90,1.25);seg(0,y0+170,40,y0+230,1.25);
-    [[.25,.75],[.5],[.2,.8]].forEach((row,k)=>row.forEach(fx=>peg(L*fx+(r()-.5)*14,y0+60+k*75,13+r()*3,1.3)));
+    (v6?[[.27,.73],[.5],[.3,.7]]:[[.25,.75],[.5],[.2,.8]]).forEach((row,k)=>row.forEach(fx=>peg(L*fx+(r()-.5)*14,y0+60+k*75,13+r()*3,1.3)));
     seg(0,y0+300,cx-36,y0+400);seg(L,y0+300,cx+36,y0+400);seg(cx-36,y0+400,cx-36,y0+440);seg(cx+36,y0+400,cx+36,y0+440);
     portals.push({x:cx,y:y0+422,r:22,kind:'back',tx:W-19,ty:y0+30,limit:5,off:2});
     return h;},
+   // 6판 대기 문(2026-11-15 사용자 요청: 골 앞에서 코스 중간으로 옮김): 바닥 문이 몇 초마다 잠깐 열립니다.
+   hold(y0){seg(0,y0+20,W/2-45,y0+70);o.push({t:'s',x1:W/2-45,y1:y0+70,x2:W/2+45,y2:y0+70,gate:{p:3.6,open:1.4,ph:0},hold:true});seg(W/2+45,y0+70,W,y0+20);return 110;},
    // 핀 밭
    pegs(y0,{rows=5}){pegField(0,W,y0+30,rows);return 30+rows*38+20;},
    // 핀볼장: 큰 범퍼, 양옆 튕김판, 아래 플리퍼 두 개.
    garden(y0){const h=380;seg(0,y0+20,46,y0+90,1.25);seg(W,y0+20,W-46,y0+90,1.25);seg(0,y0+190,46,y0+260,1.25);seg(W,y0+190,W-46,y0+260,1.25);
     [[.3,.7],[.15,.5,.85],[.32,.68]].forEach((row,k)=>row.forEach(fx=>peg(W*fx+(r()-.5)*16,y0+60+k*85,14+r()*4,1.25)));
-    seg(0,y0+h-100,52,y0+h-56);seg(W,y0+h-100,W-52,y0+h-56);swing(56,y0+h-52,62,.45,4.2,.42);swing(W-56,y0+h-52,62,.45,4.2,Math.PI-.42);
+    seg(0,y0+h-100,52,y0+h-56);seg(W,y0+h-100,W-52,y0+h-56);if(v6){flipper(56,y0+h-52,66,.55,-1);flipper(W-56,y0+h-52,66,Math.PI-.55,1);}else{swing(56,y0+h-52,62,.45,4.2,.42);swing(W-56,y0+h-52,62,.45,4.2,Math.PI-.42);}
     return h+10;},
    // 시계탑: 맞물려 도는 톱니 두 개와 가운데 큰 시계추.
    clock(y0,{gears=true}){const s=sign();let y=y0;if(gears){rot(W*.29,y0+105,78,1.2*s,6);rot(W*.71,y0+105,78,-1.2*s,6);y+=210;}
-    guards(y0,y-y0+190);swing(W/2,y+20,125,1.05,2,Math.PI/2);peg(W*.16,y+130,v4?11:8,v4?1.3:.8);peg(W*.84,y+130,v4?11:8,v4?1.3:.8);
+    guards(y0,y-y0+190);swing(W/2,y+20,125,1.05,2,Math.PI/2);peg(W*(v6?.22:.16),y+130,v4?11:8,v4?1.3:.8);peg(W*(v6?.78:.84),y+130,v4?11:8,v4?1.3:.8); // 6판: 벽 경사판 끝과 틈이 좁아 공이 끼던 자리라 안쪽으로
     return y-y0+190;},
    // 바람 띠: 띠마다 바람 방향이 바뀌어 구슬이 좌우로 쓸려 갑니다. 벽 쪽은 경사판이 안으로 되돌립니다.
    wind(y0,{n=3}){let d=sign();for(let i=0;i<n;i++){const y=y0+20+i*160;zones.push({y0:y,y1:y+140,ax:d*950});
@@ -155,9 +159,14 @@
     return len+20;},
   };
   // 4판 코스: 원래 구간들 → 범퍼 핀볼장 → 되돌이 길목 → 원래 구간들 한 번 더(약 2배 길이)
-  const base=RECIPES2[(course-1)%RECIPES2.length],recipe=v4?[...base,['garden'],['detour'],...base]:base;
+  const base=RECIPES2[(course-1)%RECIPES2.length],recipe=v6?[...base,['garden'],['hold'],['detour'],...base]:v4?[...base,['garden'],['detour'],...base]:base;
   let y=yStart;for(const [name,opt] of recipe){const h=T[name](y,opt||{});sections.push({name,y0:y,h});y+=h;}
   if(v3&&!v4)placePortals(o,portals,sections,r,spots);
+  // 6판 양쪽 벽 튕김 범퍼(2026-11-15 사용자 요청): 벽을 따라 일정 간격으로 반쪽 범퍼를 박아 공이 여기저기 튀게 합니다.
+  // 다른 장애물과 너무 가까운 자리는 건너뜁니다(끼임 방지).
+  if(v6){const near=(x,yy,rr)=>o.some(ob=>{if(ob.t==='c')return Math.hypot(x-ob.x,yy-ob.y)<ob.r+rr+2*R+4;if(ob.t==='rot')return Math.hypot(x-ob.cx,yy-ob.cy)<ob.len+rr+2*R+4;if(ob.t!=='s')return false;
+     const ex=ob.x2-ob.x1,ey=ob.y2-ob.y1,l2=ex*ex+ey*ey||1;let q=((x-ob.x1)*ex+(yy-ob.y1)*ey)/l2;q=Math.max(0,Math.min(1,q));return Math.hypot(x-ob.x1-ex*q,yy-ob.y1-ey*q)<rr+2*R+4;});
+   const add=[];for(let yy=yStart+60,k=0;yy<y-40;yy+=95,k++)for(const x of k%2?[0,W]:[W,0]){if(!near(x,yy,13))add.push({t:'c',x,y:yy,r:13,e:1.6,wall:true});}o.push(...add);}
   return {o,zones,y,portals};
  }
  const boards=new Map();
@@ -170,13 +179,14 @@
    for(const ob of o)if(ob.t==='c'){if(ob.x-ob.r>0&&ob.x-ob.r<2*R+4)ob.x=0;if(W-ob.x-ob.r>0&&W-ob.x-ob.r<2*R+4)ob.x=W;}
   }else{const built=buildV2(course,r,y,layout);o=built.o;zones=built.zones;portals=built.portals;y=built.y;theme=THEMES[(course-1)%THEMES.length];}
   // 3판 대기 문: 골 앞 깔때기 바닥이 몇 초마다 잠깐 열려, 먼저 온 구슬도 뒤따라온 구슬과 함께 다시 섞여 내려갑니다.
-  if(layout>=3){o.push({t:'s',x1:0,y1:y+20,x2:W/2-45,y2:y+70},{t:'s',x1:W/2-45,y1:y+70,x2:W/2+45,y2:y+70,gate:{p:3.6,open:1.4,ph:0},hold:true},{t:'s',x1:W/2+45,y1:y+70,x2:W,y2:y+20});y+=110;}
+  if(layout>=3&&layout<6){o.push({t:'s',x1:0,y1:y+20,x2:W/2-45,y2:y+70},{t:'s',x1:W/2-45,y1:y+70,x2:W/2+45,y2:y+70,gate:{p:3.6,open:1.4,ph:0},hold:true},{t:'s',x1:W/2+45,y1:y+70,x2:W,y2:y+20});y+=110;}
   const goalTop=y+20,goalY=goalTop+170,gap=36;
   o.push({t:'s',x1:0,y1:goalTop,x2:W/2-gap/2,y2:goalY},{t:'s',x1:W,y1:goalTop,x2:W/2+gap/2,y2:goalY});
   // 3판 골 앞 방해 장치: 좌우로 미끄러지는 막대, 튕겨 내는 범퍼, 골 구멍 위 회전 막대(먼저 와도 바로 못 들어갈 수 있음)
   if(layout>=3){o.push({t:'slide',x1:W/2-35,y1:goalTop+70,x2:W/2+35,y2:goalTop+70,amp:70,w:1.6,ph:r()*6.28,e:.6});
    o.push({t:'c',x:100,y:goalTop+60,r:12,e:1.3},{t:'c',x:W-100,y:goalTop+60,r:12,e:1.3});
-   o.push({t:'rot',cx:W/2,cy:goalY-40,len:30,w:(r()<.5?-1:1)*2.2,a0:r()*6.28,arms:2,guard:true});}
+   // 6판: 십자(팔 4개) 회전 막대. 골 구멍 바로 위에 두면 구멍을 막아 공이 끼므로, 깔때기가 넓은 곳으로 올려 둡니다.
+   o.push(layout>=6?{t:'rot',cx:W/2,cy:goalY-78,len:28,w:(r()<.5?-1:1)*2.6,a0:r()*6.28,arms:4,guard:true}:{t:'rot',cx:W/2,cy:goalY-40,len:30,w:(r()<.5?-1:1)*2.2,a0:r()*6.28,arms:2,guard:true});}
   // 무거운 계산을 줄이려고 장애물을 높이 구간별로 나눠 둡니다.
   const buckets=new Map();for(const ob of o){const ext=ob.t==='c'?ob.r+R:ob.t==='rot'?ob.len+R:R;const ys=ob.t==='s'||ob.t==='slide'?[Math.min(ob.y1,ob.y2)-ext,Math.max(ob.y1,ob.y2)+ext]:[(ob.y??ob.cy)-ext,(ob.y??ob.cy)+ext];for(let k=Math.floor(ys[0]/BUCKET);k<=Math.floor(ys[1]/BUCKET);k++){if(!buckets.has(k))buckets.set(k,[]);buckets.get(k).push(ob);}}
   const b={W,R,course,layout,name:(layout===1?COURSES_V1:COURSES)[(course-1)%COURSES.length],obstacles:o,zones,portals,theme,buckets,goalY,goalGap:gap,height:goalY+60,chamber:CHAMBER,mixFrames:layout>=5?MIX_FRAMES_V5:MIX_FRAMES};
@@ -184,7 +194,9 @@
  }
  // 회전 막대는 계속 돌고(w), 시계추·플리퍼는 좌우로 흔들립니다(amp).
  const gateOpen=(ob,t)=>((t+ob.gate.ph)%ob.gate.p)<ob.gate.open,slideAt=(ob,t)=>ob.amp*Math.sin(ob.w*t+ob.ph);
- const angleAt=(ob,t)=>ob.amp?ob.a0+ob.amp*Math.sin(ob.w*t+ob.ph):ob.a0+ob.w*t,spinAt=(ob,t)=>ob.amp?ob.amp*ob.w*Math.cos(ob.w*t+ob.ph):ob.w;
+ // 플리퍼 움직임: 0.07초에 쳐올리고 잠깐 멈춘 뒤 0.35초에 걸쳐 내려옵니다.
+ const flipPos=(f,t)=>{const u=((t+f.ph)%f.p+f.p)%f.p;return u<.07?u/.07:u<.12?1:u<.47?1-(u-.12)/.35:0;},flipVel=(f,t)=>{const u=((t+f.ph)%f.p+f.p)%f.p;return u<.07?1/.07:u<.12?0:u<.47?-1/.35:0;};
+ const angleAt=(ob,t)=>ob.flip?ob.a0+ob.flip.dir*ob.flip.amp*flipPos(ob.flip,t):ob.amp?ob.a0+ob.amp*Math.sin(ob.w*t+ob.ph):ob.a0+ob.w*t,spinAt=(ob,t)=>ob.flip?ob.flip.dir*ob.flip.amp*flipVel(ob.flip,t):ob.amp?ob.amp*ob.w*Math.cos(ob.w*t+ob.ph):ob.w;
  function armsAt(ob,t){const a=angleAt(ob,t),out=[];for(let k=0;k<ob.arms;k++){const ang=a+k*Math.PI*2/ob.arms;out.push([ob.cx,ob.cy,ob.cx+Math.cos(ang)*ob.len,ob.cy+Math.sin(ang)*ob.len]);}return out;}
  function hitSegment(st,i,x1,y1,x2,y2,e,vxs,vys){
   const {x,y,vx,vy}=st,ex=x2-x1,ey=y2-y1,l2=ex*ex+ey*ey||1;let t=((x[i]-x1)*ex+(y[i]-y1)*ey)/l2;t=t<0?0:t>1?1:t;
@@ -193,8 +205,10 @@
   const sx=vxs?vxs(px,py):0,sy=vys?vys(px,py):0,rvx=vx[i]-sx,rvy=vy[i]-sy,vn=rvx*nx+rvy*ny;
   if(vn<0){vx[i]-=(1+e)*vn*nx;vy[i]-=(1+e)*vn*ny;}
  }
- function simulate(count,seedHex,course=1,layout=LAYOUT){
+ // bounce: 6판 반발 세기 선택(0.8 약하게 / 1 보통 / 1.3 강하게 / 1.6 아주 강하게). 6판은 기본 반발도 1.2배입니다.
+ function simulate(count,seedHex,course=1,layout=LAYOUT,bounce=1){
   const b=board(course,layout),rand=rng(seedHex),dt=1/(FPS*SUB),maxFrames=FPS*(layout>=4?300:MAX_SECONDS),n=count;
+  const eK=layout>=6?1.2*bounce:1,E=e=>eK===1?e:Math.min(2.2,e*eK),VMAX=layout>=6?1300:950;
   const st={x:new Float64Array(n),y:new Float64Array(n),vx:new Float64Array(n),vy:new Float64Array(n)},{x,y,vx,vy}=st;
   const done=new Int32Array(n).fill(-1),slow=new Int32Array(n),np=b.portals.length,used=new Uint8Array(n*np),pCount=new Int32Array(np),pOff=new Float64Array(np),portalLog=b.portals.map(()=>({hits:[],off:[]}));
   // 출발 통 안에 배치. 4판까지는 회원 번호 순서대로 자리가 정해져(같은 명단이면 같은 자리) 일부 자리가 유리했습니다.
@@ -221,12 +235,12 @@
      if(mixing&&y[i]>CHAMBER-R){y[i]=CHAMBER-R;vy[i]=-Math.abs(vy[i])*.6;}
      const list=b.buckets.get(Math.floor(y[i]/BUCKET));
      if(list)for(const ob of list){
-      if(ob.t==='c'){const dx=x[i]-ob.x,dy=y[i]-ob.y,d2=dx*dx+dy*dy,m=R+ob.r;if(d2<m*m&&d2>1e-9){const d=Math.sqrt(d2),nx=dx/d,ny=dy/d;x[i]=ob.x+nx*m;y[i]=ob.y+ny*m;const vn=vx[i]*nx+vy[i]*ny;if(vn<0){vx[i]-=(1+ob.e)*vn*nx;vy[i]-=(1+ob.e)*vn*ny;vx[i]+=(rand()-.5)*20;}}}
-      else if(ob.t==='s'){if(!ob.gate||!gateOpen(ob,t))hitSegment(st,i,ob.x1,ob.y1,ob.x2,ob.y2,ob.e??.35);}
-      else if(ob.t==='slide'){const dx=slideAt(ob,t),sv=ob.amp*ob.w*Math.cos(ob.w*t+ob.ph);hitSegment(st,i,ob.x1+dx,ob.y1,ob.x2+dx,ob.y2,ob.e??.5,()=>sv,()=>0);}
-      else{const om=spinAt(ob,t);for(const a of armsAt(ob,t))hitSegment(st,i,a[0],a[1],a[2],a[3],ob.e??.45,(px,py)=>-om*(py-ob.cy),(px)=>om*(px-ob.cx));}
+      if(ob.t==='c'){const dx=x[i]-ob.x,dy=y[i]-ob.y,d2=dx*dx+dy*dy,m=R+ob.r;if(d2<m*m&&d2>1e-9){const d=Math.sqrt(d2),nx=dx/d,ny=dy/d;x[i]=ob.x+nx*m;y[i]=ob.y+ny*m;const vn=vx[i]*nx+vy[i]*ny;if(vn<0){const e=E(ob.e);vx[i]-=(1+e)*vn*nx;vy[i]-=(1+e)*vn*ny;vx[i]+=(rand()-.5)*20;}}}
+      else if(ob.t==='s'){if(!ob.gate||!gateOpen(ob,t))hitSegment(st,i,ob.x1,ob.y1,ob.x2,ob.y2,E(ob.e??.35));}
+      else if(ob.t==='slide'){const dx=slideAt(ob,t),sv=ob.amp*ob.w*Math.cos(ob.w*t+ob.ph);hitSegment(st,i,ob.x1+dx,ob.y1,ob.x2+dx,ob.y2,E(ob.e??.5),()=>sv,()=>0);}
+      else{const om=spinAt(ob,t);for(const a of armsAt(ob,t))hitSegment(st,i,a[0],a[1],a[2],a[3],E(ob.e??.45),(px,py)=>-om*(py-ob.cy),(px)=>om*(px-ob.cx));}
      }
-     const sp=Math.hypot(vx[i],vy[i]);if(sp>950){vx[i]*=950/sp;vy[i]*=950/sp;}
+     const sp=Math.hypot(vx[i],vy[i]);if(sp>VMAX){vx[i]*=VMAX/sp;vy[i]*=VMAX/sp;}
      if(!mixing)for(let p=0;p<np;p++){const q=b.portals[p];if(used[i*np+p])continue;if(q.limit&&t<pOff[p])continue;const dx=x[i]-q.x,dy=y[i]-q.y;if(dx*dx+dy*dy<q.r*q.r){used[i*np+p]=1;
       if(q.limit){x[i]=q.tx;y[i]=q.ty;vx[i]=(rand()-.5)*40;vy[i]=0;portalLog[p].hits.push(frame);if(++pCount[p]>=q.limit){pCount[p]=0;pOff[p]=t+q.off;portalLog[p].off.push([frame,frame+Math.ceil(q.off*FPS)]);}}
       else{x[i]=40+rand()*(W-80);y[i]=q.ty;vx[i]=(rand()-.5)*80;vy[i]=0;}}}
@@ -245,11 +259,11 @@
   return {board:b,order,finish:Array.from(done),frames,timedOut,portalLog};
  }
  // 참가자는 회원 번호 순으로 고정해 같은 추첨 번호면 같은 결과가 나오게 합니다.
- function run(participants,seed,mode,count,course=1,layout=LAYOUT){
+ function run(participants,seed,mode,count,course=1,layout=LAYOUT,bounce=1){
   const list=participants.slice().sort((a,b)=>a.memberId.localeCompare(b.memberId));
   // 5판: 회원 번호 순서 자체를 추첨 번호로 섞습니다. 출발 자리뿐 아니라 부딪힘 계산 순서 같은 '번호 순서'의 영향도 매번 달라집니다.
   if(layout>=5){const mix=rng(((parseInt(seed,16)^0x5bd1e995)>>>0).toString(16));for(let k=list.length-1;k>0;k--){const j=Math.floor(mix()*(k+1));[list[k],list[j]]=[list[j],list[k]];}}
-  const sim=simulate(list.length,seed,course,layout),order=sim.order.map(i=>list[i].memberId);
+  const sim=simulate(list.length,seed,course,layout,layout>=6?bounce:1),order=sim.order.map(i=>list[i].memberId);
   const picks=mode==='first'?order.slice(0,count):order.slice(order.length-count);
   return {list,sim,order,picks};
  }
@@ -313,7 +327,7 @@
   mode.value=arena?'last':'first';mode.dispatchEvent(new Event('change',{bubbles:true}));
   $('pbBoardTitle').textContent=arena?'탈락 순서':'골인 순서';
  }
- function settings(){return {source:document.querySelector('input[name="pbSource"]:checked')?.value||'auto',threshold:Number(String($('pbThreshold').value).replace(/[^0-9]/g,''))||0,includeFixed:$('pbFixed').checked,mode:$('pbMode').value,count:Math.max(1,Number($('pbCount').value)||1),course:$('pbCourse').value,game:$('pbGame')?.value==='arena'&&root.arenaEngine?'arena':$('pbGame')?.value==='treadmill'&&root.treadmillEngine?'treadmill':'pinball',voice:!!$('pbVoice')?.checked,slow:$('pbSlow').checked,speed:Number($('pbSpeed').value)||1};}
+ function settings(){return {source:document.querySelector('input[name="pbSource"]:checked')?.value||'auto',threshold:Number(String($('pbThreshold').value).replace(/[^0-9]/g,''))||0,includeFixed:$('pbFixed').checked,mode:$('pbMode').value,count:Math.max(1,Number($('pbCount').value)||1),course:$('pbCourse').value,game:$('pbGame')?.value==='arena'&&root.arenaEngine?'arena':$('pbGame')?.value==='treadmill'&&root.treadmillEngine?'treadmill':'pinball',voice:!!$('pbVoice')?.checked,bounce:[.8,1,1.3,1.6].includes(Number($('pbBounce')?.value))?Number($('pbBounce').value):1,slow:$('pbSlow').checked,speed:Number($('pbSpeed').value)||1};}
  function roster(){
   const v=view();if(!v)return null;const points=new Map((v.active?.rows||[]).map(r=>[r.memberId,r.points]));const fixed=new Set((state.rotationMembers||[]).map(e=>e.memberId));
   return v.members.filter(m=>m.current).map(m=>({memberId:m.memberId,nickname:m.nickname,points:points.get(m.memberId)??0,fixed:fixed.has(m.memberId),excluded:state.vipExcludedMembers?.[m.memberId]===1})).sort((a,b)=>b.points-a.points||a.nickname.localeCompare(b.nickname));
@@ -481,8 +495,8 @@
   const el=$('pbRecords');if(!el)return;
   if(records.error){el.innerHTML='<p class="sub">'+esc(records.error)+'</p>';return;}
   if(!records.draws.length){el.innerHTML='<p class="sub">아직 기록이 없습니다.</p>';return;}
-  el.innerHTML=records.draws.map(d=>{const names=(knockout(d.game)&&d.mode==='last'?d.picks.slice().reverse():d.picks).map(id=>d.participants.find(p=>p.memberId===id)?.nickname||id);return '<details class="pb-record"><summary><b>'+esc(new Date(d.at).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}))+'</b><span>'+(d.source==='manual'?'직접 선택':fmtN(d.threshold)+'점 이상')+' '+d.participants.length+'명 · '+modeText(d.game,d.mode,d.count)+' · '+gameName(d)+' · 추첨 번호 '+esc(d.seed)+'</span></summary><ol>'+names.map(n=>'<li>'+esc(n)+'</li>').join('')+'</ol><div class="actions"><button type="button" class="btn ghost" data-replay="'+esc(d.id)+'">다시 보기</button></div></details>';}).join('');
-  el.querySelectorAll('[data-replay]').forEach(btn=>btn.onclick=()=>{const d=records.draws.find(x=>x.id===btn.dataset.replay);if(!d)return;if(knockout(d.game)&&!engineOf(d.game))return showNoticeSafe('추첨 화면을 불러오지 못했습니다. 새로고침해 주세요.');const result=knockout(d.game)?engineOf(d.game).run(d.participants,d.seed,d.mode,d.count):run(d.participants,d.seed,d.mode,d.count,d.course,d.layout||1);
+  el.innerHTML=records.draws.map(d=>{const names=(knockout(d.game)&&d.mode==='last'?d.picks.slice().reverse():d.picks).map(id=>d.participants.find(p=>p.memberId===id)?.nickname||id);return '<details class="pb-record"><summary><b>'+esc(new Date(d.at).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}))+'</b><span>'+(d.source==='manual'?'직접 선택':fmtN(d.threshold)+'점 이상')+' '+d.participants.length+'명 · '+modeText(d.game,d.mode,d.count)+' · '+gameName(d)+(d.bounce&&d.bounce!==1?' · 반발 '+({0.8:'약하게',1.3:'강하게',1.6:'아주 강하게'}[d.bounce]||''):'')+' · 추첨 번호 '+esc(d.seed)+'</span></summary><ol>'+names.map(n=>'<li>'+esc(n)+'</li>').join('')+'</ol><div class="actions"><button type="button" class="btn ghost" data-replay="'+esc(d.id)+'">다시 보기</button></div></details>';}).join('');
+  el.querySelectorAll('[data-replay]').forEach(btn=>btn.onclick=()=>{const d=records.draws.find(x=>x.id===btn.dataset.replay);if(!d)return;if(knockout(d.game)&&!engineOf(d.game))return showNoticeSafe('추첨 화면을 불러오지 못했습니다. 새로고침해 주세요.');const result=knockout(d.game)?engineOf(d.game).run(d.participants,d.seed,d.mode,d.count):run(d.participants,d.seed,d.mode,d.count,d.course,d.layout||1,d.bounce||1);
    if(JSON.stringify(result.order)!==JSON.stringify(d.order))showNoticeSafe('다시 계산한 결과가 기록과 다릅니다. 관리자에게 알려 주세요.');startMusic(d.seed,d.game);play(result,d);});
  }
  function showNoticeSafe(m){if(typeof showNotice==='function')showNotice(m);else alert(m);}
@@ -495,8 +509,8 @@
   if(s.game==='treadmill'&&s.voice&&soundOn()&&typeof speechSynthesis!=='undefined'){try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(' ');u.volume=0;speechSynthesis.speak(u);}catch{/* 지원하지 않는 브라우저 */}}
   const arena=knockout(s.game),course=arena?1:s.course==='random'?1+parseInt(seed,16)%COURSES.length:Number(s.course);
   const participants=list.map(m=>({memberId:m.memberId,nickname:m.nickname,points:m.points}));
-  const result=arena?engineOf(s.game).run(participants,seed,s.mode,count):run(participants,seed,s.mode,count,course,LAYOUT);
-  const drawRec={id:crypto.randomUUID(),seed,source:s.source,threshold:s.source==='auto'?s.threshold:0,includeFixed:s.includeFixed,mode:s.mode,count,course,...(arena?{game:s.game}:{layout:LAYOUT}),week:view().active?.appliesOn||null,participants:result.list,order:result.order,picks:result.picks,timedOut:result.sim.timedOut};
+  const result=arena?engineOf(s.game).run(participants,seed,s.mode,count):run(participants,seed,s.mode,count,course,LAYOUT,s.bounce);
+  const drawRec={id:crypto.randomUUID(),seed,source:s.source,threshold:s.source==='auto'?s.threshold:0,includeFixed:s.includeFixed,mode:s.mode,count,course,...(arena?{game:s.game}:{layout:LAYOUT,bounce:s.bounce}),week:view().active?.appliesOn||null,participants:result.list,order:result.order,picks:result.picks,timedOut:result.sim.timedOut};
   $('pbStart').disabled=true;
   try{records=await api('/api/pinball',{method:'POST',body:JSON.stringify({revision:records.revision,mutation:crypto.randomUUID(),draw:drawRec})});renderRecords();}
   catch(e){stopMusic(true);showNoticeSafe('추첨 기록을 저장하지 못해 추첨을 시작하지 않았습니다. '+e.message);$('pbStart').disabled=false;return;}
@@ -513,6 +527,7 @@
    +'<div class="field" id="pbCourseField"><label for="pbCourse">코스</label><select id="pbCourse"><option value="random">무작위 코스</option>'+COURSES.map((n,k)=>'<option value="'+(k+1)+'">'+(k+1)+'. '+n+'</option>').join('')+'</select></div>'
    +'<div class="field"><label for="pbMode">뽑는 방식</label><select id="pbMode"><option value="first">먼저 들어온 사람</option><option value="last">늦게 들어온 사람</option></select></div>'
    +'<div class="field"><label for="pbCount">뽑는 인원</label><input id="pbCount" type="number" min="1" max="150" value="5" inputmode="numeric"></div>'
+   +'<div class="field"><label for="pbBounce">장애물 반발 세기</label><select id="pbBounce"><option value="0.8">약하게</option><option value="1" selected>보통</option><option value="1.3">강하게</option><option value="1.6">아주 강하게 (한 판이 길어짐)</option></select></div>'
    +'<div class="field"><label for="pbSpeed">배속</label><select id="pbSpeed"><option value="0.5">0.5배</option><option value="1" selected>1배</option><option value="2">2배</option><option value="3">3배</option></select></div>'
    +'<div class="field pb-check"><label><input id="pbSlow" type="checkbox" checked> 끝나기 전 느린 화면</label></div>'
    +'<div class="field"><label for="pbTrack">배경음악</label><select id="pbTrack"><option value="auto">추첨마다 자동</option></select></div>'
