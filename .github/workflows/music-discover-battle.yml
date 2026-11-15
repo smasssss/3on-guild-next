@@ -1,0 +1,15 @@
+name: List CC0 battle chiptunes and hit sounds for the 배틀로얄 draw (read-only)
+# 2026-11-15: user asked for a fitting free BGM for the new 배틀로얄 draw. Lists candidates only; downloads nothing into the site.
+on:
+  push:
+    branches: [claude/new-session-narazy]
+    paths: ['.github/workflows/music-discover-battle.yml']
+permissions:
+  contents: read
+jobs:
+  list:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - run: python3 scripts/music-discover-battle.py
