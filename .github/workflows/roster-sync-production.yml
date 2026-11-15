@@ -23,6 +23,7 @@ name: Promote roster sync to Production after a fresh Staging verification (user
 # Release 23 (user-approved 2026-11-12 "VIP 기준 1회 Production 반영 승인"): VIP queue baseline. Current 0-VIP members count as one VIP on 2026-11-12 (one-time, after a backup); new members count one VIP on their join day; returning members keep their count and queue from the return day.
 # Release 24 (user-approved 2026-11-13 "명단 출처 변경 Production 배포 승인"): hourly roster from the Last Asylum Tracker API when TRACKER_API_KEY is set (lastasylum.gg fallback); the one-time 2026-11-12 VIP baseline step is removed (already applied in Release 23).
 # Release 25 (user-approved 2026-11-15 "명단 합치기 Production 배포 승인"): roster merged from the tracker API and lastasylum.gg (either alone when the other fails); a return counts only a day or more after a non-void departure; the false 2026-11-13 departure of game 307460940071 is marked void (kept).
+# Release 26 (user-approved 2026-11-15, 배틀로얄 Production 배포 승인): 배틀로얄 draw in the 핀볼 추첨 menu (shrinking arena, elimination order, same record kind with game 'arena') with CC0 battle music.
 on:
   push:
     branches: [claude/new-session-narazy]
@@ -59,7 +60,7 @@ jobs:
         run: |
           npx --no-install eslint lib/vip-weekly.ts lib/validate.ts app/api/state/route.ts app/api/carriage/vip/route.ts public/carriage-vip.js scripts/growth-auto-ui.mjs scripts/growth-roster-browser.mjs tests/vip-fixture.cjs tests/vip_*regression.cjs
           npx --no-install eslint lib/growth-roster.ts lib/growth.ts lib/growth-automation.ts app/api/growth/legacy/route.ts tests/growth_roster_regression.cjs tests/roster_restored_check.cjs tests/roster_sync_regression.cjs public/growth-auto.js
-          npx --no-install eslint lib/pinball.ts app/api/pinball/route.ts public/pinball.js tests/pinball_regression.cjs
+          npx --no-install eslint lib/pinball.ts app/api/pinball/route.ts public/pinball.js public/arena.js tests/pinball_regression.cjs tests/arena_regression.cjs
           npx --no-install tsc --noEmit
           python tests/vip_release_guards.py
           python tests/weekly_release_guards.py
@@ -81,6 +82,7 @@ jobs:
           node tests/vip_baseline_regression.cjs
           node tests/tracker_source_regression.cjs
           node tests/pinball_regression.cjs
+          node tests/arena_regression.cjs
           node tests/vip_sunday_regression.cjs
           node tests/weekly_input_regression.cjs
           node tests/vip_weekly_regression.cjs
