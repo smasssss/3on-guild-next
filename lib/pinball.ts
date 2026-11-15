@@ -7,9 +7,9 @@ export type Participant = {memberId:string;nickname:string;points:number};
 export const COURSE_COUNT = 10;
 // 코스 판 번호(2026-11-10): 1판은 처음 코스, 2판은 새 코스, 3판은 2판에 반전 장치를 더한 코스, 4판은 지름길을 빼고 길목 되돌이·반발 장치를 더해 약 2배로 늘린 코스. 번호가 없는 옛 기록은 1판으로 다시 봅니다.
 export const LAYOUTS = [1,2,3,4,5] as const;
-// 게임 종류(2026-11-15): 없으면 핀볼(골인 순서), 'arena'는 배틀로얄(탈락 순서). 순서와 뽑힌 사람의 관계는 같습니다.
-export const GAMES = ['arena'] as const;
-export type Draw = {id:string;at:string;actor?:string;seed:string;source:'auto'|'manual';threshold:number;includeFixed:boolean;mode:'first'|'last';count:number;course:number;layout?:2|3|4|5;game?:'arena';week:string|null;participants:Participant[];order:string[];picks:string[];timedOut:boolean};
+// 게임 종류(2026-11-15): 없으면 핀볼(골인 순서), 'arena'는 배틀로얄, 'treadmill'은 러닝머신 경주(둘 다 탈락 순서). 순서와 뽑힌 사람의 관계는 같습니다.
+export const GAMES = ['arena','treadmill'] as const;
+export type Draw = {id:string;at:string;actor?:string;seed:string;source:'auto'|'manual';threshold:number;includeFixed:boolean;mode:'first'|'last';count:number;course:number;layout?:2|3|4|5;game?:'arena'|'treadmill';week:string|null;participants:Participant[];order:string[];picks:string[];timedOut:boolean};
 export type PinballData = {version:1;draws:Draw[]};
 export const emptyPinball = ():PinballData => ({version:1,draws:[]});
 
@@ -29,7 +29,7 @@ export function validateDraw(input:unknown):Draw{
  if(d.source==='manual'&&d.threshold!==0)invalid('직접 선택은 점수 기준을 쓰지 않습니다.');
  if(!Number.isSafeInteger(d.course)||(d.course as number)<1||(d.course as number)>COURSE_COUNT)invalid('코스를 확인해 주세요.');
  if(d.layout!==undefined&&!LAYOUTS.includes(d.layout as 1|2|3|4|5))invalid('코스 판을 확인해 주세요.');
- if(d.game!==undefined&&!GAMES.includes(d.game as 'arena'))invalid('게임 종류를 확인해 주세요.');
+ if(d.game!==undefined&&!GAMES.includes(d.game as 'arena'|'treadmill'))invalid('게임 종류를 확인해 주세요.');
  if(d.week!==null&&!(typeof d.week==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(d.week)))invalid('길드전 주차를 확인해 주세요.');
  if(!Array.isArray(d.participants)||d.participants.length<1||d.participants.length>MAX_PARTICIPANTS)invalid('참가 인원을 확인해 주세요.');
  const ids=new Set<string>();
@@ -44,7 +44,7 @@ export function validateDraw(input:unknown):Draw{
  const order=d.order as string[],count=d.count as number;
  const expected=d.mode==='first'?order.slice(0,count):order.slice(order.length-count);
  if(!Array.isArray(d.picks)||JSON.stringify(d.picks)!==JSON.stringify(expected))invalid('뽑힌 사람이 골인 순서와 맞지 않습니다.');
- return {id:String(d.id),at:'',seed:String(d.seed),source:d.source,threshold:d.threshold as number,includeFixed:d.includeFixed as boolean,mode:d.mode,count,course:d.course as number,...(typeof d.layout==='number'&&d.layout>=2?{layout:d.layout as 2|3|4|5}:{}),...(d.game==='arena'?{game:'arena' as const}:{}),week:(d.week as string|null),participants,order,picks:expected,timedOut:d.timedOut as boolean};
+ return {id:String(d.id),at:'',seed:String(d.seed),source:d.source,threshold:d.threshold as number,includeFixed:d.includeFixed as boolean,mode:d.mode,count,course:d.course as number,...(typeof d.layout==='number'&&d.layout>=2?{layout:d.layout as 2|3|4|5}:{}),...(d.game==='arena'||d.game==='treadmill'?{game:d.game as 'arena'|'treadmill'}:{}),week:(d.week as string|null),participants,order,picks:expected,timedOut:d.timedOut as boolean};
 }
 
 /** 새 기록을 맨 앞에 넣고 최근 MAX_DRAWS건만 남깁니다. 같은 번호의 기록은 다시 넣지 않습니다. */
