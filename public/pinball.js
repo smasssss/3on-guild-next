@@ -301,7 +301,7 @@
   o.type='square';o.frequency.setValueAtTime(520,t);o.frequency.exponentialRampToValueAtTime(90,t+.14);g.gain.setValueAtTime(.14,t);g.gain.exponentialRampToValueAtTime(.001,t+.16);
   o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+.17);
  }
- async function loadTracks(){try{tracks=await (await fetch('/pinball-music/tracks.json?v=2')).json();}catch{tracks=[];}const sel=$('pbTrack');if(sel)sel.innerHTML='<option value="auto">추첨마다 자동</option>'+tracks.filter(t=>t.kind==='music').map((t,k)=>'<option value="'+(k+1)+'">'+(k+1)+'. '+esc(t.label||t.title)+'</option>').join('');}
+ async function loadTracks(){try{tracks=await (await fetch('/pinball-music/tracks.json?v=3')).json();}catch{tracks=[];}const sel=$('pbTrack');if(sel)sel.innerHTML='<option value="auto">추첨마다 자동</option>'+tracks.filter(t=>t.kind==='music').map((t,k)=>'<option value="'+(k+1)+'">'+(k+1)+'. '+esc(t.label||t.title)+'</option>').join('');}
  const view=()=>typeof carriageVip!=='undefined'?carriageVip.view:null;
  // 게임 종류(2026-11-15): 핀볼은 골인 순서, 배틀로얄은 탈락 순서가 결과입니다. 기록의 '먼저/늦게'는 그 순서의 앞/뒤입니다.
  const modeText=(game,mode,count)=>game==='arena'?(mode==='first'?'먼저 떨어진 ':'마지막까지 남은 ')+count+'명':(mode==='first'?'먼저':'늦게')+' 들어온 '+count+'명';
