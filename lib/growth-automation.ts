@@ -211,8 +211,12 @@ export async function collect(env:AutoEnv,triggerKind='cron',now=Date.now(),fetc
     let raw:string,status:number,note:string|null=null;
     if(trackerSnap&&ggText){
       const gg=JSON.parse(ggText),ids=new Set(trackerSnap.roster.map((r:any)=>r.id)),extra=gg.roster.filter((r:any)=>!ids.has(String(r.id)));
-      const roster=[...trackerSnap.roster,...extra];
-      raw=JSON.stringify({...trackerSnap,members:roster.length,roster,source:extra.length?'lastasylumtracker+gg':'lastasylumtracker',filledFromGg:extra.map((r:any)=>String(r.id))});status=trackerStatus;
+      // 2026-11-15 사용자 결정: 트래커가 등급(R1~R5)을 빼고 보낸 길드원은 같은 시간 .gg의 등급으로 채웁니다
+      // (등급이 비면 '검토 필요'가 되어 마차 VIP 명단에서 빠지기 때문).
+      const ggRank=new Map(gg.roster.filter((r:any)=>Number.isInteger(r.rank)&&r.rank>=1&&r.rank<=5).map((r:any)=>[String(r.id),r.rank]));
+      const rankFromGg:string[]=[];
+      const roster=[...trackerSnap.roster.map((r:any)=>r.rank==null&&ggRank.has(r.id)?(rankFromGg.push(r.id),{...r,rank:ggRank.get(r.id)}):r),...extra];
+      raw=JSON.stringify({...trackerSnap,members:roster.length,roster,source:extra.length?'lastasylumtracker+gg':'lastasylumtracker',filledFromGg:extra.map((r:any)=>String(r.id)),...(rankFromGg.length?{rankFromGg}:{})});status=trackerStatus;
     // 2026-11-15 사용자 결정: .gg를 못 받은 시간의 트래커 명단은 빠진 사람이 있을 수 있어(전각 빈칸 이름 누락),
     // 전투력은 저장하되 가입·탈퇴 판정에는 쓰지 않습니다(rosterPartial).
     }else if(trackerSnap){raw=JSON.stringify({...trackerSnap,rosterPartial:true});status=trackerStatus;note='gg unavailable: '+ggError;}

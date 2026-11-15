@@ -61,5 +61,13 @@ const reply=(status,body)=>({ok:status>=200&&status<300,status,text:async()=>typ
  // Still one collection per hour, and fixture mode never calls anything.
  calls.length=0;await auto.collect({DB:f.db,GROWTH_AUTO_MODE:'production',TRACKER_API_KEY:'test-key'},'test',hour(14)+60_000,fetcher);assert.equal(calls.length,0);
  await auto.collect({DB:f.db,GROWTH_AUTO_MODE:'fixture',TRACKER_API_KEY:'test-key'},'test',hour(16),fetcher);assert.equal(calls.length,0);
- console.log('PASS: roster from the tracker API with the key (same shape as .gg), filled from .gg when the tracker list misses someone, either source alone when the other fails, .gg only without a key, one collection per hour, tracker-only hours (.gg down) never decide joins or leaves');
+ ggReply=()=>reply(200,{...gg,asOf:Math.floor(at/1000)-60});
+ // 5) 2026-11-15 user decision: a tracker row without a rank (R1~R5) takes the .gg rank of the same hour, so it is not
+ //     flagged for review (a review row drops the member from the carriage VIP list).
+ const noRank=gg.roster[2].id;
+ trackerReply=()=>{const t=tracker(Math.floor(hour(18)/1000)-30);t.members.find(m=>String(m.uid)===noRank).rank_code=null;return reply(200,t);};
+ await auto.collect({DB:f.db,GROWTH_AUTO_MODE:'production',TRACKER_API_KEY:'test-key'},'test',hour(18),fetcher);
+ run=last();stored=JSON.parse(run.raw_json);assert.deepEqual(stored.rankFromGg,[noRank]);assert.equal(stored.roster.find(r=>r.id===noRank).rank,gg.roster[2].rank);
+ assert.equal(f.sql.prepare('SELECT status FROM growth_hourly_observations WHERE game_id=? ORDER BY source_as_of DESC LIMIT 1').get(noRank).status,'valid','rank filled from .gg, no review');
+ console.log('PASS: roster from the tracker API with the key (same shape as .gg), filled from .gg when the tracker list misses someone, either source alone when the other fails, .gg only without a key, one collection per hour, tracker-only hours (.gg down) never decide joins or leaves, a missing tracker rank is filled from .gg');
 })().catch(e=>{console.error(e);process.exitCode=1;});
