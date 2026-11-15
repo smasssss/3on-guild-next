@@ -16,3 +16,11 @@
 - `win.mp3` — "Victorious" by SpiderDave — CC0 — https://opengameart.org/content/victorious (원본 파일: 29 Victorious 8-bit.ogg)
 
 사이트에 맞게 손본 점: 모두 한 채널 96kbps로 바꾸고 소리 크기를 맞췄습니다. 배경음악은 최대 2분으로 자르고 끝을 서서히 줄였습니다. `bgm01.mp3`는 끝의 무음을 빼서 반복이 자연스럽게, `win.mp3`는 앞 9초만 쓰고 끝을 서서히 줄였습니다.
+
+배틀로얄 추첨용(2026-11-15 추가, 모두 CC0):
+- `battle01.mp3` — "4 Chiptunes (Adventure)" by SubspaceAudio — CC0 — https://opengameart.org/content/4-chiptunes-adventure (원본 파일: Juhani Junkala [Chiptune Adventures] 3. Boss Fight.ogg)
+- `battle02.mp3` — "Boss Battle #2 ["8 bit"]" by nene — CC0 — https://opengameart.org/content/boss-battle-2-8-bit (원본 파일: boss_battle_#2.mp3)
+- `battle03.mp3` — "8-Bit Battle Loop" by Wolfgang_ — CC0 — https://opengameart.org/content/8-bit-battle-loop (원본 파일: 8BitBattleLoop.ogg)
+- `battle04.mp3` — "NES Shooter Music (5 tracks, 3 jingles)" by SketchyLogic — CC0 — https://opengameart.org/content/nes-shooter-music-5-tracks-3-jingles (원본 파일: Boss.ogg)
+- `battle05.mp3` — "Chiptune Battle Music" by pmiller — CC0 — https://opengameart.org/content/chiptune-battle-music (원본 파일: battle_music_01-loop.ogg)
+- `boom.mp3` — "bomb_explosion_8bit" by Luke.RUSTLTD — CC0 — https://opengameart.org/content/bombexplosion8bit (원본 파일: 8bit_bomb_explosion.wav)

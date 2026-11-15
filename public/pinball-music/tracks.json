@@ -94,5 +94,53 @@
   "author": "SpiderDave",
   "seconds": 9.0,
   "label": "결과 축하 소리"
+ },
+ {
+  "key": "battle01",
+  "kind": "battle",
+  "title": "4 Chiptunes (Adventure)",
+  "author": "SubspaceAudio",
+  "seconds": 71.7,
+  "label": "보스전"
+ },
+ {
+  "key": "battle02",
+  "kind": "battle",
+  "title": "Boss Battle #2 [\"8 bit\"]",
+  "author": "nene",
+  "seconds": 59.6,
+  "label": "결투"
+ },
+ {
+  "key": "battle03",
+  "kind": "battle",
+  "title": "8-Bit Battle Loop",
+  "author": "Wolfgang_",
+  "seconds": 26.6,
+  "label": "난투"
+ },
+ {
+  "key": "battle04",
+  "kind": "battle",
+  "title": "NES Shooter Music (5 tracks, 3 jingles)",
+  "author": "SketchyLogic",
+  "seconds": 66.2,
+  "label": "우주 슈팅 · 보스"
+ },
+ {
+  "key": "battle05",
+  "kind": "battle",
+  "title": "Chiptune Battle Music",
+  "author": "pmiller",
+  "seconds": 120.0,
+  "label": "전투 개시"
+ },
+ {
+  "key": "boom",
+  "kind": "sfx",
+  "title": "bomb_explosion_8bit",
+  "author": "Luke.RUSTLTD",
+  "seconds": 0.6,
+  "label": "충격파 폭발 소리"
  }
 ]
