@@ -87,7 +87,7 @@ export async function ingestStored(db:D1Database,runId:string,acceptedAt=Date.no
   // Raw source time and our call/receipt times are kept apart; receipt time is never a measurement time.
   const timing={source_as_of_raw:source.asOf,source_time_basis:aligned?'received_at':'source_as_of',called_at:run.called_at,received_at:run.received_at??null};
   const contentHash=await digest(canonical({id:source.id,asOf:source.asOf,members:source.members,power:source.power,roster:[...source.roster].sort((a,b)=>a.id.localeCompare(b.id))}));
-  const rosterBefore=await completeRoster(db).catch(()=>null);
+  const rosterBefore=await completeRoster(db).catch(()=>null),rosterPartial=JSON.parse(run.raw_json).rosterPartial===true;
   // Unchanged data is a duplicate collection (a further hourly confirmation), never new hourly rows.
   // With a whole-day asOf, "unchanged" means identical to the newest stored snapshot.
   const existing=await first(db,aligned
@@ -135,7 +135,8 @@ export async function ingestStored(db:D1Database,runId:string,acceptedAt=Date.no
   // Only members still on the confirmed roster can become departure candidates; members the
   // 3-collection rule already removed are not re-flagged every hour.
   const onRoster=rosterBefore?new Set(rosterBefore.gameIds):null;
-  for(const m of mappings)if(m.status==='confirmed'&&!m.departed_at&&!present.has(m.game_id)&&(!onRoster||onRoster.has(m.game_id)))event('departure_candidate',m,'pending',null,null,'명단 미관측 · 탈퇴 미확정');
+  // A roster that may be missing people (tracker only, .gg unavailable) raises no absence candidates.
+  if(!rosterPartial)for(const m of mappings)if(m.status==='confirmed'&&!m.departed_at&&!present.has(m.game_id)&&(!onRoster||onRoster.has(m.game_id)))event('departure_candidate',m,'pending',null,null,'명단 미관측 · 탈퇴 미확정');
   const guard='auto-ingest-'+runId;
   const statements=[
     stmt(db,"INSERT INTO growth_tx_guards VALUES(?,CASE WHEN NOT EXISTS(SELECT 1 FROM growth_auto_snapshots WHERE source_as_of=? ) AND EXISTS(SELECT 1 FROM growth_auto_runs WHERE run_id=? AND status IN ('received','db_error')) AND (SELECT value FROM growth_meta WHERE key='identity_revision')=? THEN 1 ELSE NULL END,?)",guard,sourceTime,runId,revision.value,new Date(acceptedAt).toISOString()),
@@ -212,7 +213,9 @@ export async function collect(env:AutoEnv,triggerKind='cron',now=Date.now(),fetc
       const gg=JSON.parse(ggText),ids=new Set(trackerSnap.roster.map((r:any)=>r.id)),extra=gg.roster.filter((r:any)=>!ids.has(String(r.id)));
       const roster=[...trackerSnap.roster,...extra];
       raw=JSON.stringify({...trackerSnap,members:roster.length,roster,source:extra.length?'lastasylumtracker+gg':'lastasylumtracker',filledFromGg:extra.map((r:any)=>String(r.id))});status=trackerStatus;
-    }else if(trackerSnap){raw=JSON.stringify(trackerSnap);status=trackerStatus;note='gg unavailable: '+ggError;}
+    // 2026-11-15 사용자 결정: .gg를 못 받은 시간의 트래커 명단은 빠진 사람이 있을 수 있어(전각 빈칸 이름 누락),
+    // 전투력은 저장하되 가입·탈퇴 판정에는 쓰지 않습니다(rosterPartial).
+    }else if(trackerSnap){raw=JSON.stringify({...trackerSnap,rosterPartial:true});status=trackerStatus;note='gg unavailable: '+ggError;}
     else if(ggText){raw=ggText;status=ggStatus;note=trackerError?'tracker fallback: '+trackerError:null;}
     else throw Error((ggError||'GG_FAILED')+(trackerError?' / tracker '+trackerError:''));
     const received=Date.now();await stmt(db,"UPDATE growth_auto_runs SET status='received',received_at=?,http_status=?,raw_json=?,raw_hash=?,error=? WHERE run_id=?",received,status,raw,await digest(raw),note,runId).run();

@@ -35,7 +35,16 @@ const reply=(status,body)=>({ok:status>=200&&status<300,status,text:async()=>typ
  // 1b) .gg down: the tracker alone is used and the reason is kept.
  calls.length=0;trackerReply=()=>reply(200,tracker(Math.floor(hour(2)/1000)-30));ggReply=()=>reply(502,'down');
  await auto.collect({DB:f.db,GROWTH_AUTO_MODE:'production',TRACKER_API_KEY:'test-key'},'test',hour(2),fetcher);
- run=last();assert.equal(JSON.parse(run.raw_json).source,'lastasylumtracker');assert.match(run.error||'',/gg unavailable: HTTP_502/);
+ run=last();assert.equal(JSON.parse(run.raw_json).source,'lastasylumtracker');assert.equal(JSON.parse(run.raw_json).rosterPartial,true);assert.match(run.error||'',/gg unavailable: HTTP_502/);
+ // 1c) 2026-11-15 user decision: while .gg is down the tracker list can miss someone (it once dropped a full-width-space
+ //     name), so tracker-only rosters are left out of join/leave decisions. Four such hours without one member never
+ //     make them leave or even a departure candidate; power is still stored.
+ const missing=gg.roster[0].id,roster=f.load('lib/growth-roster.ts');
+ for(const h of [3,4,5,6]){trackerReply=()=>{const t=tracker(Math.floor(hour(h)/1000)-30);t.members=t.members.filter(m=>String(m.uid)!==missing);t.member_count=t.members.length;return reply(200,t);};
+  await auto.collect({DB:f.db,GROWTH_AUTO_MODE:'production',TRACKER_API_KEY:'test-key'},'test',hour(h),fetcher);assert.notEqual(last().status,'failed');}
+ const kept=await roster.completeRoster(f.db);assert.ok(kept.gameIds.includes(missing),'a tracker-only miss never removes a member');
+ assert.equal(f.sql.prepare("SELECT COUNT(*) n FROM growth_auto_events WHERE game_id=? AND kind IN ('departure_candidate','roster_leave')").get(missing).n,0);
+ assert.ok(f.sql.prepare('SELECT COUNT(*) n FROM growth_auto_snapshots').get().n>=5,'tracker-only hours still store power');
  ggReply=()=>reply(200,{...gg,asOf:Math.floor(at/1000)-60});
  // 2) Tracker down: the same hour falls back to .gg (two calls at most), and the reason is kept.
  calls.length=0;trackerReply=()=>reply(503,'busy');
@@ -52,5 +61,5 @@ const reply=(status,body)=>({ok:status>=200&&status<300,status,text:async()=>typ
  // Still one collection per hour, and fixture mode never calls anything.
  calls.length=0;await auto.collect({DB:f.db,GROWTH_AUTO_MODE:'production',TRACKER_API_KEY:'test-key'},'test',hour(14)+60_000,fetcher);assert.equal(calls.length,0);
  await auto.collect({DB:f.db,GROWTH_AUTO_MODE:'fixture',TRACKER_API_KEY:'test-key'},'test',hour(16),fetcher);assert.equal(calls.length,0);
- console.log('PASS: roster from the tracker API with the key (same shape as .gg), filled from .gg when the tracker list misses someone, either source alone when the other fails, .gg only without a key, one collection per hour');
+ console.log('PASS: roster from the tracker API with the key (same shape as .gg), filled from .gg when the tracker list misses someone, either source alone when the other fails, .gg only without a key, one collection per hour, tracker-only hours (.gg down) never decide joins or leaves');
 })().catch(e=>{console.error(e);process.exitCode=1;});

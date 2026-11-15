@@ -6,6 +6,8 @@
 // responses are not stored as collections, so they neither count nor reset the sequence.
 // A user-provided Sunday snapshot participant is current at once; absence from that
 // snapshot never removes anyone.
+// A roster stored while lastasylum.gg was unavailable (tracker only, marked rosterPartial) can miss
+// members, so it is left out of the presence sequence: it neither counts nor resets (2026-11-15).
 export const CONFIRMATIONS=3;
 // Bounded read: twelve stored rosters are enough to settle a 3-collection rule.
 export const ROSTER_WINDOW=12;
@@ -40,7 +42,8 @@ export async function rosterHistory(db:D1Database,cutoff?:number){
  let byDb=presenceCache.get(db as object);if(!byDb){byDb=new Map();presenceCache.set(db as object,byDb);}
  let presence=byDb.get(cacheKey);
  if(!presence){
-  const snapshots=(await bindCut(db.prepare(`SELECT s.snapshot_id,s.source_as_of,s.received_at,s.accepted_at,s.member_count,s.run_id,r.called_at FROM growth_auto_snapshots s LEFT JOIN growth_auto_runs r ON r.run_id=s.run_id${scope.replaceAll('source_as_of','s.source_as_of').replaceAll('received_at','s.received_at').replaceAll('accepted_at','s.accepted_at')} ORDER BY s.source_as_of DESC LIMIT ${ROSTER_WINDOW}`)).all<SnapshotRow>()).results.reverse();
+  const snapshots=(await bindCut(db.prepare(`SELECT s.snapshot_id,s.source_as_of,s.received_at,s.accepted_at,s.member_count,s.run_id,r.called_at FROM growth_auto_snapshots s LEFT JOIN growth_auto_runs r ON r.run_id=s.run_id WHERE json_extract(r.raw_json,'$.rosterPartial') IS NOT 1${scope.replace(' WHERE ',' AND ').replaceAll('source_as_of','s.source_as_of').replaceAll('received_at','s.received_at').replaceAll('accepted_at','s.accepted_at')} ORDER BY s.source_as_of DESC LIMIT ${ROSTER_WINDOW}`)).all<SnapshotRow>()).results.reverse();
+  if(!snapshots.length)return null;
   const ids=JSON.stringify(snapshots.map(s=>s.snapshot_id)),oldest=Math.min(...snapshots.map(s=>s.received_at));
   const [rowResult,repeatResult]=await Promise.all([
    // Covered by the (snapshot_id, game_id) primary-key index: no observation payload is read.
