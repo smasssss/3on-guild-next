@@ -25,6 +25,7 @@ name: Promote roster sync to Production after a fresh Staging verification (user
 # Release 25 (user-approved 2026-11-15 "명단 합치기 Production 배포 승인"): roster merged from the tracker API and lastasylum.gg (either alone when the other fails); a return counts only a day or more after a non-void departure; the false 2026-11-13 departure of game 307460940071 is marked void (kept).
 # Release 26 (user-approved 2026-11-15, 배틀로얄 Production 배포 승인): 배틀로얄 draw in the 핀볼 추첨 menu (shrinking arena, elimination order, same record kind with game 'arena') with CC0 battle music.
 # Release 27 (user-approved 2026-11-15 "러닝머신 Production 배포 승인"): 러닝머신 경주 draw (heats then a final on a treadmill belt, caption and spoken commentary; same record kind with game 'treadmill').
+# Release 28 (user-approved 2026-11-15 "배틀로얄·러닝머신 내리기 Production 배포 승인"): 배틀로얄 and 러닝머신 removed from new draws (pinball only); existing records still replay.
 on:
   push:
     branches: [claude/new-session-narazy]

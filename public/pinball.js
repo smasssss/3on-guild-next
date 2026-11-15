@@ -504,11 +504,12 @@
  }
  function init(){
   const page=$('pinball');if(!page||page.dataset.ready)return;page.dataset.ready='1';
-  page.innerHTML='<div class="card"><h2>핀볼 추첨</h2><p class="sub">이름이 적힌 구슬들이 코스를 내려와 골에 먼저(또는 늦게) 들어온 순서대로 뽑힙니다. 배틀로얄은 경기장에서 밀려난 순서로, 러닝머신 경주는 벨트에서 떨어진 순서로 뽑습니다. 추첨은 관리자만 돌릴 수 있고, 결과는 기록으로 남아 누구나 볼 수 있습니다.</p>'
+  page.innerHTML='<div class="card"><h2>핀볼 추첨</h2><p class="sub">이름이 적힌 구슬들이 코스를 내려와 골에 먼저(또는 늦게) 들어온 순서대로 뽑힙니다. 추첨은 관리자만 돌릴 수 있고, 결과는 기록으로 남아 누구나 볼 수 있습니다.</p>'
    +'<div class="pb-source" role="radiogroup" aria-label="참가자 고르는 방법"><label><input type="radio" name="pbSource" value="auto" checked> 길드전 점수 기준</label><label><input type="radio" name="pbSource" value="manual"> 직접 선택</label></div>'
    +'<div id="pbAuto" class="formgrid"><div class="field"><label for="pbThreshold">길드전 점수 기준(이상)</label><input id="pbThreshold" inputmode="numeric" value="40,000,000"></div><div class="field pb-check"><label><input id="pbFixed" type="checkbox" checked> 고정 마차장 포함 (영구 제외는 항상 빠짐)</label></div></div>'
    +'<div id="pbManual" hidden><div class="field"><label for="pbSearch">이름 검색</label><input id="pbSearch" placeholder="닉네임"></div><div class="actions"><button type="button" class="smallbtn" id="pbSelAuto">점수 기준으로 다시 고르기</button><button type="button" class="smallbtn" id="pbSelAll">모두 선택</button><button type="button" class="smallbtn" id="pbSelNone">모두 해제</button></div><div class="pb-manual-list" id="pbManualList"></div></div>'
-   +'<div class="formgrid"><div class="field"><label for="pbGame">게임 종류</label><select id="pbGame"><option value="pinball">핀볼 (코스 경주)</option>'+(root.arenaEngine?'<option value="arena">배틀로얄 (밀어내기)</option>':'')+(root.treadmillEngine?'<option value="treadmill">러닝머신 경주 (토너먼트)</option>':'')+'</select></div>'
+   // 2026-11-15 사용자 결정: 배틀로얄·러닝머신은 새 추첨에서 내림(재미가 덜해서). 이미 남은 기록의 다시 보기는 그대로 됩니다.
+   +'<div class="formgrid"><div class="field" hidden><label for="pbGame">게임 종류</label><select id="pbGame"><option value="pinball">핀볼 (코스 경주)</option></select></div>'
    +'<div class="field" id="pbCourseField"><label for="pbCourse">코스</label><select id="pbCourse"><option value="random">무작위 코스</option>'+COURSES.map((n,k)=>'<option value="'+(k+1)+'">'+(k+1)+'. '+n+'</option>').join('')+'</select></div>'
    +'<div class="field"><label for="pbMode">뽑는 방식</label><select id="pbMode"><option value="first">먼저 들어온 사람</option><option value="last">늦게 들어온 사람</option></select></div>'
    +'<div class="field"><label for="pbCount">뽑는 인원</label><input id="pbCount" type="number" min="1" max="150" value="5" inputmode="numeric"></div>'
