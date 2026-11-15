@@ -28,6 +28,7 @@ name: Promote roster sync to Production after a fresh Staging verification (user
 # Release 28 (user-approved 2026-11-15 "배틀로얄·러닝머신 내리기 Production 배포 승인"): 배틀로얄 and 러닝머신 removed from new draws (pinball only); existing records still replay.
 # Release 29 (user-approved 2026-11-15 "핀볼 6판 Production 배포 승인"): pinball layout 6 (stronger bounce with a bounce-strength option, hold gate moved to mid-course, snapping flippers, wall bumpers, 4-arm goal guard); older records replay unchanged.
 # Release 30 (user-approved 2026-11-15 "명단 안전장치·핀볼 정리 Production 배포 승인"): tracker-only rosters (lastasylum.gg unavailable) are marked rosterPartial and left out of join/leave decisions; pinball settings drop the unused voice and game fields.
+# Release 31 (user-approved 2026-11-15 "등급 채우기 프로덕션 배포 승인"): a tracker roster row without a rank (R1~R5) takes the same hour's lastasylum.gg rank, so it is not flagged for review and stays on the carriage VIP list.
 on:
   push:
     branches: [claude/new-session-narazy]
