@@ -1,0 +1,24 @@
+name: Download the chosen CC0 battle music for the 배틀로얄 draw
+# 2026-11-15: user asked for a fitting free BGM for the new 배틀로얄 draw. Downloads 5 CC0 battle chiptunes and one
+# CC0 explosion sound from OpenGameArt (license re-checked per page) and commits them to public/pinball-music.
+on:
+  push:
+    branches: [claude/new-session-narazy]
+    paths: ['.github/workflows/music-fetch-battle.yml']
+permissions:
+  contents: write
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - run: sudo apt-get install -y -qq ffmpeg >/dev/null
+      - run: python3 scripts/music-download-battle.py
+      - name: Commit the files to this branch (no deploy is triggered)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/pinball-music
+          git commit -m "Add CC0 battle music and an explosion sound for the 배틀로얄 draw (downloaded by CI)"
+          git push origin HEAD:claude/new-session-narazy
