@@ -321,13 +321,7 @@
  const knockout=game=>game==='arena'||game==='treadmill',gameName=d=>d.game==='arena'?'배틀로얄':d.game==='treadmill'?'러닝머신':d.course+'번 코스';
  const engineOf=game=>game==='arena'?root.arenaEngine:game==='treadmill'?root.treadmillEngine:null;
  const modeText=(game,mode,count)=>knockout(game)?(mode==='first'?'먼저 떨어진 ':'마지막까지 남은 ')+count+'명':(mode==='first'?'먼저':'늦게')+' 들어온 '+count+'명';
- function applyGame(){
-  const game=settings().game,arena=knockout(game),mode=$('pbMode');$('pbVoiceField').hidden=game!=='treadmill';
-  $('pbCourseField').hidden=arena;mode.options[0].textContent=arena?'먼저 떨어진 사람':'먼저 들어온 사람';mode.options[1].textContent=arena?'마지막까지 남은 사람':'늦게 들어온 사람';
-  mode.value=arena?'last':'first';mode.dispatchEvent(new Event('change',{bubbles:true}));
-  $('pbBoardTitle').textContent=arena?'탈락 순서':'골인 순서';
- }
- function settings(){return {source:document.querySelector('input[name="pbSource"]:checked')?.value||'auto',threshold:Number(String($('pbThreshold').value).replace(/[^0-9]/g,''))||0,includeFixed:$('pbFixed').checked,mode:$('pbMode').value,count:Math.max(1,Number($('pbCount').value)||1),course:$('pbCourse').value,game:$('pbGame')?.value==='arena'&&root.arenaEngine?'arena':$('pbGame')?.value==='treadmill'&&root.treadmillEngine?'treadmill':'pinball',voice:!!$('pbVoice')?.checked,bounce:[.8,1,1.3,1.6].includes(Number($('pbBounce')?.value))?Number($('pbBounce').value):1,slow:$('pbSlow').checked,speed:Number($('pbSpeed').value)||1};}
+ function settings(){return {source:document.querySelector('input[name="pbSource"]:checked')?.value||'auto',threshold:Number(String($('pbThreshold').value).replace(/[^0-9]/g,''))||0,includeFixed:$('pbFixed').checked,mode:$('pbMode').value,count:Math.max(1,Number($('pbCount').value)||1),course:$('pbCourse').value,game:'pinball',voice:false,bounce:[.8,1,1.3,1.6].includes(Number($('pbBounce')?.value))?Number($('pbBounce').value):1,slow:$('pbSlow').checked,speed:Number($('pbSpeed').value)||1};}
  function roster(){
   const v=view();if(!v)return null;const points=new Map((v.active?.rows||[]).map(r=>[r.memberId,r.points]));const fixed=new Set((state.rotationMembers||[]).map(e=>e.memberId));
   return v.members.filter(m=>m.current).map(m=>({memberId:m.memberId,nickname:m.nickname,points:points.get(m.memberId)??0,fixed:fixed.has(m.memberId),excluded:state.vipExcludedMembers?.[m.memberId]===1})).sort((a,b)=>b.points-a.points||a.nickname.localeCompare(b.nickname));
@@ -505,8 +499,6 @@
   const list=candidates(),s=settings();if(!list||!list.length)return;
   const count=Math.min(s.count,list.length),seed=Array.from(crypto.getRandomValues(new Uint8Array(4)),x=>x.toString(16).padStart(2,'0')).join('');
   startMusic(seed,s.game);
-  // 휴대폰은 누르는 순간에만 목소리를 켤 수 있어, 음성 중계를 쓰면 시작 버튼에서 한 번 깨워 둡니다.
-  if(s.game==='treadmill'&&s.voice&&soundOn()&&typeof speechSynthesis!=='undefined'){try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(' ');u.volume=0;speechSynthesis.speak(u);}catch{/* 지원하지 않는 브라우저 */}}
   const arena=knockout(s.game),course=arena?1:s.course==='random'?1+parseInt(seed,16)%COURSES.length:Number(s.course);
   const participants=list.map(m=>({memberId:m.memberId,nickname:m.nickname,points:m.points}));
   const result=arena?engineOf(s.game).run(participants,seed,s.mode,count):run(participants,seed,s.mode,count,course,LAYOUT,s.bounce);
@@ -523,7 +515,7 @@
    +'<div id="pbAuto" class="formgrid"><div class="field"><label for="pbThreshold">길드전 점수 기준(이상)</label><input id="pbThreshold" inputmode="numeric" value="40,000,000"></div><div class="field pb-check"><label><input id="pbFixed" type="checkbox" checked> 고정 마차장 포함 (영구 제외는 항상 빠짐)</label></div></div>'
    +'<div id="pbManual" hidden><div class="field"><label for="pbSearch">이름 검색</label><input id="pbSearch" placeholder="닉네임"></div><div class="actions"><button type="button" class="smallbtn" id="pbSelAuto">점수 기준으로 다시 고르기</button><button type="button" class="smallbtn" id="pbSelAll">모두 선택</button><button type="button" class="smallbtn" id="pbSelNone">모두 해제</button></div><div class="pb-manual-list" id="pbManualList"></div></div>'
    // 2026-11-15 사용자 결정: 배틀로얄·러닝머신은 새 추첨에서 내림(재미가 덜해서). 이미 남은 기록의 다시 보기는 그대로 됩니다.
-   +'<div class="formgrid"><div class="field" hidden><label for="pbGame">게임 종류</label><select id="pbGame"><option value="pinball">핀볼 (코스 경주)</option></select></div>'
+   +'<div class="formgrid">'
    +'<div class="field" id="pbCourseField"><label for="pbCourse">코스</label><select id="pbCourse"><option value="random">무작위 코스</option>'+COURSES.map((n,k)=>'<option value="'+(k+1)+'">'+(k+1)+'. '+n+'</option>').join('')+'</select></div>'
    +'<div class="field"><label for="pbMode">뽑는 방식</label><select id="pbMode"><option value="first">먼저 들어온 사람</option><option value="last">늦게 들어온 사람</option></select></div>'
    +'<div class="field"><label for="pbCount">뽑는 인원</label><input id="pbCount" type="number" min="1" max="150" value="5" inputmode="numeric"></div>'
@@ -532,7 +524,7 @@
    +'<div class="field pb-check"><label><input id="pbSlow" type="checkbox" checked> 끝나기 전 느린 화면</label></div>'
    +'<div class="field"><label for="pbTrack">배경음악</label><select id="pbTrack"><option value="auto">추첨마다 자동</option></select></div>'
    +'<div class="field pb-check"><label><input id="pbSound" type="checkbox" checked> 소리 켜기</label></div>'
-   +'<div class="field pb-check" id="pbVoiceField" hidden><label><input id="pbVoice" type="checkbox" checked> 음성 중계 (자막을 목소리로 읽어 줌)</label></div></div>'
+   +'</div>'
    +'<p class="sub" id="pbSummary" role="status"></p><div class="actions"><button type="button" class="btn primary" id="pbStart">추첨 시작</button></div></div>'
    +'<div class="card" id="pbStage" hidden><p class="sub" id="pbCourseName"></p><div class="pb-controls"><button type="button" class="smallbtn" id="pbSkip">결과 바로 보기</button><span class="sub">배속과 느린 화면은 위 설정을 바꾸면 바로 적용됩니다.</span></div>'
    +'<div class="pb-stage-grid"><div class="pb-canvas-wrap"><canvas id="pbCanvas" aria-label="핀볼 추첨 화면"></canvas><div class="pb-popup" id="pbPopup" hidden><canvas id="pbConfetti"></canvas><div class="pb-popup-card"><p>당첨 결과</p><h3 id="pbPopupTitle"></h3><ol id="pbPopupNames"></ol><button type="button" class="btn primary" id="pbPopupClose">확인</button></div></div></div><div>'
@@ -543,7 +535,6 @@
   page.querySelectorAll('input[name="pbSource"]').forEach(r=>r.addEventListener('change',()=>{renderManual();summary();}));
   $('pbThreshold').addEventListener('blur',()=>{$('pbThreshold').value=fmtN(settings().threshold);if(!manualTouched)renderManual();summary();});
   $('pbSearch').addEventListener('input',renderManual);
-  $('pbGame').addEventListener('change',applyGame);
   $('pbSelAuto').onclick=()=>{manualTouched=false;renderManual();summary();};
   $('pbSelAll').onclick=()=>{manualTouched=true;manual=new Set((roster()||[]).map(m=>m.memberId));renderManual();summary();};
   $('pbSelNone').onclick=()=>{manualTouched=true;manual=new Set();renderManual();summary();};
@@ -551,7 +542,6 @@
   $('pbCopy').onclick=async()=>{try{await navigator.clipboard.writeText($('pbResultText').value);showNoticeSafe('결과를 복사했습니다.');}catch{$('pbResultText').select();}};
   summary();loadRecords();loadTracks();
   $('pbSound').addEventListener('change',()=>{if(!soundOn()){stopMusic(true);stopVoice();}});
-  $('pbVoice').addEventListener('change',()=>{if(!$('pbVoice').checked)stopVoice();else if(playing&&!playing.stop)voice.on=soundOn();});
   $('pbPopupClose').addEventListener('click',()=>stopMusic(true));
   if(typeof refreshCarriageVip==='function'&&!view())refreshCarriageVip().then(()=>{renderManual();summary();},summary);
   const timer=setInterval(()=>{if(view()){renderManual();summary();clearInterval(timer);}},1000);
