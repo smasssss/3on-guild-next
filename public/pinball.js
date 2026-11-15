@@ -264,7 +264,8 @@
   // 5판: 회원 번호 순서 자체를 추첨 번호로 섞습니다. 출발 자리뿐 아니라 부딪힘 계산 순서 같은 '번호 순서'의 영향도 매번 달라집니다.
   if(layout>=5){const mix=rng(((parseInt(seed,16)^0x5bd1e995)>>>0).toString(16));for(let k=list.length-1;k>0;k--){const j=Math.floor(mix()*(k+1));[list[k],list[j]]=[list[j],list[k]];}}
   const sim=simulate(list.length,seed,course,layout,layout>=6?bounce:1),order=sim.order.map(i=>list[i].memberId);
-  const picks=mode==='first'?order.slice(0,count):order.slice(order.length-count);
+  // 2026-11-15: 'both'는 먼저 들어온 count.first명과 늦게 들어온 count.last명을 함께 뽑습니다.
+  const picks=mode==='both'?[...order.slice(0,count.first),...order.slice(order.length-count.last)]:mode==='first'?order.slice(0,count):order.slice(order.length-count);
   return {list,sim,order,picks};
  }
  const engine={simulate,run,board,armsAt,angleAt,gateOpen,slideAt,COURSES,LAYOUT};
@@ -320,8 +321,11 @@
  // 게임 종류(2026-11-15): 핀볼은 골인 순서, 배틀로얄은 탈락 순서가 결과입니다. 기록의 '먼저/늦게'는 그 순서의 앞/뒤입니다.
  const knockout=game=>game==='arena'||game==='treadmill',gameName=d=>d.game==='arena'?'배틀로얄':d.game==='treadmill'?'러닝머신':d.course+'번 코스';
  const engineOf=game=>game==='arena'?root.arenaEngine:game==='treadmill'?root.treadmillEngine:null;
- const modeText=(game,mode,count)=>knockout(game)?(mode==='first'?'먼저 떨어진 ':'마지막까지 남은 ')+count+'명':(mode==='first'?'먼저':'늦게')+' 들어온 '+count+'명';
- function settings(){return {source:document.querySelector('input[name="pbSource"]:checked')?.value||'auto',threshold:Number(String($('pbThreshold').value).replace(/[^0-9]/g,''))||0,includeFixed:$('pbFixed').checked,mode:$('pbMode').value,count:Math.max(1,Number($('pbCount').value)||1),course:$('pbCourse').value,game:'pinball',voice:false,bounce:[.8,1,1.3,1.6].includes(Number($('pbBounce')?.value))?Number($('pbBounce').value):1,slow:$('pbSlow').checked,speed:Number($('pbSpeed').value)||1};}
+ const modeText=(game,mode,count,d)=>knockout(game)?(mode==='first'?'먼저 떨어진 ':'마지막까지 남은 ')+count+'명':mode==='both'?'먼저 들어온 '+d.first+'명 + 늦게 들어온 '+d.last+'명':(mode==='first'?'먼저':'늦게')+' 들어온 '+count+'명';
+ // 뽑는 인원(먼저 몇 명, 늦게 몇 명)을 참가 인원에 맞춰 줄이고, 기록에 남길 방식으로 바꿉니다.
+ const pickPlan=(s,n)=>{const first=Math.min(s.first,n),last=Math.min(s.last,n-first);return {first,last,count:first+last,mode:first&&last?'both':last?'last':'first'};};
+ const countArg=d=>d.mode==='both'?{first:d.first,last:d.last}:d.count;
+ function settings(){return {source:document.querySelector('input[name="pbSource"]:checked')?.value||'auto',threshold:Number(String($('pbThreshold').value).replace(/[^0-9]/g,''))||0,includeFixed:$('pbFixed').checked,first:Math.max(0,Math.floor(Number($('pbFirst').value))||0),last:Math.max(0,Math.floor(Number($('pbLast').value))||0),course:$('pbCourse').value,game:'pinball',voice:false,bounce:[.8,1,1.3,1.6].includes(Number($('pbBounce')?.value))?Number($('pbBounce').value):1,slow:$('pbSlow').checked,speed:Number($('pbSpeed').value)||1};}
  function roster(){
   const v=view();if(!v)return null;const points=new Map((v.active?.rows||[]).map(r=>[r.memberId,r.points]));const fixed=new Set((state.rotationMembers||[]).map(e=>e.memberId));
   return v.members.filter(m=>m.current).map(m=>({memberId:m.memberId,nickname:m.nickname,points:points.get(m.memberId)??0,fixed:fixed.has(m.memberId),excluded:state.vipExcludedMembers?.[m.memberId]===1})).sort((a,b)=>b.points-a.points||a.nickname.localeCompare(b.nickname));
@@ -338,9 +342,9 @@
   const el=$('pbSummary');if(!el)return;const s=settings(),list=candidates();
   $('pbAuto').hidden=s.source!=='auto';$('pbManual').hidden=s.source!=='manual';
   if(!list){el.textContent='길드원 명단과 길드전 점수를 불러오는 중입니다.';$('pbStart').disabled=true;return;}
-  const week=view().active?.appliesOn,count=Math.min(s.count,list.length);
-  el.textContent=(s.source==='auto'?(week?week+' 주차 길드전 '+fmtN(s.threshold)+'점 이상':'적용 중인 길드전 기록 없음'):'직접 선택')+' · 참가 '+list.length+'명 · '+modeText(s.game,s.mode,count)+'을 뽑습니다.';
-  $('pbStart').disabled=!list.length;
+  const week=view().active?.appliesOn,plan=pickPlan(s,list.length);
+  el.textContent=(s.source==='auto'?(week?week+' 주차 길드전 '+fmtN(s.threshold)+'점 이상':'적용 중인 길드전 기록 없음'):'직접 선택')+' · 참가 '+list.length+'명 · '+(plan.count?modeText(s.game,plan.mode,plan.count,plan)+'을 뽑습니다.':'먼저 들어온 사람이나 늦게 들어온 사람 인원을 1명 이상 적어 주세요.');
+  $('pbStart').disabled=!list.length||!plan.count;
  }
  function drawFrame(ctx,b,res,f,camY,viewH,scale,targetIdx){
   const list=res.list,n=list.length,pos=res.sim.frames[Math.min(Math.floor(f),res.sim.frames.length-1)],finish=res.sim.finish,t=Math.floor(f)/FPS;
@@ -391,7 +395,8 @@
   canvas.width=Math.round(b.W*scale*devicePixelRatio);canvas.height=Math.round(viewH*scale*devicePixelRatio);canvas.style.height=Math.round(viewH*scale)+'px';
   const s=scale*devicePixelRatio;let f=0,cam=0,shown=0,target,cand,candAt=0,doneCount=0;
   // 지금 순위로 본 당첨 유력 공(골인한 수와 남은 공의 높이로 판단, 결과를 미리 보지 않음)
-  const likely=(pos,fi)=>{const k=result.picks.length,n=list.length;if(meta.mode==='first'&&doneCount>=k)return undefined;const rest=[];for(let i=0;i<n;i++)if(finish[i]>fi)rest.push(i);if(!rest.length)return undefined;rest.sort((a,c)=>pos[2*c+1]-pos[2*a+1]||a-c);return rest[meta.mode==='first'?0:Math.min(rest.length-1,Math.max(0,n-k-doneCount))];};
+  const fa=meta.mode==='both'?meta.first:meta.mode==='first'?result.picks.length:0,la=meta.mode==='both'?meta.last:meta.mode==='last'?result.picks.length:0;
+  const likely=(pos,fi)=>{const n=list.length;if(doneCount>=fa&&!la)return undefined;const rest=[];for(let i=0;i<n;i++)if(finish[i]>fi)rest.push(i);if(!rest.length)return undefined;rest.sort((a,c)=>pos[2*c+1]-pos[2*a+1]||a-c);return rest[doneCount<fa?0:Math.min(rest.length-1,Math.max(0,n-la-doneCount))];};
   $('pbSkip').onclick=()=>{f=frames.length-1;};
   // 2026-11-10: 화면 새로고침 횟수(60번/120번)와 상관없이 실제 시간으로 진행하고, 기본 속도는 4/5로 조금 늦춥니다(사용자 요청).
   let last=null;
@@ -479,7 +484,7 @@
  }
  function finishPlay(result,meta){
   const arena=knockout(meta.game),ids=arena&&meta.mode==='last'?result.picks.slice().reverse():result.picks; // 배틀로얄 생존자는 끝까지 남은 순서로
-  const names=ids.map(id=>result.list.find(p=>p.memberId===id).nickname),title=modeText(meta.game,meta.mode,result.picks.length);
+  const names=ids.map(id=>result.list.find(p=>p.memberId===id).nickname),title=modeText(meta.game,meta.mode,result.picks.length,meta);
   $('pbResult').hidden=false;$('pbResultTitle').textContent=title+' · 추첨 번호 '+meta.seed+(result.sim.timedOut?' · 시간 초과로 남은 구슬은 골에 가까운 순서':'');$('pbResultText').value=names.join('\n');
   $('pbPopupNames').innerHTML=names.map(n=>'<li>'+esc(n)+'</li>').join('');$('pbPopupTitle').textContent=title;$('pbPopup').hidden=false;confetti();stopMusic(true);effect('win');
  }
@@ -489,20 +494,21 @@
   const el=$('pbRecords');if(!el)return;
   if(records.error){el.innerHTML='<p class="sub">'+esc(records.error)+'</p>';return;}
   if(!records.draws.length){el.innerHTML='<p class="sub">아직 기록이 없습니다.</p>';return;}
-  el.innerHTML=records.draws.map(d=>{const names=(knockout(d.game)&&d.mode==='last'?d.picks.slice().reverse():d.picks).map(id=>d.participants.find(p=>p.memberId===id)?.nickname||id);return '<details class="pb-record"><summary><b>'+esc(new Date(d.at).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}))+'</b><span>'+(d.source==='manual'?'직접 선택':fmtN(d.threshold)+'점 이상')+' '+d.participants.length+'명 · '+modeText(d.game,d.mode,d.count)+' · '+gameName(d)+(d.bounce&&d.bounce!==1?' · 반발 '+({0.8:'약하게',1.3:'강하게',1.6:'아주 강하게'}[d.bounce]||''):'')+' · 추첨 번호 '+esc(d.seed)+'</span></summary><ol>'+names.map(n=>'<li>'+esc(n)+'</li>').join('')+'</ol><div class="actions"><button type="button" class="btn ghost" data-replay="'+esc(d.id)+'">다시 보기</button></div></details>';}).join('');
-  el.querySelectorAll('[data-replay]').forEach(btn=>btn.onclick=()=>{const d=records.draws.find(x=>x.id===btn.dataset.replay);if(!d)return;if(knockout(d.game)&&!engineOf(d.game))return showNoticeSafe('추첨 화면을 불러오지 못했습니다. 새로고침해 주세요.');const result=knockout(d.game)?engineOf(d.game).run(d.participants,d.seed,d.mode,d.count):run(d.participants,d.seed,d.mode,d.count,d.course,d.layout||1,d.bounce||1);
+  el.innerHTML=records.draws.map(d=>{const names=(knockout(d.game)&&d.mode==='last'?d.picks.slice().reverse():d.picks).map(id=>d.participants.find(p=>p.memberId===id)?.nickname||id);return '<details class="pb-record"><summary><b>'+esc(new Date(d.at).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}))+'</b><span>'+(d.source==='manual'?'직접 선택':fmtN(d.threshold)+'점 이상')+' '+d.participants.length+'명 · '+modeText(d.game,d.mode,d.count,d)+' · '+gameName(d)+(d.bounce&&d.bounce!==1?' · 반발 '+({0.8:'약하게',1.3:'강하게',1.6:'아주 강하게'}[d.bounce]||''):'')+' · 추첨 번호 '+esc(d.seed)+'</span></summary><ol>'+names.map(n=>'<li>'+esc(n)+'</li>').join('')+'</ol><div class="actions"><button type="button" class="btn ghost" data-replay="'+esc(d.id)+'">다시 보기</button></div></details>';}).join('');
+  el.querySelectorAll('[data-replay]').forEach(btn=>btn.onclick=()=>{const d=records.draws.find(x=>x.id===btn.dataset.replay);if(!d)return;if(knockout(d.game)&&!engineOf(d.game))return showNoticeSafe('추첨 화면을 불러오지 못했습니다. 새로고침해 주세요.');const result=knockout(d.game)?engineOf(d.game).run(d.participants,d.seed,d.mode,d.count):run(d.participants,d.seed,d.mode,countArg(d),d.course,d.layout||1,d.bounce||1);
    if(JSON.stringify(result.order)!==JSON.stringify(d.order))showNoticeSafe('다시 계산한 결과가 기록과 다릅니다. 관리자에게 알려 주세요.');startMusic(d.seed,d.game);play(result,d);});
  }
  function showNoticeSafe(m){if(typeof showNotice==='function')showNotice(m);else alert(m);}
  async function start(){
   if(typeof ensureAdmin==='function'&&!ensureAdmin())return;
   const list=candidates(),s=settings();if(!list||!list.length)return;
-  const count=Math.min(s.count,list.length),seed=Array.from(crypto.getRandomValues(new Uint8Array(4)),x=>x.toString(16).padStart(2,'0')).join('');
+  const plan=pickPlan(s,list.length);if(!plan.count)return;
+  const seed=Array.from(crypto.getRandomValues(new Uint8Array(4)),x=>x.toString(16).padStart(2,'0')).join('');
   startMusic(seed,s.game);
   const arena=knockout(s.game),course=arena?1:s.course==='random'?1+parseInt(seed,16)%COURSES.length:Number(s.course);
   const participants=list.map(m=>({memberId:m.memberId,nickname:m.nickname,points:m.points}));
-  const result=arena?engineOf(s.game).run(participants,seed,s.mode,count):run(participants,seed,s.mode,count,course,LAYOUT,s.bounce);
-  const drawRec={id:crypto.randomUUID(),seed,source:s.source,threshold:s.source==='auto'?s.threshold:0,includeFixed:s.includeFixed,mode:s.mode,count,course,...(arena?{game:s.game}:{layout:LAYOUT,bounce:s.bounce}),week:view().active?.appliesOn||null,participants:result.list,order:result.order,picks:result.picks,timedOut:result.sim.timedOut};
+  const result=arena?engineOf(s.game).run(participants,seed,plan.mode,plan.count):run(participants,seed,plan.mode,countArg(plan),course,LAYOUT,s.bounce);
+  const drawRec={id:crypto.randomUUID(),seed,source:s.source,threshold:s.source==='auto'?s.threshold:0,includeFixed:s.includeFixed,mode:plan.mode,count:plan.count,...(plan.mode==='both'?{first:plan.first,last:plan.last}:{}),course,...(arena?{game:s.game}:{layout:LAYOUT,bounce:s.bounce}),week:view().active?.appliesOn||null,participants:result.list,order:result.order,picks:result.picks,timedOut:result.sim.timedOut};
   $('pbStart').disabled=true;
   try{records=await api('/api/pinball',{method:'POST',body:JSON.stringify({revision:records.revision,mutation:crypto.randomUUID(),draw:drawRec})});renderRecords();}
   catch(e){stopMusic(true);showNoticeSafe('추첨 기록을 저장하지 못해 추첨을 시작하지 않았습니다. '+e.message);$('pbStart').disabled=false;return;}
@@ -517,8 +523,9 @@
    // 2026-11-15 사용자 결정: 배틀로얄·러닝머신은 새 추첨에서 내림(재미가 덜해서). 이미 남은 기록의 다시 보기는 그대로 됩니다.
    +'<div class="formgrid">'
    +'<div class="field" id="pbCourseField"><label for="pbCourse">코스</label><select id="pbCourse"><option value="random">무작위 코스</option>'+COURSES.map((n,k)=>'<option value="'+(k+1)+'">'+(k+1)+'. '+n+'</option>').join('')+'</select></div>'
-   +'<div class="field"><label for="pbMode">뽑는 방식</label><select id="pbMode"><option value="first">먼저 들어온 사람</option><option value="last">늦게 들어온 사람</option></select></div>'
-   +'<div class="field"><label for="pbCount">뽑는 인원</label><input id="pbCount" type="number" min="1" max="150" value="5" inputmode="numeric"></div>'
+   // 2026-11-15 사용자 결정: 뽑는 방식을 고르지 않고, 먼저 들어온 사람과 늦게 들어온 사람 인원을 각각 적습니다(한쪽만 0이면 그쪽만 뽑음).
+   +'<div class="field"><label for="pbFirst">먼저 들어온 사람 (명)</label><input id="pbFirst" type="number" min="0" max="150" value="5" inputmode="numeric"></div>'
+   +'<div class="field"><label for="pbLast">늦게 들어온 사람 (명)</label><input id="pbLast" type="number" min="0" max="150" value="0" inputmode="numeric"></div>'
    +'<div class="field"><label for="pbBounce">장애물 반발 세기</label><select id="pbBounce"><option value="0.8">약하게</option><option value="1" selected>보통</option><option value="1.3">강하게</option><option value="1.6">아주 강하게 (한 판이 길어짐)</option></select></div>'
    +'<div class="field"><label for="pbSpeed">배속</label><select id="pbSpeed"><option value="0.5">0.5배</option><option value="1" selected>1배</option><option value="2">2배</option><option value="3">3배</option></select></div>'
    +'<div class="field pb-check"><label><input id="pbSlow" type="checkbox" checked> 끝나기 전 느린 화면</label></div>'

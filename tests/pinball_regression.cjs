@@ -72,6 +72,16 @@ const post=(body,auth=true)=>route.POST(new Request(origin+'/api/pinball',{metho
  assert.equal(lib.validateDraw({...draw,source:'manual',threshold:0}).source,'manual','direct selection is recorded as such');
  assert.equal(lib.validateDraw({...draw,layout:2}).layout,2,'layout 2 is recorded');assert.equal(lib.validateDraw({...draw,layout:3}).layout,3,'layout 3 is recorded');assert.equal('layout' in lib.validateDraw(draw),false,'old records stay layout 1');
  assert.equal(lib.validateDraw({...draw,layout:4}).layout,4,'layout 4 is recorded');assert.equal(lib.validateDraw({...draw,layout:5}).layout,5,'layout 5 is recorded');assert.equal(lib.validateDraw({...draw,layout:6,bounce:1.3}).bounce,1.3,'bounce is recorded');assert.throws(()=>lib.validateDraw({...draw,layout:6,bounce:2}),/반발/);assert.throws(()=>lib.validateDraw({...draw,layout:5,bounce:1.3}),/반발/);assert.throws(()=>lib.validateDraw({...draw,layout:7}),/코스 판/);
+ // 2026-11-15 사용자 결정: 먼저 들어온 몇 명과 늦게 들어온 몇 명을 함께 뽑을 수 있습니다(mode 'both').
+ const both=engine.run(a.list,'0a1b2c3d','both',{first:2,last:3},3);
+ assert.deepEqual(both.order,a.order,'the race does not depend on how many are picked');
+ assert.deepEqual(both.picks,[...a.order.slice(0,2),...a.order.slice(-3)],'first two and last three');
+ const drawBoth={...draw,mode:'both',count:5,first:2,last:3,picks:both.picks};
+ const savedBoth=lib.validateDraw(drawBoth);assert.equal(savedBoth.first,2);assert.equal(savedBoth.last,3);
+ assert.throws(()=>lib.validateDraw({...drawBoth,picks:a.picks}),/맞지 않습니다/);
+ assert.throws(()=>lib.validateDraw({...drawBoth,last:2}),/뽑는 인원/);assert.throws(()=>lib.validateDraw({...drawBoth,first:0,last:5}),/뽑는 인원/);
+ assert.throws(()=>lib.validateDraw({...drawBoth,game:'arena'}),/뽑는 인원/);assert.throws(()=>lib.validateDraw({...draw,first:1}),/뽑는 인원/);
+ assert.equal('first' in lib.validateDraw(draw),false,'one-sided records keep their old shape');
  // 저장: 관리자만, 백업 포함, 누구나 조회
  assert.equal((await post({revision:0,mutation:'a'.repeat(32),draw},false)).status,401,'not an administrator');
  f.sql.prepare('INSERT INTO credentials VALUES(?,?,?,?,?)').run(await store.hash(token),'password-session-v1','admin',await store.hash(f.env.ADMIN_PASSWORD_HASH),Date.now()+86400000);
@@ -79,5 +89,5 @@ const post=(body,auth=true)=>route.POST(new Request(origin+'/api/pinball',{metho
  assert.equal((await post({revision:0,mutation:'b'.repeat(32),draw:{...draw,id:'abcdefabcdefabcdef12'}})).status,409,'stale revision is refused');
  r=await route.GET(new Request(origin+'/api/pinball'));body=await r.json();assert.equal(body.revision,1);assert.deepEqual(body.draws[0].picks,a.picks,'anyone can read the record');
  assert.equal(f.sql.prepare("SELECT COUNT(*) n FROM backups WHERE kind='pinball'").get().n,1,'state before the save is backed up');
- console.log('PASS: pinball is deterministic, 100 balls finish, records validate, only administrators save (with backup), anyone reads');
+ console.log('PASS: pinball is deterministic, 100 balls finish, records validate (also first N + last M), only administrators save (with backup), anyone reads');
 })().catch(e=>{console.error(e);process.exitCode=1;});
