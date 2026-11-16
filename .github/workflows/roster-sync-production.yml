@@ -33,6 +33,7 @@ name: Promote roster sync to Production after a fresh Staging verification (user
 # Release 33 (user-approved 2026-11-15 "핀볼 인원 Production 배포 승인"): pinball picks a number from the front and a number from the back (mode both); one-sided draws and old records unchanged.
 # Release 34 (user-approved 2026-11-16 "VIP 0시 적용 Production 배포 승인"): weekly guild-war points apply to the carriage VIP list from Monday 00:00 KST (was 11:00).
 # Release 34 rerun 1: the first run stopped on Staging (nothing changed in Production) because the carriage-vip.js address carried ?v=2; the address is back to the plain form the build check expects.
+# Release 34 rerun 2: rerun 1 deployed but the Production check refused it and rolled back, because before 11:00 KST the new rule switched the week in force during the deploy (the check requires the week in force to stay the same). After 11:00 KST both rules use the same week, so the check is unchanged and this runs at 11:05 KST.
 on:
   push:
     branches: [claude/new-session-narazy]
