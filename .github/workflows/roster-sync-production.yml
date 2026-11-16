@@ -32,6 +32,7 @@ name: Promote roster sync to Production after a fresh Staging verification (user
 # Release 32 (user-approved 2026-11-15 "배포 프로덕션까지 승인"): permanent VIP exclusions for the alt characters 으나친구, 문도치즈, ᴺᴵᴺᴵ.
 # Release 33 (user-approved 2026-11-15 "핀볼 인원 Production 배포 승인"): pinball picks a number from the front and a number from the back (mode both); one-sided draws and old records unchanged.
 # Release 34 (user-approved 2026-11-16 "VIP 0시 적용 Production 배포 승인"): weekly guild-war points apply to the carriage VIP list from Monday 00:00 KST (was 11:00).
+# Release 34 rerun 1: the first run stopped on Staging (nothing changed in Production) because the carriage-vip.js address carried ?v=2; the address is back to the plain form the build check expects.
 on:
   push:
     branches: [claude/new-session-narazy]
