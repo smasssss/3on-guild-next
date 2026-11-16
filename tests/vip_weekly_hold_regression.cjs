@@ -12,8 +12,8 @@ f.sql.prepare("INSERT INTO backups(mutation,kind,revision,payload,saved_at,actor
  assert.equal(row.revision,3);assert.deepEqual(JSON.parse(row.payload),{current:prev,pending:next});
  assert.equal(f.sql.prepare("SELECT COUNT(*) n FROM backups WHERE kind='vip-weekly' AND revision=2").get().n,1,'state before the hold is backed up');
  const v=f.load('lib/vip-weekly.ts'),data=JSON.parse(row.payload);
- assert.equal(v.weeklyView(data,Date.parse('2026-11-09T01:59:59Z')).active.appliesOn,'2026-11-02','last week until Monday 10:59:59 KST');
- assert.equal(v.weeklyView(data,Date.parse('2026-11-09T02:00:00Z')).active.appliesOn,'2026-11-09','this week from Monday 11:00 KST');
+ assert.equal(v.weeklyView(data,Date.parse('2026-11-08T14:59:59Z')).active.appliesOn,'2026-11-02','last week until Sunday 23:59:59 KST (2026-11-16 rule; was Monday 10:59:59)');
+ assert.equal(v.weeklyView(data,Date.parse('2026-11-08T15:00:00Z')).active.appliesOn,'2026-11-09','this week from Monday 00:00 KST');
  assert.equal((await holdLastWeek(f.db,quiet)).status,'duplicate','running twice changes nothing');
- console.log('PASS: last week stays in force until Monday 11:00 KST; uploaded week waits; backup kept; idempotent');
+ console.log('PASS: last week stays in force until Monday 00:00 KST; uploaded week waits; backup kept; idempotent');
 })().catch(e=>{console.error(e);process.exitCode=1;});

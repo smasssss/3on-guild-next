@@ -30,7 +30,7 @@ async function run(){
  const input={providedOn:'2026-10-31',appliesOn:'2026-11-02',coverage:'partial',rows:[{memberId:'eligible',nickname:'Eligible',points:21720000}]};
  const weekly=v.prepareWeekly(input,roster.members,now);assert.equal(weekly.rows[0].points,21720000);
  const doc={current:null,pending:weekly};assert.equal(v.weeklyView(doc,now).active,null);
- assert.equal(v.weeklyView(doc,at('2026-11-02T01:59:59Z')).active,null,'2026-11-08 rule: not before Monday 11:00 KST');
+ assert.equal(v.weeklyView(doc,at('2026-11-01T14:59:59Z')).active,null,'2026-11-16 rule: not before Monday 00:00 KST');assert.equal(v.weeklyView(doc,at('2026-11-01T15:00:00Z')).active.appliesOn,'2026-11-02','from Monday 00:00 KST (was 11:00 until 2026-11-16)');
  let view=v.weeklyView(doc,at('2026-11-02T02:00:00Z'));assert.equal(view.active.appliesOn,'2026-11-02');
  assert.equal(v.eligibility(eligible,T,view.active,at('2026-11-02T02:00:00Z')).eligible,true);
  assert.equal(v.eligibility(eligible,carriage,view.active,at('2026-11-02T02:00:00Z')).reason,'permanent');
@@ -50,7 +50,7 @@ async function run(){
  for(const points of [21719999,15000000]){const w={...weekly,rows:[{...weekly.rows[0],points}]};assert.equal(v.eligibility(eligible,T,w,at('2026-11-02T01:00Z')).reason,'score_low');}
  const second=v.prepareWeekly({...input,providedOn:'2026-11-07',appliesOn:'2026-11-09',rows:[{...input.rows[0],points:15000000}]},roster.members,at('2026-11-07T13:00Z'));
  const replaced=v.replaceWeekly(doc,second,at('2026-11-07T13:00Z'));assert.equal(v.weeklyView(replaced,at('2026-11-09T02:00Z')).active.rows[0].points,15000000);
- assert.equal(v.weeklyView(replaced,at('2026-11-09T01:59:59Z')).active.rows[0].points,21720000,'2026-11-08 rule: previous score until Monday 11:00 KST');
+ assert.equal(v.weeklyView(replaced,at('2026-11-08T14:59:59Z')).active.rows[0].points,21720000,'2026-11-16 rule: previous score until Monday 00:00 KST (was 11:00)');assert.equal(v.weeklyView(replaced,at('2026-11-08T15:00:00Z')).active.rows[0].points,15000000,'new score from Monday 00:00 KST');
  assert.equal(v.weeklyView(replaced,at('2026-11-07T14:59:59Z')).active.rows[0].points,21720000,'new pending upload keeps previous score until Sunday');
  assert.equal(v.weeklyView(replaced,at('2026-11-09T02:00Z')).carriedForward,false);
  assert.equal(v.eligibility(eligible,T,v.weeklyView(replaced,at('2026-11-15T15:00Z')).active,at('2026-11-16T00:00Z')).reason,'score_low','retained low scores stay ineligible');
