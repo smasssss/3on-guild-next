@@ -34,6 +34,7 @@ name: Promote roster sync to Production after a fresh Staging verification (user
 # Release 34 (user-approved 2026-11-16 "VIP 0시 적용 Production 배포 승인"): weekly guild-war points apply to the carriage VIP list from Monday 00:00 KST (was 11:00).
 # Release 34 rerun 1: the first run stopped on Staging (nothing changed in Production) because the carriage-vip.js address carried ?v=2; the address is back to the plain form the build check expects.
 # Release 34 rerun 2: rerun 1 deployed but the Production check refused it and rolled back, because before 11:00 KST the new rule switched the week in force during the deploy (the check requires the week in force to stay the same). After 11:00 KST both rules use the same week, so the check is unchanged and this runs at 11:05 KST.
+# Release 35 (user-approved 2026-11-20 "국가원정 탭 Production 배포 승인"): 국가원정 tab (server 295 alliance power loss and kills from lastasylum.gg public pages, Saturday 22:00 / Sunday 01-12 KST only; contribution statistics; Korean/English/Russian/Spanish), recorded as its own document kind 'kvk'; its regression test joins the checks below.
 on:
   push:
     branches: [claude/new-session-narazy]
@@ -70,7 +71,7 @@ jobs:
         run: |
           npx --no-install eslint lib/vip-weekly.ts lib/validate.ts app/api/state/route.ts app/api/carriage/vip/route.ts public/carriage-vip.js scripts/growth-auto-ui.mjs scripts/growth-roster-browser.mjs tests/vip-fixture.cjs tests/vip_*regression.cjs
           npx --no-install eslint lib/growth-roster.ts lib/growth.ts lib/growth-automation.ts app/api/growth/legacy/route.ts tests/growth_roster_regression.cjs tests/roster_restored_check.cjs tests/roster_sync_regression.cjs public/growth-auto.js
-          npx --no-install eslint lib/pinball.ts app/api/pinball/route.ts public/pinball.js public/arena.js public/treadmill.js tests/pinball_regression.cjs tests/arena_regression.cjs tests/treadmill_regression.cjs
+          npx --no-install eslint lib/kvk.ts app/api/kvk/route.ts public/kvk.js tests/kvk_regression.cjs lib/pinball.ts app/api/pinball/route.ts public/pinball.js public/arena.js public/treadmill.js tests/pinball_regression.cjs tests/arena_regression.cjs tests/treadmill_regression.cjs
           npx --no-install tsc --noEmit
           python tests/vip_release_guards.py
           python tests/weekly_release_guards.py
@@ -92,6 +93,7 @@ jobs:
           node tests/vip_baseline_regression.cjs
           node tests/tracker_source_regression.cjs
           node tests/pinball_regression.cjs
+          node tests/kvk_regression.cjs
           node tests/arena_regression.cjs
           node tests/treadmill_regression.cjs
           node tests/vip_sunday_regression.cjs
