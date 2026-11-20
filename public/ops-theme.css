@@ -282,3 +282,19 @@ html.ops-wait body{visibility:hidden}
 .pb-popup-card{position:relative;width:min(320px,100%);background:#fff;border:2px solid var(--accent);border-radius:18px;padding:18px;text-align:center;box-shadow:0 20px 50px rgba(120,60,80,.25)}
 .pb-popup-card p{margin:0;color:#b03a6a;font-weight:800;letter-spacing:.1em}.pb-popup-card h3{margin:6px 0 10px}
 .pb-popup-card ol{text-align:left;margin:0 0 14px 1.6em;font-size:17px;font-weight:700;max-height:40vh;overflow:auto}
+/* 국가원정 탭 (2026-11-20) */
+#kvk .kvk-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0}
+#kvk .kvk-bar select{min-height:44px;max-width:100%}
+#kvk .kvk-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 12px}
+#kvk .kvk-tabs button{min-height:44px;padding:0 16px;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--text);font:inherit;cursor:pointer}
+#kvk .kvk-tabs button.active{background:var(--accent-soft);border-color:var(--accent);font-weight:700}
+#kvk .kvk-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+#kvk .kvk-table{width:100%;border-collapse:collapse;white-space:nowrap}
+#kvk .kvk-table th,#kvk .kvk-table td{padding:7px 10px;text-align:left}
+#kvk .kvk-table td:not(:nth-child(2)){font-variant-numeric:tabular-nums}
+#kvk .kvk-us td{background:var(--accent-soft);font-weight:700}
+#kvk .kvk-old{color:var(--muted);font-size:12px}
+#kvk .kvk-result{font-weight:700;margin:6px 0}
+#kvk .kvk-total{margin-top:8px}
+#kvk h3{margin:18px 0 6px}
+#kvk .kvk-changes{margin:0;padding-left:18px;line-height:1.7}
