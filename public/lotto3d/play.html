@@ -1,0 +1,11 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>로또 추첨기</title>
+<link rel="stylesheet" href="play.css">
+<script type="importmap">{"imports":{"three":"../treadmill3d/vendor/three/three.module.js","three/addons/":"../treadmill3d/vendor/three/addons/"}}</script>
+</head><body>
+<div id="stage"></div>
+<header id="top"><b id="title">로또 추첨기</b><span id="sub"></span></header>
+<ol id="chips"></ol>
+<section id="result" hidden><h2>뽑힌 번호</h2><ol id="resultList"></ol><div class="btns"><button id="again">다시 보기</button><button id="close">닫기</button></div></section>
+<div id="wait"><div class="spin"></div><span id="waitText">준비 중…</span></div>
+<script type="module" src="play.mjs"></script>
+</body></html>

@@ -84,10 +84,12 @@
    +'<div class="actions"><button type="button" class="btn ghost" data-tr-replay="'+esc(d.id)+'">다시 보기</button></div></details>';}).join('');
   el.querySelectorAll('[data-tr-replay]').forEach(btn=>btn.onclick=()=>{const d=records.races.find(x=>x.id===btn.dataset.trReplay);if(d)replay(d);});
  }
+ // 게임 고르기: 다른 게임 파일(로또 추첨기 등)도 gameSwitch.add 로 자기 화면을 붙입니다
+ const pages={},shows={};
  function show(game){
-  $('pbPage').hidden=game!=='pinball';$('trPage').hidden=game!=='treadmill';
+  for(const k of Object.keys(pages))pages[k].hidden=k!==game;
   document.querySelectorAll('#trSwitch button').forEach(b=>{const on=b.dataset.game===game;b.classList.toggle('on',on);b.setAttribute('aria-selected',on?'true':'false');});
-  if(game==='treadmill'){renderManual();loadPinball();summary();}
+  if(shows[game])shows[game]();
  }
  function init(){
   const page=$('pinball');if(!page||page.dataset.trReady)return;
@@ -103,7 +105,8 @@
    +'<div id="trPinball" hidden><div class="formgrid"><div class="field"><label for="trDraw">핀볼 추첨 기록</label><select id="trDraw"></select></div><div class="field"><label for="trCount">1등부터 몇 명 (2~15)</label><input id="trCount" type="number" min="'+MIN+'" max="'+MAX+'" value="10" inputmode="numeric"></div></div><p class="sub" id="trPreview"></p></div>'
    +'<p class="sub" id="trSummary" role="status"></p><div class="actions"><button type="button" class="btn primary" id="trStart">경기 시작</button></div></div>'
    +'<div class="card"><h2>경기 기록</h2><div id="trRecords"><p class="sub">기록을 불러오는 중입니다.</p></div></div>';
-  page.append(sw,pb,tr);
+  page.append(sw,pb,tr);pages.pinball=pb;pages.treadmill=tr;shows.treadmill=()=>{renderManual();loadPinball();summary();};
+  root.gameSwitch={add(key,label,el,onShow){if(pages[key])return;const b=document.createElement('button');b.type='button';b.setAttribute('role','tab');b.dataset.game=key;b.setAttribute('aria-selected','false');b.textContent=label;b.onclick=()=>show(key);sw.appendChild(b);el.hidden=true;page.appendChild(el);pages[key]=el;if(onShow)shows[key]=onShow;}};
   const ov=document.createElement('div');ov.id='trOverlay';ov.hidden=true;ov.innerHTML='<iframe id="trFrame" title="런닝머신 레이스 경기 화면" allow="autoplay"></iframe><button type="button" id="trClose" aria-label="경기 화면 닫기">닫기</button>';document.body.appendChild(ov);
   sw.querySelectorAll('button').forEach(b=>b.onclick=()=>show(b.dataset.game));
   tr.querySelectorAll('input,select').forEach(el=>{el.addEventListener('input',summary);el.addEventListener('change',summary);});
