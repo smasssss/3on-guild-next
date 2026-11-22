@@ -3,6 +3,8 @@ name: Verify roster sync on Staging only (Production promotion requires separate
 # user-approved change. Retries only transient management reads; never emits credentials.
 # Rerun 2: Sunday participants join growth+VIP at once; raw/receipt times kept apart; one confirmation per hour with evidence.
 # Rerun 3: live Staging may already run an earlier commit of this branch.
+# 2026-11-23 (user-approved cleanup): the allowed-files check now uses the current list (tests/vip_selection_scope_preserved.py, the same one the Production
+# workflow runs). The 2026-11-04 list (tests/roster_sync_scope_preserved.py) is frozen at that date and rejects every release approved since; it is kept, unchanged, as a record.
 on:
   push:
     branches: [claude/new-session-narazy]
@@ -61,7 +63,7 @@ jobs:
           node tests/growth_changes_regression.cjs
           node tests/production_growth_regression.cjs
           node tests/canyon_latest_regression.cjs
-          python tests/roster_sync_scope_preserved.py
+          python tests/vip_selection_scope_preserved.py
           npm run build
           python tests/automation_operations_preserved.py
           python tests/vip_exclusions_regression.py
