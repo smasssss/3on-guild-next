@@ -1,0 +1,13 @@
+<!doctype html><meta charset="utf-8"><style>html,body{margin:0;height:100%;background:#111}#stage{position:fixed;inset:0}</style><div id="stage"></div>
+<script type="importmap">{"imports":{"three":"../../public/treadmill3d/vendor/three/three.module.js","three/addons/":"../../public/treadmill3d/vendor/three/addons/"}}</script>
+<script type="module">
+import RAPIER from '../../public/treadmill3d/vendor/rapier.mjs';
+import {createRace,RACE_V1} from '../../public/treadmill3d/sim.mjs';
+import {createView} from '../../public/treadmill3d/render.mjs';
+await RAPIER.init();
+const kinds=['sedan','orange','racer','baseball','kei','can','tape','watermelon','tissue','doll'];
+const names=['니니','어서³ᴼᴺ','아일리³ᴼᴺ','용팝','두리³ᴼᴺ','제시³ᴼᴺ','키위','HUK333','공 주','핵불잙³ᴼᴺ'];
+const g=createRace(RAPIER,kinds,'00c51d27',RACE_V1);for(let i=0;i<40;i++)g.step();
+const view=await createView(document.getElementById('stage'),g,names,{machine:RACE_V1,cam:'close',assetBase:'../../public/treadmill3d/assets/',dollUrl:'../../public/treadmill3d/assets/doll.png'});
+view.update(g.snapshot(),g.beltPos);window.__drawn=true;
+</script>

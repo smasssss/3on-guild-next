@@ -59,17 +59,72 @@ function rainbowRail(len){
  const mesh=new THREE.Mesh(new THREE.CylinderGeometry(0.016,0.016,len,24,1),m);mesh.rotation.x=Math.PI/2;return {mesh,tex};
 }
 
-function makeCar(k,color,M){
- const g=new THREE.Group();
- const paint=new THREE.MeshPhysicalMaterial({color,metalness:0.6,roughness:0.3,clearcoat:1,clearcoatRoughness:0.08});
- const body=new THREE.Mesh(new THREE.BoxGeometry(k.wid,k.hei*0.55,k.len,1,1,1),paint);body.position.y=-k.hei*0.18;g.add(body);
- const cabin=new THREE.Mesh(new THREE.BoxGeometry(k.wid*0.82,k.hei*0.45,k.len*(k.shape==='car'&&k.label==='레이싱카'?0.38:0.5)),M.glass);cabin.position.set(0,k.hei*0.3,k.len*0.06);g.add(cabin);
- const roof=new THREE.Mesh(new THREE.BoxGeometry(k.wid*0.8,k.hei*0.06,k.len*0.42),paint);roof.position.set(0,k.hei*0.54,k.len*0.06);if(k.label!=='레이싱카')g.add(roof);
- if(k.label==='레이싱카'){const wing=new THREE.Mesh(new THREE.BoxGeometry(k.wid*1.05,0.003,0.018),paint);wing.position.set(0,k.hei*0.5,k.len*0.44);g.add(wing);}
- for(const s of [-1,1]){const l=new THREE.Mesh(new THREE.BoxGeometry(0.008,0.004,0.002),new THREE.MeshStandardMaterial({color:0xffffee,emissive:0xffffcc,emissiveIntensity:1}));l.position.set(s*k.wid*0.32,-k.hei*0.15,-k.len/2-0.001);g.add(l);}
+// 장난감 차(큰 바퀴): 옆모습 윤곽을 폭 방향으로 밀어내 둥근 모서리의 차체를 만들고, 유리·흙받이·등·범퍼를 붙입니다.
+// 바퀴가 차체 바닥 높이에 달려 있어(물리 모양과 같음) 차체 아래쪽은 바퀴 사이에 들어가는 좁은 몸통, 그 위는 넓은 지붕/짐칸입니다.
+// kind: sedan(승용차) · racer(바퀴가 드러난 레이싱카) · kei(박스형 경차). 앞머리는 -z(덮개 쪽).
+function sideBody(pts,width,mat,bevel=0.0018){ // pts: [앞뒤 위치(+가 앞), 높이] 윤곽
+ const sh=new THREE.Shape();pts.forEach(([a,b],i)=>i?sh.lineTo(a,b):sh.moveTo(a,b));sh.closePath();
+ const geo=new THREE.ExtrudeGeometry(sh,{depth:width-bevel*2,bevelEnabled:true,bevelThickness:bevel,bevelSize:bevel,bevelSegments:3,curveSegments:8});
+ geo.translate(0,0,-(width-bevel*2)/2);geo.rotateY(Math.PI/2); // 윤곽의 가로(앞) → -z
+ return new THREE.Mesh(geo,mat);
+}
+function makeCar(k,color,M,kind,wr=MACHINE.wheelR){
+ const g=new THREE.Group(),L=k.len,W=k.wid,H=k.hei,h=H/2,tireW=0.017;
+ const paint=new THREE.MeshPhysicalMaterial({color,metalness:0.55,roughness:0.28,clearcoat:1,clearcoatRoughness:0.06});
+ const dark=new THREE.MeshStandardMaterial({color:0x17181b,roughness:0.6,metalness:0.3});
+ const chrome=new THREE.MeshStandardMaterial({color:0xdfe3e8,metalness:1,roughness:0.18});
+ const lampF=new THREE.MeshStandardMaterial({color:0xfffbe6,emissive:0xfff2b0,emissiveIntensity:1.6,roughness:0.2});
+ const lampR=new THREE.MeshStandardMaterial({color:0xc01010,emissive:0xff1a1a,emissiveIntensity:1.1,roughness:0.3});
+ const inner=W-tireW-0.004,f=L/2,wz=L/2-Math.min(0.02,L/2-wr-0.002); // 바퀴 사이에 들어가는 몸통 폭, 앞 끝, 바퀴 축 위치
+ const add=(mesh,x=0,y=0,z=0)=>{mesh.position.set(x,y,z);g.add(mesh);return mesh;};
+ const box=(w,hh,l,mat)=>new THREE.Mesh(new THREE.BoxGeometry(w,hh,l),mat);
+ // 차대(축 높이의 검은 판)와 축
+ add(box(inner*0.9,0.004,L*0.86,dark),0,-h+0.002,0);
+ for(const z of [-wz,wz]){const ax=new THREE.Mesh(new THREE.CylinderGeometry(0.0022,0.0022,W-0.006,10),chrome);ax.rotation.z=Math.PI/2;add(ax,0,-h,z);}
+ if(kind==='racer'){
+  // 낮고 뾰족한 몸통 + 조종석 덮개 + 뒷날개. 바퀴는 밖으로 드러남
+  g.add(sideBody([[f,-h+0.003],[f,-h+0.008],[f*0.55,-h+0.013],[0.004,h-0.004],[-f*0.75,h-0.003],[-f,h-0.007],[-f,-h+0.003]],inner*0.82,paint,0.0022));
+  add(box(W*0.92,0.0022,0.016,paint),0,-h+0.0055,-f+0.006); // 앞날개
+  g.add(sideBody([[f*0.28,h-0.008],[f*0.12,h+0.004],[-f*0.2,h+0.005],[-f*0.42,h-0.006]],inner*0.5,M.glass,0.0016)); // 조종석 덮개
+  for(const sx of [-1,1])add(box(0.0022,0.012,0.0045,dark),sx*inner*0.3,h+0.003,f*0.86); // 뒷날개 기둥
+  add(box(W*0.95,0.0022,0.02,paint),0,h+0.0095,f*0.86); // 뒷날개
+  add(box(inner*0.2,0.0006,L*0.7,new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.4})),0,h-0.0026,-0.004); // 흰 줄
+  for(const sx of [-1,1])add(box(0.006,0.003,0.002,lampR),sx*inner*0.26,-h+0.012,f+0.0004);
+ }else{
+  const van=kind==='kei';
+  // 아래 몸통(바퀴 사이): 앞뒤 범퍼까지
+  g.add(sideBody([[f,-h+0.004],[f,van?-0.002:-0.004],[f*0.9,van?0.002:0.0],[-f*0.92,van?0.002:0.0],[-f,-0.004],[-f,-h+0.004]],inner,paint));
+  // 위 몸통: 승용차는 엔진룸-객실-트렁크, 경차는 네모난 객실. 바퀴 위로 넓게 덮음(흙받이 겸)
+  const top=van?[[f*0.98,-0.001],[f*0.98,h*0.25],[f*0.8,h-0.0015],[-f*0.96,h-0.0015],[-f*0.98,h*0.4],[-f*0.98,-0.001]]
+               :[[f*0.98,-0.001],[f*0.97,h*0.16],[f*0.5,h*0.24],[f*0.26,h-0.0015],[-f*0.5,h-0.0015],[-f*0.74,h*0.3],[-f*0.98,h*0.24],[-f*0.98,-0.001]];
+  const upper=sideBody(top,W*0.98,paint,0.0024);g.add(upper);
+  // 유리: 위 몸통보다 살짝 넓은 검푸른 띠(앞·옆·뒤 창)
+  const gl=van?[[f*0.955,h*0.34],[f*0.79,h-0.0045],[-f*0.9,h-0.0045],[-f*0.93,h*0.46]]:[[f*0.47,h*0.3],[f*0.26,h-0.0045],[-f*0.49,h-0.0045],[-f*0.7,h*0.36]];
+  g.add(sideBody(gl,W*0.98+0.0012,M.glass,0.001));
+  // 창 사이 기둥(차체 색)
+  for(const zf of van?[0.25,-0.35]:[-0.08])add(box(W*0.98+0.002,h*0.62,0.004,paint),0,h*0.72,-f*zf);
+  // 흙받이: 바퀴 위를 덮는 둥근 덮개
+  for(const sx of [-1,1])for(const z of [-wz,wz]){const fe=new THREE.Mesh(new THREE.CylinderGeometry(wr+0.0035,wr+0.0035,tireW+0.003,28,1,true,Math.PI*0.5-0.95,1.9),paint);fe.rotation.z=Math.PI/2;fe.material=paint.clone();fe.material.side=THREE.DoubleSide;add(fe,sx*(W/2-0.001),-h,z);}
+  // 범퍼·등·그릴
+  add(box(W*0.9,0.004,0.004,chrome),0,-h+0.007,-f-0.0005);add(box(W*0.9,0.004,0.004,chrome),0,-h+0.007,f+0.0005);
+  add(box(W*0.42,0.0045,0.0015,dark),0,-0.004+(van?0.004:0),-f-0.0012);
+  for(const sx of [-1,1]){add(box(0.008,0.0048,0.002,lampF),sx*W*0.33,van?h*0.12:-0.001,-f*0.98-0.0006);add(box(0.008,0.004,0.002,lampR),sx*W*0.33,van?h*0.2:0.001,f*0.98+0.0006);}
+  if(van)add(box(W*0.5,0.002,L*0.5,chrome),0,h+0.0004,0.004).material=dark; // 지붕 선반
+ }
  g.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});return g;
 }
-export function makeWheel(M,r=MACHINE.wheelR,w=0.008){const g=new THREE.Group();const t=new THREE.Mesh(new THREE.CylinderGeometry(r,r,w,24),M.tire);t.rotation.z=Math.PI/2;const h=new THREE.Mesh(new THREE.CylinderGeometry(r*0.6,r*0.6,w+0.001,16),M.rim);h.rotation.z=Math.PI/2;g.add(t,h);t.castShadow=true;return g;}
+// 바퀴: 둥근 어깨의 두툼한 고무 타이어(가로 홈) + 반짝이는 휠(바큇살 5개)
+export function makeWheel(M,r=MACHINE.wheelR,w=0.017){
+ const g=new THREE.Group(),rim=r*0.6,hw=w/2,pr=[[rim,-hw],[r*0.93,-hw],[r,-hw*0.55],[r,hw*0.55],[r*0.93,hw],[rim,hw]].map(([x,y])=>new THREE.Vector2(x,y));
+ if(!M.tread){M.tread=canvasTex(256,64,(c,cw,ch)=>{c.fillStyle='#808080';c.fillRect(0,0,cw,ch);c.fillStyle='#303030';for(let x=0;x<cw;x+=16){c.fillRect(x,0,6,ch*0.42);c.fillRect(x+8,ch*0.58,6,ch*0.42);}},true);M.tread.colorSpace=THREE.NoColorSpace;M.tread.repeat.set(3,1);
+  M.tire=new THREE.MeshStandardMaterial({color:0x151515,roughness:0.92,bumpMap:M.tread,bumpScale:2.5});M.rim=new THREE.MeshStandardMaterial({color:0xe2e5ea,metalness:1,roughness:0.16});M.hub=new THREE.MeshStandardMaterial({color:0x2a2c30,metalness:0.7,roughness:0.4});}
+ const tire=new THREE.Mesh(new THREE.LatheGeometry(pr,36),M.tire);tire.rotation.z=Math.PI/2;tire.castShadow=true;g.add(tire);
+ for(const sx of [-1,1]){const d=new THREE.Mesh(new THREE.CylinderGeometry(rim,rim,0.0016,28),M.hub);d.rotation.z=Math.PI/2;d.position.x=sx*(hw-0.0022);g.add(d);
+  for(let i=0;i<5;i++){const sp=new THREE.Mesh(new THREE.BoxGeometry(0.0016,rim*0.92,rim*0.2),M.rim);sp.position.x=sx*(hw-0.0012);sp.rotation.x=i*Math.PI*2/5;sp.translateY(rim*0.46);g.add(sp);}
+  const cap=new THREE.Mesh(new THREE.CylinderGeometry(rim*0.24,rim*0.24,0.003,16),M.rim);cap.rotation.z=Math.PI/2;cap.position.x=sx*(hw-0.001);g.add(cap);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(rim*0.97,0.0011,8,32),M.rim);ring.rotation.y=Math.PI/2;ring.position.x=sx*(hw-0.0012);g.add(ring);}
+ return g;
+}
 
 // 솜인형 입체: 앞 그림의 윤곽을 그대로 따서 가장자리에서 멀수록 두껍게 부풀림(몸통은 통통, 볏·팔·꼬리·발은 가늘게 튀어나옴).
 // 앞면에는 앞 그림, 뒷면에는 뒤에서 본 그림을 입힘
@@ -122,6 +177,7 @@ function makeDoll(k,dollTex,backTex,fuzzN){
  g.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});return g;
 }
 
+const MACHINE_WHEEL={r:MACHINE.wheelR,scale:1};export function setWheelR(r,scale=1){MACHINE_WHEEL.r=r;MACHINE_WHEEL.scale=scale;}
 export function makeObject(kind,M,dollTex,variant,A){
  const k=KINDS[kind];let mesh;
  if(A&&kind==='baseball')mesh=fit(A.baseball,2*k.r,2*k.r*k.ax,2*k.r);
@@ -148,7 +204,7 @@ export function makeObject(kind,M,dollTex,variant,A){
  else if(k.shape==='cyl'){mesh=new THREE.Group();const prof=[[k.ri,-k.h/2],[k.r,-k.h/2],[k.r,k.h/2],[k.ri,k.h/2],[k.ri,-k.h/2]].map(([x,y])=>new THREE.Vector2(x,y));
   mesh.add(new THREE.Mesh(new THREE.LatheGeometry(prof,64),kind==='tissue'?M.tissue:M.tape));
   const core=new THREE.Mesh(new THREE.CylinderGeometry(k.ri,k.ri,k.h*1.001,48,1,true),M.core);mesh.add(core);if(kind==='tape'){const side=new THREE.Mesh(new THREE.RingGeometry(k.ri,k.r,64),new THREE.MeshStandardMaterial({color:0xd98aa5,roughness:0.5,side:THREE.DoubleSide}));for(const sgn of [-1,1]){const r=side.clone();r.rotation.x=Math.PI/2;r.position.y=sgn*k.h/2*1.002;mesh.add(r);}}}
- else if(k.shape==='car'){const colors=[0xd61f26,0x1f5fd6,0xf2c21b,0x1fae5b,0xffffff,0x222222,0xff7a00];mesh=makeCar(k,colors[variant%colors.length],M);}
+ else if(k.shape==='car'){const colors=[0xd61f26,0x1f5fd6,0xf2c21b,0x1fae5b,0xffffff,0x222222,0xff7a00];const cs=MACHINE_WHEEL.scale;mesh=makeCar({...k,len:k.len*cs,wid:k.wid*cs,hei:k.hei*cs},kind==='racer'?[0xd61f26,0x1f5fd6,0xff7a00,0x111111][variant%4]:colors[variant%colors.length],M,kind,MACHINE_WHEEL.r);}
  else if(k.shape==='doll')mesh=makeDoll(k,dollTex,A&&A.dollBack,A&&A.terryN);
  mesh.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
  return mesh;
@@ -216,6 +272,7 @@ export async function createView(container,race,names,opts={}){
   const mesh=new THREE.Mesh(new THREE.CylinderGeometry(g.r,g.r,L,20,1),g.kind==='cross'?barMat:seamMat);mesh.quaternion.setFromUnitVectors(up,dir.set(dx/L,dy/L,dz/L));
   mesh.userData={x:(g.x1+g.x2)/2,y:(y1+y2)/2,z:(g.z1+g.z2)/2,q:mesh.quaternion.clone(),half:Math.abs(dz)/2+g.r};mesh.receiveShadow=true;if(g.kind==='cross')mesh.castShadow=true;scene.add(mesh);return mesh;});
  // 벨트 면 아래로 내려간 부분은 가려지도록 벨트를 먼저 그림(깊이로 자연히 가려짐)
+ setWheelR(m.wheelR,m.carScale??1);
  const items=race.entries.map((e,i)=>{const obj=makeObject(e.kind,M,dollTex,i,A);scene.add(obj);
   const wheels=(e.wheels||[]).map(()=>{const w=makeWheel(M,m.wheelR);scene.add(w);return w;});
   const tag=label(names[i]||('#'+(i+1)),i===opts.highlight);scene.add(tag);return {e,obj,wheels,tag};});

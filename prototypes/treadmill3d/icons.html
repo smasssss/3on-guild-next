@@ -2,18 +2,18 @@
 <script type="importmap">{"imports":{"three":"../../public/treadmill3d/vendor/three/three.module.js","three/addons/":"../../public/treadmill3d/vendor/three/addons/"}}</script>
 <script type="module">
 import * as THREE from 'three';
-import {loadAssets,materials,makeObject,makeWheel} from '../../public/treadmill3d/render.mjs';
+import {loadAssets,materials,makeObject,makeWheel,setWheelR} from '../../public/treadmill3d/render.mjs';
 import {KINDS,POOL,RACE_V1} from '../../public/treadmill3d/sim.mjs';
 const S=384,r=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});r.setSize(S,S);r.setPixelRatio(1);r.outputColorSpace=THREE.SRGBColorSpace;r.toneMapping=THREE.ACESFilmicToneMapping;r.setClearColor(0,0);
 document.body.appendChild(r.domElement);
 const M=materials(),A=await loadAssets("../../public/treadmill3d/assets/");const dollTex=await new THREE.TextureLoader().loadAsync("../../public/treadmill3d/assets/doll.png");dollTex.colorSpace=THREE.SRGBColorSpace;
 const pm=new THREE.PMREMGenerator(r);A.env.mapping=THREE.EquirectangularReflectionMapping;const env=pm.fromEquirectangular(A.env).texture;
 M.watermelon.map=A.melon;M.watermelon.clearcoat=0.45;M.watermelon.roughness=0.5;M.tissue.map=A.tissue;M.tissue.bumpMap=A.tissueBump;M.tissue.bumpScale=1.6;
-const out={};
+setWheelR(RACE_V1.wheelR,RACE_V1.carScale);const out={};
 for(const kind of POOL){const scene=new THREE.Scene();scene.environment=env;scene.environmentIntensity=1.0;
  const key=new THREE.DirectionalLight(0xffffff,2.2);key.position.set(0.4,1,-0.8);scene.add(key);
  const k=KINDS[kind],o=makeObject(kind,M,dollTex,kind==='racer'?0:kind==='kei'?2:1,A);const g=new THREE.Group();g.add(o);
- if(k.shape==='car'){const wr=RACE_V1.wheelR,cy=wr+k.hei/2-0.006+RACE_V1.carLift;for(const [dx,dz] of [[-1,-1],[1,-1],[-1,1],[1,1]]){const w=makeWheel(M,wr,0.014);w.position.set(dx*(k.wid/2+0.006),wr-cy,dz*(k.len/2-Math.min(0.02,k.len/2-wr-0.002)));g.add(w);}}
+ if(k.shape==='car'){const cs=RACE_V1.carScale,kk={len:k.len*cs,wid:k.wid*cs,hei:k.hei*cs},wr=RACE_V1.wheelR,cy=wr+kk.hei/2-0.006+RACE_V1.carLift;for(const [dx,dz] of [[-1,-1],[1,-1],[-1,1],[1,1]]){const w=makeWheel(M,wr);w.position.set(dx*(kk.wid/2-0.001),wr-cy,dz*(kk.len/2-Math.min(0.02,kk.len/2-wr-0.002)));g.add(w);}}
  if(k.shape==='cyl')g.rotation.z=Math.PI/2; // 구르는 자세(옆으로 누움)
  if(k.shape==='car')g.rotation.y=Math.PI*0.2;else if(k.shape==='cyl')g.rotation.y=-0.5;else if(kind==='baseball')g.rotation.set(0.5,0.4,0.2);else if(kind!=='doll')g.rotation.set(0.3,0.5,0);
  scene.add(g);const b=new THREE.Box3().setFromObject(g),c=b.getCenter(new THREE.Vector3()),sz=b.getSize(new THREE.Vector3()),R=Math.max(sz.x,sz.y,sz.z)*0.62;

@@ -178,7 +178,7 @@ export function createRace(RAPIER,kinds,seedHex,machine=MACHINE){
 
 // ───────── 확정 설정 1판 (2026-11-22 사용자 결정). 기록에 판 번호를 남기고, 값을 바꾸면 새 판 번호를 씁니다(옛 기록은 옛 값으로 다시 봄).
 export const RACE_V1 = Object.freeze({...MACHINE,wave:2,crossAngleDeg:10,crossCount:4,seamZ0:0.75,seamGap:0.9,startDelay:0.3,rowZ:0.10,rowPitch:0.2,spinUp:2,seamLong:0.0005,
- wheelR:0.026,carLift:0.006,carRear:0.04,stuckSeconds:10,seamCrossR:0.06,tiltDeg:1,len:2.0,speed:3.4,tiltFarDeg:24,seamCross:0.034,waveBase:0.2,carW:0.334});
+ wheelR:0.026,carLift:0.006,carRear:0.04,stuckSeconds:10,seamCrossR:0.06,tiltDeg:1,len:2.0,speed:3.4,tiltFarDeg:24,seamCross:0.034,waveBase:0.2,carW:0.334,carScale:1.5});
 export const MAX_RACERS=15,MIN_RACERS=2,MAX_RACE_SECONDS=120;
 
 // ───────── 자리 정하기 핀볼(아주 단순한 판): 섞인 공이 사선(/) 하나를 타고 내려와 구멍 하나로 들어가고, 들어간 순서가 1번 자리부터의 주인.

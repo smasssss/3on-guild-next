@@ -11,7 +11,7 @@ function play(seed,n){const d=createDrop(RAPIER,n,seed);while(!d.finished())d.st
  const kinds=pickKinds(seed,n,RACE_V1.carW),g=createRace(RAPIER,kinds,seed,RACE_V1);while(!g.finished()&&g.t<MAX_RACE_SECONDS)g.step();
  const out={kinds,slots:owner,order:g.result().map(s=>owner[s]),restarts:g.restarts,seconds:Math.round(g.t*10)/10,finished:g.finished()};g.world.free();return out;}
 const GOLD=[
- ['00c51d27',15,{kinds:['kei','tissue','can','tape','orange','baseball','doll','baseball','can','tissue','orange','kei','tape','baseball','watermelon'],slots:[13,6,8,2,11,7,5,3,4,1,9,10,0,14,12],order:[10,5,13,1,8,6,3,7,4,0,14,11,12,9,2],restarts:0,seconds:29.8,finished:true}],
+ ['00c51d27',15,{kinds:['kei','tissue','can','tape','orange','baseball','doll','baseball','can','tissue','orange','kei','tape','baseball','watermelon'],slots:[13,6,8,2,11,7,5,3,4,1,9,10,0,14,12],order:[10,5,13,6,1,8,7,2,12,9,0,14,3,11,4],restarts:0,seconds:30.9,finished:true}],
  ['1a2b3c4d',4,{kinds:['watermelon','tape','baseball','orange'],slots:[2,3,1,0],order:[3,0,1,2],restarts:0,seconds:9.8,finished:true}],
  ['deadbeef',2,{kinds:['doll','watermelon'],slots:[1,0],order:[1,0],restarts:0,seconds:2.1,finished:true}],
 ];

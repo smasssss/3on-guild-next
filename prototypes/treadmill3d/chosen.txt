@@ -1,1 +1,1 @@
-wave=2,crossAngleDeg=10,crossCount=4,seamZ0=0.75,seamGap=0.9,startDelay=0.3,rowZ=0.10,rowPitch=0.2,spinUp=2,seamLong=0.0005,wheelR=0.026,carLift=0.006,carRear=0.04,stuckSeconds=10,seamCrossR=0.06,tiltDeg=1,len=2.0,speed=3.4,tiltFarDeg=24,seamCross=0.034,waveBase=0.2,carW=0.334
+wave=2,crossAngleDeg=10,crossCount=4,seamZ0=0.75,seamGap=0.9,startDelay=0.3,rowZ=0.10,rowPitch=0.2,spinUp=2,seamLong=0.0005,wheelR=0.026,carLift=0.006,carRear=0.04,stuckSeconds=10,seamCrossR=0.06,tiltDeg=1,len=2.0,speed=3.4,tiltFarDeg=24,seamCross=0.034,waveBase=0.2,carW=0.334,carScale=1.5
