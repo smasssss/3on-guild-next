@@ -78,7 +78,7 @@ const kst=s=>Date.parse(s+'+09:00');
  assert.deepEqual(ui.shares({loss:{rows:[{id:'a',loss:-100,pct:-1,before:1,after:1},{id:'b',loss:-300,pct:-1,before:1,after:1}]}}).map(r=>[r.id,r.score]),[['b',75],['a',25]],'loss only');
  // 2026-11-20 user decision: the tab reads in Korean, English, Russian and Spanish; alliance names are never translated.
  for(const l of ['en','ru','es']){assert.deepEqual(Object.keys(ui.I18N[l]).sort(),Object.keys(ui.I18N.ko).sort(),l+' has every text');assert.ok(Object.values(ui.I18N[l]).every(v=>!/[가-힣]/.test(v)),l+' has no Korean left');}
- assert.match(fs.readFileSync('public/kvk.js','utf8'),/return '<b>\['\+esc\(r\.tag\)\+'\]<\/b> '\+esc\(r\.name\)/,'alliance names and tags are shown as recorded, in every language');
+ assert.match(fs.readFileSync('public/kvk.js','utf8'),/<b>\['\+esc\(r\.tag\)\+'\]<\/b> '\+esc\(r\.name\)\+'<\/span>'/,'alliance names and tags are shown as recorded, in every language');
  assert.equal(ui.fallKst('15:03'),'일 00:03');assert.equal(ui.big(-250600000),'-250.6M');
  console.log('PASS: 국가원정 pages parsed (295 only, by alliance number), calls only on Saturday 22:00 / Sunday 01-12 KST until complete, past weeks once one per hour, own document, failures recorded without stopping collection');
 })().catch(e=>{console.error(e);process.exitCode=1;});

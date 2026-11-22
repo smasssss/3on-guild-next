@@ -19,7 +19,7 @@
    scoreLossOnly:' 이 주는 처치 증가 기록이 없어 손실 기여도만 반영됩니다.',score:'기여 점수',killShare:'처치 기여도',lossShare:'손실 기여도',eff:'효율',
    cumTitle:'누적 기여 (국가원정 {n}회: {weeks})',cumNote:'평균 기여 점수 = 주마다의 기여 점수 합 ÷ 국가원정 횟수. 참여하지 않은 주는 0점으로 칩니다. 도시 배분처럼 길드 사이 비교에 쓰기 좋은 기준입니다.',avgScore:'평균 기여 점수',weeksRec:'기록된 주',cumGain:'누적 처치 증가',cumLoss:'누적 전투력 손실',
    trendTitle:'주차별 추이',result:'결과',srvLoss:'295 전체 손실',usLoss:'3ON 손실',usPct:'3ON 손실률',usGain:'3ON 처치 증가',usEff:'3ON 효율',
-   changesTitle:'길드 변동',renamed:'이름 변경 {at}',gone:'처치 순위 목록에서 사라짐(마지막 확인 {at})',newSeen:'새로 보임 {at}',noChanges:'아직 바뀐 길드가 없습니다.',oldName:'이전 이름'},
+   changesTitle:'길드 변동',renamed:'이름 변경 {at}',gone:'처치 순위 목록에서 사라짐(마지막 확인 {at})',newSeen:'새로 보임 {at}',noChanges:'아직 바뀐 길드가 없습니다.',oldName:'이전 이름',hScore:'점수',hKillShare:'처치 기여',hLossShare:'손실 기여',hEff:'효율',hAvg:'평균 점수',hWeeks:'주',beforeKills:'이전(토 22시) 누적 처치',afterKills:'이후 누적 처치',srcCheck:'원본 확인',srcAlliance:'길드 페이지',srcKvk:'국가원정 페이지',srcKills:'처치 순위 페이지',toggle:'자세히'},
   en:{title:'KvK — Server 295',intro:'Every Saturday 23:00 to early Sunday (KST, UTC+9). Only alliances of server 295 are recorded. Source: lastasylum.gg, recorded automatically every hour.',lastError:'⚠ Last collection failed',loading:'Loading records…',loadFail:'Could not load the KvK records.',lang:'Language',week:'Week',noRecords:'No records',tabLoss:'Power lost',tabKills:'Kills',tabStats:'Statistics',
    taken:'Captured',held:'Defended (not captured)',none:'Did not take part',pending:'Result not yet in',fallAt:'captured {t}',sat:'Sat',sun:'Sun',stale:'⚠ Data was still incomplete at Sunday 12:00',noWeek:'No record for this week.',
    lossNone:'No losses: the server did not take part this week.',lossMissing:"This week's loss table is no longer available on the source site.",lossYet:'No loss record yet.',
@@ -32,7 +32,7 @@
    scoreLossOnly:' This week has no kill record, so only the loss share is used.',score:'Score',killShare:'Kill share',lossShare:'Loss share',eff:'Efficiency',
    cumTitle:'Overall contribution ({n} KvKs: {weeks})',cumNote:'Average score = sum of weekly scores ÷ number of KvKs. Weeks an alliance did not appear count as 0. A fair basis for comparing alliances, e.g. when sharing cities.',avgScore:'Average score',weeksRec:'Weeks recorded',cumGain:'Total kills gained',cumLoss:'Total power lost',
    trendTitle:'Week by week',result:'Result',srvLoss:'Server 295 loss',usLoss:'3ON loss',usPct:'3ON loss %',usGain:'3ON kills gained',usEff:'3ON efficiency',
-   changesTitle:'Alliance changes',renamed:'renamed {at}',gone:'no longer in the kills ranking (last seen {at})',newSeen:'new, first seen {at}',noChanges:'No alliance changes yet.',oldName:'Former name'},
+   changesTitle:'Alliance changes',renamed:'renamed {at}',gone:'no longer in the kills ranking (last seen {at})',newSeen:'new, first seen {at}',noChanges:'No alliance changes yet.',oldName:'Former name',hScore:'Score',hKillShare:'Kill share',hLossShare:'Loss share',hEff:'Eff.',hAvg:'Avg score',hWeeks:'Weeks',beforeKills:'Before (Sat 22:00) total kills',afterKills:'After, total kills',srcCheck:'Check the source',srcAlliance:'alliance page',srcKvk:'KvK page',srcKills:'kills ranking page',toggle:'Details'},
   ru:{title:'KvK — сервер 295',intro:'Каждую субботу с 23:00 до раннего утра воскресенья (KST, UTC+9). Учитываются только альянсы сервера 295. Источник: lastasylum.gg, данные записываются автоматически каждый час.',lastError:'⚠ Последний сбор данных не удался',loading:'Загрузка данных…',loadFail:'Не удалось загрузить данные KvK.',lang:'Язык',week:'Неделя',noRecords:'Нет данных',tabLoss:'Потери мощи',tabKills:'Убийства',tabStats:'Статистика',
    taken:'Захвачен',held:'Отбит (не захвачен)',none:'Не участвовал',pending:'Результата ещё нет',fallAt:'захвачен {t}',sat:'сб',sun:'вс',stale:'⚠ К воскресенью 12:00 данные так и не обновились полностью',noWeek:'Нет данных за эту неделю.',
    lossNone:'Потерь нет: сервер не участвовал на этой неделе.',lossMissing:'Таблица потерь за эту неделю больше недоступна на сайте-источнике.',lossYet:'Данных о потерях пока нет.',
@@ -45,7 +45,7 @@
    scoreLossOnly:' За эту неделю нет данных об убийствах, учитывается только доля потерь.',score:'Очки вклада',killShare:'Доля убийств',lossShare:'Доля потерь',eff:'Эффективность',
    cumTitle:'Общий вклад (KvK: {n} — {weeks})',cumNote:'Средние очки = сумма очков за недели ÷ число KvK. Недели без участия альянса считаются как 0. Честная основа для сравнения альянсов, например при распределении городов.',avgScore:'Средние очки',weeksRec:'Недель с данными',cumGain:'Всего убийств за KvK',cumLoss:'Всего потеряно мощи',
    trendTitle:'По неделям',result:'Результат',srvLoss:'Потери сервера 295',usLoss:'Потери 3ON',usPct:'Потери 3ON %',usGain:'Убийства 3ON',usEff:'Эффективность 3ON',
-   changesTitle:'Изменения альянсов',renamed:'переименован {at}',gone:'исчез из рейтинга убийств (последний раз {at})',newSeen:'новый, впервые {at}',noChanges:'Изменений альянсов пока нет.',oldName:'Прежнее название'},
+   changesTitle:'Изменения альянсов',renamed:'переименован {at}',gone:'исчез из рейтинга убийств (последний раз {at})',newSeen:'новый, впервые {at}',noChanges:'Изменений альянсов пока нет.',oldName:'Прежнее название',hScore:'Очки',hKillShare:'Доля убийств',hLossShare:'Доля потерь',hEff:'Эфф.',hAvg:'Ср. очки',hWeeks:'Нед.',beforeKills:'До (сб 22:00), всего убийств',afterKills:'После, всего убийств',srcCheck:'Проверить источник',srcAlliance:'страница альянса',srcKvk:'страница KvK',srcKills:'рейтинг убийств',toggle:'Подробнее'},
   es:{title:'KvK — servidor 295',intro:'Cada sábado de 23:00 a la madrugada del domingo (KST, UTC+9). Solo se registran las alianzas del servidor 295. Fuente: lastasylum.gg, registro automático cada hora.',lastError:'⚠ Falló la última recogida de datos',loading:'Cargando registros…',loadFail:'No se pudieron cargar los registros de KvK.',lang:'Idioma',week:'Semana',noRecords:'Sin registros',tabLoss:'Poder perdido',tabKills:'Bajas',tabStats:'Estadísticas',
    taken:'Conquistado',held:'Defendido (no conquistado)',none:'No participó',pending:'Resultado pendiente',fallAt:'conquistado {t}',sat:'sáb',sun:'dom',stale:'⚠ A las 12:00 del domingo los datos seguían incompletos',noWeek:'No hay registro de esta semana.',
    lossNone:'Sin pérdidas: el servidor no participó esta semana.',lossMissing:'La tabla de pérdidas de esta semana ya no está disponible en la web de origen.',lossYet:'Aún no hay registro de pérdidas.',
@@ -58,7 +58,7 @@
    scoreLossOnly:' Esta semana no hay registro de bajas, solo cuenta la cuota de pérdidas.',score:'Puntuación',killShare:'Cuota de bajas',lossShare:'Cuota de pérdidas',eff:'Eficiencia',
    cumTitle:'Contribución total ({n} KvK: {weeks})',cumNote:'Puntuación media = suma de puntuaciones semanales ÷ número de KvK. Las semanas sin participación cuentan como 0. Una base justa para comparar alianzas, por ejemplo al repartir ciudades.',avgScore:'Puntuación media',weeksRec:'Semanas registradas',cumGain:'Bajas totales obtenidas',cumLoss:'Poder total perdido',
    trendTitle:'Semana a semana',result:'Resultado',srvLoss:'Pérdida servidor 295',usLoss:'Pérdida 3ON',usPct:'Pérdida 3ON %',usGain:'Bajas 3ON',usEff:'Eficiencia 3ON',
-   changesTitle:'Cambios de alianzas',renamed:'renombrada {at}',gone:'ya no aparece en el ranking de bajas (vista por última vez {at})',newSeen:'nueva, vista por primera vez {at}',noChanges:'Aún no hay cambios de alianzas.',oldName:'Nombre anterior'},
+   changesTitle:'Cambios de alianzas',renamed:'renombrada {at}',gone:'ya no aparece en el ranking de bajas (vista por última vez {at})',newSeen:'nueva, vista por primera vez {at}',noChanges:'Aún no hay cambios de alianzas.',oldName:'Nombre anterior',hScore:'Punt.',hKillShare:'Cuota bajas',hLossShare:'Cuota pérd.',hEff:'Efic.',hAvg:'Punt. media',hWeeks:'Sem.',beforeKills:'Antes (sáb 22:00), bajas totales',afterKills:'Después, bajas totales',srcCheck:'Ver la fuente',srcAlliance:'página de la alianza',srcKvk:'página del KvK',srcKills:'ranking de bajas',toggle:'Detalles'},
  };
  const pickLang=()=>{let v=null;try{v=new URLSearchParams(location.search).get('lang')||localStorage.getItem('kvkLang');}catch{/* 저장소 사용 불가 */}return LANGS[v]?v:'ko';};
  let lang=typeof location==='undefined'?'ko':pickLang();
@@ -73,12 +73,30 @@
 
  function name(id){
   const r=data.alliances[id];if(!r)return esc(id);
-  const old=r.history.slice(0,-1).map(h=>'['+h.tag+'] '+h.name);
-  return '<b>['+esc(r.tag)+']</b> '+esc(r.name)+(old.length?' <span class="kvk-old" title="'+esc(t('oldName'))+'">('+esc(old.join(', '))+')</span>':'');
+  return '<span class="kvk-name" title="['+esc(r.tag)+'] '+esc(r.name)+'"><b>['+esc(r.tag)+']</b> '+esc(r.name)+'</span>';
  }
  const isUs=id=>id==='50373046';
  function table(head,rows){return '<div class="kvk-scroll"><table class="kvk-table"><thead><tr>'+head.map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+rows.join('')+'</tbody></table></div>';}
- const tr=(id,cells)=>'<tr'+(isUs(id)?' class="kvk-us"':'')+'>'+cells.map(c=>'<td>'+c+'</td>').join('')+'</tr>';
+ // 2026-11-22 사용자 결정: 휴대폰 한 화면에 들어가게 핵심 숫자만 보이고, 나머지는 줄을 눌러 펼칩니다.
+ // 컬럼: '#'(순위), 길드(이름은 화면 폭에 맞춰 …로 자름), 숫자 칸들. 펼친 곳에 나머지 숫자와 원본 확인 링크(6번).
+ const open=new Set();
+ function fit(key,head,rows){
+  const n=head.length+1;
+  return '<table class="kvk-fit kvk-n'+(head.length-2)+'"><thead><tr>'+head.map((h,i)=>'<th class="'+(i===0?'c-rank':i===1?'c-name':'c-num')+'">'+h+'</th>').join('')+'<th class="c-chev" aria-hidden="true"></th></tr></thead><tbody>'
+   +rows.map(r=>{const k=key+'|'+r.id,on=open.has(k);
+    return '<tr class="kvk-row'+(isUs(r.id)?' kvk-us':'')+(on?' is-open':'')+'" data-open="'+esc(k)+'" tabindex="0" role="button" aria-expanded="'+on+'" aria-label="'+esc(t('toggle'))+'">'+r.cells.map((c,i)=>'<td class="'+(i===0?'c-rank':i===1?'c-name':'c-num')+'">'+c+'</td>').join('')+'<td class="c-chev" aria-hidden="true">'+(on?'▴':'▾')+'</td></tr>'
+     +(on?'<tr class="kvk-detail'+(isUs(r.id)?' kvk-us':'')+'"><td colspan="'+n+'">'+r.detail+'</td></tr>':'');}).join('')+'</tbody></table>';
+ }
+ const ggLang=()=>lang==='ko'?'ko':'en';
+ function detail(id,pairs,links){
+  const r=data.alliances[id],old=r?r.history.slice(0,-1).map(h=>'['+h.tag+'] '+h.name):[];
+  return '<dl class="kvk-dl">'+(r?'<dt>'+t('alliance')+'</dt><dd>['+esc(r.tag)+'] '+esc(r.name)+'</dd>':'')+(old.length?'<dt>'+t('oldName')+'</dt><dd>'+esc(old.join(', '))+'</dd>':'')
+   +pairs.map(([k,v])=>'<dt>'+k+'</dt><dd>'+v+'</dd>').join('')+'</dl>'
+   +'<p class="kvk-src">'+t('srcCheck')+': '+links.map(([label,url])=>'<a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+label+'</a>').join(' · ')+'</p>';
+ }
+ const allianceUrl=id=>'https://lastasylum.gg/'+ggLang()+'/leaderboard/alliance/'+encodeURIComponent(id);
+ const kvkPageUrl=wk=>'https://lastasylum.gg/'+ggLang()+'/leaderboard/kings/kvk?s=295'+(wk?'&w='+wk:'')+'#losses';
+ const killsPageUrl=()=>'https://lastasylum.gg/'+ggLang()+'/leaderboard/servers/295/alliance-kills';
 
  function weekGain(w){
   if(!w?.killsBefore||!w?.killsAfter)return null;
@@ -109,18 +127,20 @@
   if(!w?.loss)return summary(w)+'<p class="sub">'+(w?.result==='none'?t('lossNone'):w?.lossMissing?t('lossMissing'):t('lossYet'))+'</p>';
   const rows=w.loss.rows.slice().sort((a,b)=>a.loss-b.loss),total=rows.reduce((s,r)=>s+r.loss,0);
   return summary(w)+'<p class="sub">'+t('lossNote',{at:when(w.loss.at)})+'</p>'
-   +table(['#',t('alliance'),t('powerLost'),t('lossPct'),t('before'),t('after')],rows.map((r,i)=>tr(r.id,[i+1,name(r.id),big(r.loss),r.pct.toFixed(1)+'%',big(r.before),big(r.after)])))
+   +fit('loss|'+week,['#',t('alliance'),t('powerLost'),t('lossPct')],rows.map((r,i)=>({id:r.id,cells:[i+1,name(r.id),big(r.loss),r.pct.toFixed(1)+'%'],
+     detail:detail(r.id,[[t('before'),big(r.before)],[t('after'),big(r.after)]],[[t('srcAlliance'),allianceUrl(r.id)],[t('srcKvk'),kvkPageUrl(week)]])})))
    +'<p class="kvk-total">'+t('total',{v:'<b>'+big(total)+'</b>',n:rows.length})+'</p>';
  }
  function renderKills(w){
   let html='';
   const gain=weekGain(w);
   html+='<h3>'+t('gainTitle')+'</h3>'+summary(w);
-  if(gain)html+='<p class="sub">'+t('gainNote',{a:when(w.killsBefore.at),b:when(w.killsAfter.at)})+'</p>'+table(['#',t('alliance'),t('gain')],gain.sort((a,b)=>b.gain-a.gain).map((r,i)=>tr(r.id,[i+1,name(r.id),num(r.gain)])));
+  if(gain)html+='<p class="sub">'+t('gainNote',{a:when(w.killsBefore.at),b:when(w.killsAfter.at)})+'</p>'+fit('gain|'+week,['#',t('alliance'),t('gain')],gain.sort((a,b)=>b.gain-a.gain).map((r,i)=>{const b=w.killsBefore.rows.find(x=>x.id===r.id),a=w.killsAfter.rows.find(x=>x.id===r.id);
+    return {id:r.id,cells:[i+1,name(r.id),num(r.gain)],detail:detail(r.id,[[t('beforeKills'),b?num(b.kills):'-'],[t('afterKills'),a?num(a.kills):'-']],[[t('srcAlliance'),allianceUrl(r.id)],[t('srcKills'),killsPageUrl()]])};}));
   else html+='<p class="sub">'+(w?.result==='none'?t('killsNoneWeek'):t('killsNeed'))+'</p>';
   const latest=data.killsLatest;
   html+='<h3>'+t('totalTitle')+'</h3>';
-  html+=latest?'<p class="sub">'+t('recorded',{at:when(latest.at)})+'</p>'+table(['#',t('alliance'),t('totalKills')],latest.rows.map((r,i)=>tr(r.id,[i+1,name(r.id),num(r.kills)]))):'<p class="sub">'+t('noneYet')+'</p>';
+  html+=latest?'<p class="sub">'+t('recorded',{at:when(latest.at)})+'</p>'+fit('total',['#',t('alliance'),t('totalKills')],latest.rows.map((r,i)=>({id:r.id,cells:[i+1,name(r.id),num(r.kills)],detail:detail(r.id,[],[[t('srcAlliance'),allianceUrl(r.id)],[t('srcKills'),killsPageUrl()]])}))):'<p class="sub">'+t('noneYet')+'</p>';
   return html;
  }
  function renderStats(w){
@@ -130,7 +150,9 @@
   else{
    const rows=shares(w);
    html+='<p class="sub">'+t('scoreNote')+(gain?'':t('scoreLossOnly'))+'</p>'
-    +table(['#',t('alliance'),t('score'),t('gain'),t('killShare'),t('powerLost'),t('lossPct'),t('lossShare'),t('eff')],rows.map((r,i)=>tr(r.id,[i+1,name(r.id),'<b>'+r.score.toFixed(1)+'</b>',r.k==null?'-':num(r.k),r.kShare==null?'-':r.kShare.toFixed(1)+'%',r.x?big(r.x.loss):'-',r.x?r.x.pct.toFixed(1)+'%':'-',r.lShare==null?'-':r.lShare.toFixed(1)+'%',r.eff==null?'-':num(Math.round(r.eff))])));
+    +fit('stats|'+week,['#',t('alliance'),t('hScore'),t('hKillShare'),t('hLossShare'),t('hEff')],rows.map((r,i)=>({id:r.id,
+     cells:[i+1,name(r.id),'<b>'+r.score.toFixed(1)+'</b>',r.kShare==null?'-':r.kShare.toFixed(1)+'%',r.lShare==null?'-':r.lShare.toFixed(1)+'%',r.eff==null?'-':num(Math.round(r.eff))],
+     detail:detail(r.id,[[t('gain'),r.k==null?'-':num(r.k)],[t('powerLost'),r.x?big(r.x.loss):'-'],[t('lossPct'),r.x?r.x.pct.toFixed(1)+'%':'-']],[[t('srcAlliance'),allianceUrl(r.id)],[t('srcKvk'),kvkPageUrl(week)]])})));
   }
   // 누적 기여: 기록이 있는 모든 국가원정 주
   const fought=Object.keys(data.weeks).filter(k=>{const x=data.weeks[k];return (x.result==='taken'||x.result==='held')&&(x.loss||weekGain(x));}).sort();
@@ -139,7 +161,8 @@
    for(const k of fought)for(const r of shares(data.weeks[k])){const a=acc.get(r.id)||{id:r.id,weeks:0,score:0,k:0,kSeen:false,loss:0};a.weeks++;a.score+=r.score;if(r.k!=null){a.k+=r.k;a.kSeen=true;}if(r.x)a.loss+=r.x.loss;acc.set(r.id,a);}
    const list=[...acc.values()].map(a=>({...a,avg:a.score/fought.length})).sort((a,b)=>b.avg-a.avg);
    html+='<h3>'+t('cumTitle',{n:fought.length,weeks:fought.map(dayText).join(', ')})+'</h3><p class="sub">'+t('cumNote')+'</p>'
-    +table(['#',t('alliance'),t('avgScore'),t('weeksRec'),t('cumGain'),t('cumLoss')],list.map((a,i)=>tr(a.id,[i+1,name(a.id),'<b>'+a.avg.toFixed(1)+'</b>',a.weeks+'/'+fought.length,a.kSeen?num(a.k):'-',a.loss?big(a.loss):'-'])));
+    +fit('cum',['#',t('alliance'),t('hAvg'),t('hWeeks')],list.map((a,i)=>({id:a.id,cells:[i+1,name(a.id),'<b>'+a.avg.toFixed(1)+'</b>',a.weeks+'/'+fought.length],
+     detail:detail(a.id,[[t('cumGain'),a.kSeen?num(a.k):'-'],[t('cumLoss'),a.loss?big(a.loss):'-']],[[t('srcAlliance'),allianceUrl(a.id)]].concat(fought.map(k=>[t('srcKvk')+' '+esc(dayText(k)),kvkPageUrl(k)])))})));
   }
   // 주차별 추이: 서버 합계와 3ON
   const weeks=Object.keys(data.weeks).filter(k=>data.weeks[k].result).sort().reverse();
@@ -173,6 +196,8 @@
   $('kvkWeek').onchange=e=>{week=e.target.value;render();};
   $('kvkLang').onchange=e=>{lang=LANGS[e.target.value]?e.target.value:'ko';try{localStorage.setItem('kvkLang',lang);}catch{/* 저장소 사용 불가 */}render();};
   page.querySelectorAll('[data-kvk]').forEach(b=>b.onclick=()=>{view=b.dataset.kvk;render();});
+  page.querySelectorAll('[data-open]').forEach(row=>{const k=row.dataset.open,toggle=()=>{if(open.has(k))open.delete(k);else open.add(k);const y=window.scrollY;render();window.scrollTo(0,y);page.querySelector('[data-open="'+CSS.escape(k)+'"]')?.focus({preventScroll:true});};
+   row.onclick=toggle;row.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();}};});
  }
  async function load(){try{const r=await fetch('/api/kvk',{cache:'no-store'});data=await r.json();if(!r.ok&&!data.error)data={error:'load'};}catch{data={error:'load'};}render();}
  function init(){const page=$('kvk');if(!page||page.dataset.ready)return;page.dataset.ready='1';render();load();}

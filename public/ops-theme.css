@@ -299,3 +299,23 @@ html.ops-wait body{visibility:hidden}
 #kvk .kvk-total{margin-top:8px}
 #kvk h3{margin:18px 0 6px}
 #kvk .kvk-changes{margin:0;padding-left:18px;line-height:1.7}
+/* 국가원정 표: 휴대폰 한 화면에 맞추고 줄을 눌러 펼침 (2026-11-22) */
+#kvk .kvk-fit{width:100%;table-layout:fixed;border-collapse:collapse}
+#kvk .kvk-fit th,#kvk .kvk-fit td{padding:8px 6px;font-variant-numeric:tabular-nums;vertical-align:middle}
+#kvk .kvk-fit .c-rank{width:2.2em;text-align:right;color:var(--muted)}
+#kvk .kvk-fit .c-name{overflow:hidden}
+#kvk .kvk-fit .c-num{width:5.6em;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#kvk .kvk-fit th.c-num{white-space:normal;line-height:1.2;font-size:12px}
+#kvk .kvk-fit .c-chev{width:1.4em;text-align:center;color:var(--muted)}
+#kvk .kvk-name{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#kvk .kvk-row{cursor:pointer}
+#kvk .kvk-row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+#kvk .kvk-row.is-open td{border-bottom-color:transparent}
+#kvk .kvk-detail td{background:#fffaf2;padding:8px 10px 12px}
+#kvk .kvk-detail.kvk-us td{background:var(--accent-soft)}
+#kvk .kvk-dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0}
+#kvk .kvk-dl dt{color:var(--muted)}#kvk .kvk-dl dd{margin:0;overflow-wrap:anywhere}
+#kvk .kvk-src{margin:8px 0 0;font-size:13px;overflow-wrap:anywhere}
+#kvk .kvk-src a{color:#b03a6a}
+#kvk .kvk-n1 .c-num{width:7.5em}#kvk .kvk-n2 .c-num{width:6.4em}
+@media(max-width:520px){#kvk .kvk-fit th,#kvk .kvk-fit td{padding:7px 3px;font-size:13px}#kvk .kvk-fit .c-rank{width:1.8em}#kvk .kvk-n4 .c-num{width:4.4em}#kvk .kvk-n2 .c-num{width:5.4em}#kvk .kvk-n1 .c-num{width:7em}}
