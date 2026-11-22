@@ -9,9 +9,11 @@ export const MAX_RACERS = 15;
 export const ITEMS = ['orange','baseball','watermelon','can','tissue','tape','sedan','racer','kei','doll'] as const;
 // 경기 설정 판 번호: 화면 쪽 물리 설정(public/treadmill3d/sim.mjs 의 RACE_V1)과 짝입니다. 설정을 바꾸면 새 번호를 씁니다.
 // 2판(2026-11-23 사용자 결정): 자리 정하기 핀볼 앞에 섞는 통(바람으로 공을 날려 섞은 뒤 문이 열림)을 넣음. 경기 설정은 1판과 같음.
-export const VERSIONS = [1,2] as const;
+// 3판(2026-11-23 사용자 결정): 10초 재출발을 없애고, 오목한 바닥 대신 평평한 벨트 + 뒤쪽의 높은 경사로 + 가운데로 살짝 기운 양옆,
+// 낮은 이음매, 10초마다 벨트가 조금 빨라지고 경사로가 조금 내려옴(RACE_V3). 자리 정하기는 2판과 같음.
+export const VERSIONS = [1,2,3] as const;
 export type Racer = {memberId:string;nickname:string};
-export type Race = {id:string;at:string;actor?:string;seed:string;version:1|2;source:'manual'|'pinball';pinballDrawId?:string;participants:Racer[];items:string[];slots:string[];order:string[];restarts:number;seconds:number;timedOut:boolean};
+export type Race = {id:string;at:string;actor?:string;seed:string;version:1|2|3;source:'manual'|'pinball';pinballDrawId?:string;participants:Racer[];items:string[];slots:string[];order:string[];restarts:number;seconds:number;timedOut:boolean};
 export type TreadmillData = {version:1;races:Race[]};
 export const emptyTreadmill = ():TreadmillData => ({version:1,races:[]});
 
@@ -43,7 +45,7 @@ export function validateRace(input:unknown):Race{
  if(!Number.isSafeInteger(d.restarts)||(d.restarts as number)<0||(d.restarts as number)>50)invalid('재출발 횟수를 확인해 주세요.');
  if(typeof d.seconds!=='number'||!Number.isFinite(d.seconds)||d.seconds<=0||d.seconds>600)invalid('경기 시간을 확인해 주세요.');
  if(typeof d.timedOut!=='boolean')invalid('경기 설정을 확인해 주세요.');
- return {id:String(d.id),at:'',seed:String(d.seed),version:d.version as 1|2,source:d.source,...(d.source==='pinball'?{pinballDrawId:String(d.pinballDrawId)}:{}),participants,items:(d.items as string[]).slice(),slots:(d.slots as string[]).slice(),order:(d.order as string[]).slice(),restarts:d.restarts as number,seconds:Math.round((d.seconds as number)*10)/10,timedOut:d.timedOut as boolean};
+ return {id:String(d.id),at:'',seed:String(d.seed),version:d.version as 1|2|3,source:d.source,...(d.source==='pinball'?{pinballDrawId:String(d.pinballDrawId)}:{}),participants,items:(d.items as string[]).slice(),slots:(d.slots as string[]).slice(),order:(d.order as string[]).slice(),restarts:d.restarts as number,seconds:Math.round((d.seconds as number)*10)/10,timedOut:d.timedOut as boolean};
 }
 
 /** 새 기록을 맨 앞에 넣고 최근 MAX_RACES건만 남깁니다. 같은 번호의 기록은 다시 넣지 않습니다. */

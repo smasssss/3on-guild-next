@@ -4,7 +4,7 @@
    - 경기 화면과 계산은 /treadmill3d/ 의 별도 화면이 맡고, 이 파일은 참가자 고르기·기록 저장·기록 목록을 맡습니다.
    - 경기는 관리자만 돌릴 수 있고, 기록은 누구나 보고 다시 볼 수 있습니다. 같은 추첨 번호면 언제나 같은 경기입니다. */
 (function(root){'use strict';
- const MIN=2,MAX=15,PLAY='/treadmill3d/play.html?v=3',MUSIC='/treadmill3d/assets/music/race01.mp3?v=1',VERSION=2; // 2판(2026-11-23): 자리 정하기 전에 섞는 통에서 공을 섞음. 1판 기록은 1판 그대로 다시 봄
+ const MIN=2,MAX=15,PLAY='/treadmill3d/play.html?v=4',MUSIC='/treadmill3d/assets/music/race01.mp3?v=1',VERSION=3; // 3판(2026-11-23): 재출발 없음, 뒤쪽 경사로와 양옆 경사, 10초마다 빨라지고 경사로가 내려옴. 1·2판 기록은 그 판 그대로 다시 봄
  const ITEM={orange:'오렌지',baseball:'야구공',watermelon:'미니 수박',can:'참치캔',tissue:'두루마리 휴지',tape:'박스테이프',sedan:'승용차',racer:'레이싱카',kei:'경차',doll:'핵불잙 인형'};
  const $=id=>document.getElementById(id);
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -120,7 +120,7 @@
   const sw=document.createElement('div');sw.id='trSwitch';sw.className='tr-switch';sw.setAttribute('role','tablist');sw.setAttribute('aria-label','게임 고르기');
   sw.innerHTML='<button type="button" role="tab" data-game="pinball" class="on" aria-selected="true">핀볼 추첨</button><button type="button" role="tab" data-game="treadmill" aria-selected="false">런닝머신 레이스</button>';
   const tr=document.createElement('div');tr.id='trPage';tr.hidden=true;
-  tr.innerHTML='<div class="card"><h2>런닝머신 레이스</h2><p class="sub">돌아가는 런닝머신 위에서 물건들이 버티는 경기입니다. 1번 자리부터 물건이 정해지고, 간단한 핀볼로 누가 어느 자리의 주인인지 정한 뒤 경기를 합니다. 떨어진 순서대로 최하위부터 정해지고 마지막까지 버틴 사람이 1등입니다. 한 판에 '+MIN+'~'+MAX+'명. 경기는 관리자만 돌릴 수 있고, 결과는 기록으로 남아 누구나 볼 수 있습니다.</p>'
+  tr.innerHTML='<div class="card"><h2>런닝머신 레이스</h2><p class="sub">돌아가는 런닝머신 위에서 물건들이 버티는 경기입니다. 1번 자리부터 물건이 정해지고, 간단한 핀볼로 누가 어느 자리의 주인인지 정한 뒤 경기를 합니다. 10초마다 런닝머신이 조금씩 빨라지고 뒤쪽 경사로가 내려옵니다. 떨어진 순서대로 최하위부터 정해지고 마지막까지 버틴 사람이 1등입니다. 한 판에 '+MIN+'~'+MAX+'명. 경기는 관리자만 돌릴 수 있고, 결과는 기록으로 남아 누구나 볼 수 있습니다.</p>'
    +'<div class="pb-source" role="radiogroup" aria-label="참가자 고르는 방법"><label><input type="radio" name="trSource" value="manual" checked> 직접 선택</label><label><input type="radio" name="trSource" value="pinball"> 핀볼 기록에서 가져오기</label></div>'
    +'<div id="trManual"><div class="field"><label for="trSearch">이름 검색</label><input id="trSearch" placeholder="닉네임"></div><div class="actions"><button type="button" class="smallbtn" id="trSelNone">모두 해제</button></div><div class="pb-manual-list" id="trManualList"></div></div>'
    +'<div id="trPinball" hidden><div class="formgrid"><div class="field"><label for="trDraw">핀볼 추첨 기록</label><select id="trDraw"></select></div><div class="field"><label for="trCount">1등부터 몇 명 (2~15)</label><input id="trCount" type="number" min="'+MIN+'" max="'+MAX+'" value="10" inputmode="numeric"></div></div><p class="sub" id="trPreview"></p></div>'

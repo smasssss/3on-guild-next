@@ -217,7 +217,13 @@ function label(text,us){
 }
 
 // 휜 벨트의 높이(m)와 기울기(rad): 물리는 평평한 좌표에서 계산하고, 화면에서만 곡면으로 올려 그림
-export function curve(m,z){const zc=Math.max(-m.hoodR,Math.min(m.len+0.1,z));if(m.tiltFarDeg==null)return {h:Math.tan(m.tiltDeg*Math.PI/180)*zc,a:m.tiltDeg*Math.PI/180};
+// 3판(profile:'ramp'): 평평한 벨트 + 뒤쪽 경사로(시간이 갈수록 내려옴). RAMP 는 지금 경사로 각도(도).
+let RAMP=null;
+export const bankY=(m,x)=>m.profile==='ramp'?m.bankDeg*Math.PI/180*x*x/m.width:0; // 양옆이 살짝 올라간 바닥(가운데가 가장 낮음)
+export function curve(m,z){const zc=Math.max(-m.hoodR,Math.min(m.len+0.1,z));
+ if(m.profile==='ramp'){const K=Math.PI/180,af=m.frontDeg*K,ar=(RAMP??m.rampDeg)*K,z0=m.rampStart*m.len,B=m.rampBlend,u=Math.max(0,Math.min(1,(zc-z0)/B)),a=af+(ar-af)*u*u*(3-2*u);
+  const rise=zc<=z0?0:u<1?B*(u*u*u-u*u*u*u/2):B/2+(zc-z0-B);return {h:Math.tan(af)*zc+(Math.tan(ar)-Math.tan(af))*rise,a};}
+ if(m.tiltFarDeg==null)return {h:Math.tan(m.tiltDeg*Math.PI/180)*zc,a:m.tiltDeg*Math.PI/180};
  const k=Math.PI/180,z1=Math.max(0,Math.min(m.len,zc)),a=(m.tiltDeg+(m.tiltFarDeg-m.tiltDeg)*z1/m.len)*k;
  let h=(m.tiltDeg*z1+(m.tiltFarDeg-m.tiltDeg)*z1*z1/(2*m.len))*k;if(zc<0)h+=m.tiltDeg*k*zc;if(zc>m.len)h+=m.tiltFarDeg*k*(zc-m.len);return {h,a};}
 
@@ -247,23 +253,32 @@ export async function createView(container,race,names,opts={}){
  const {len,width,hoodR}=m,loop=race.loop;
  const table=new THREE.Mesh(new THREE.PlaneGeometry(6,6),M.table);table.rotation.x=-Math.PI/2;table.position.set(0,-0.09,len/2);table.receiveShadow=true;scene.add(table);
  // 벨트: 휜 면(세로 띠 무늬가 벨트와 함께 흐름)
- const bg=new THREE.PlaneGeometry(width,len+0.04,m.strips,48);bg.rotateX(-Math.PI/2);bg.translate(0,0,len/2);
- {const p=bg.attributes.position;for(let i=0;i<p.count;i++)p.setY(i,curve(m,p.getZ(i)).h+0.0005);bg.computeVertexNormals();}
  M.belt.map.repeat.set(m.strips/2,3);if(M.belt.bumpMap)M.belt.bumpMap.repeat.set(m.strips/2,3);
- const belt=new THREE.Mesh(bg,M.belt);belt.receiveShadow=true;scene.add(belt);
- const side=new THREE.Shape();side.moveTo(0,-0.08);for(let i=0;i<=40;i++){const z=len*i/40;side.lineTo(z,curve(m,z).h);}side.lineTo(len,-0.08);side.lineTo(0,-0.08);
- const deck=new THREE.Mesh(new THREE.ExtrudeGeometry(side,{depth:width+0.08,bevelEnabled:false}),M.frame);deck.rotation.y=-Math.PI/2;deck.position.set((width+0.08)/2,-0.002,0);deck.receiveShadow=true;deck.castShadow=true;scene.add(deck);
+ const railTex=canvasTex(1024,64,(g,w,h)=>{const gr=g.createLinearGradient(0,0,w,0);['#ff2a6d','#ff8a00','#ffe600','#2bff88','#00c8ff','#7a5cff','#ff2a6d'].forEach((c,i,a)=>gr.addColorStop(i/(a.length-1),c));g.fillStyle=gr;g.fillRect(0,0,w,h);});railTex.wrapS=THREE.RepeatWrapping;
+ const railMat=new THREE.MeshStandardMaterial({color:0x111111,emissive:0xffffff,emissiveMap:railTex,emissiveIntensity:2.2,roughness:0.3}),rails=[{tex:railTex}];
+ const terrain=new THREE.Group();scene.add(terrain);let builtFor=null;
+ // 벨트·받침·난간: 지형 높이를 따라 만듦. 3판은 경사로가 내려올 때마다 다시 만듦
+ function buildTerrain(){
+  for(const o of [...terrain.children]){terrain.remove(o);o.geometry.dispose();}
+  const edge=bankY(m,width/2);
+  const bg=new THREE.PlaneGeometry(width,len+0.04,m.strips,48);bg.rotateX(-Math.PI/2);bg.translate(0,0,len/2);
+  {const p=bg.attributes.position;for(let i=0;i<p.count;i++)p.setY(i,curve(m,p.getZ(i)).h+bankY(m,p.getX(i))+0.0005);bg.computeVertexNormals();}
+  const belt=new THREE.Mesh(bg,M.belt);belt.receiveShadow=true;terrain.add(belt);
+  const side=new THREE.Shape();side.moveTo(0,-0.08);for(let i=0;i<=40;i++){const z=len*i/40;side.lineTo(z,curve(m,z).h);}side.lineTo(len,-0.08);side.lineTo(0,-0.08);
+  const deck=new THREE.Mesh(new THREE.ExtrudeGeometry(side,{depth:width+0.08,bevelEnabled:false}),M.frame);deck.rotation.y=-Math.PI/2;deck.position.set((width+0.08)/2,-0.002,0);deck.receiveShadow=true;deck.castShadow=true;terrain.add(deck);
+  for(const sgn of [-1,1]){
+   const pts=[];for(let i=0;i<=30;i++){const z=-0.02+(len+0.06)*i/30;pts.push(new THREE.Vector3(sgn*(width/2+0.022),curve(m,z).h+edge+0.05,z));}
+   terrain.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),40,0.016,12),railMat));
+   const wallShape=new THREE.Shape();wallShape.moveTo(-0.02,curve(m,-0.02).h-0.02);for(let i=0;i<=30;i++){const z=-0.02+(len+0.06)*i/30;wallShape.lineTo(z,curve(m,z).h+edge+0.045);}wallShape.lineTo(len+0.04,-0.08);wallShape.lineTo(-0.02,-0.08);
+   const wall=new THREE.Mesh(new THREE.ExtrudeGeometry(wallShape,{depth:0.012,bevelEnabled:false}),M.frame);wall.rotation.y=-Math.PI/2;wall.position.set(sgn*(width/2+0.008)+0.006,0,0);wall.receiveShadow=true;terrain.add(wall);}
+  builtFor=RAMP;
+ }
+ RAMP=m.profile==='ramp'?m.rampDeg:null;buildTerrain();
  const hoodMat=new THREE.MeshPhysicalMaterial({color:0x23262b,roughness:0.45,clearcoat:0.5});
  const hood=new THREE.Mesh(new THREE.CylinderGeometry(hoodR,hoodR,width+0.1,64,1,false,0,Math.PI),hoodMat);hood.rotation.z=Math.PI/2;hood.position.set(0,0,-hoodR);hood.castShadow=true;hood.receiveShadow=true;scene.add(hood);
  const hoodBase=new THREE.Mesh(new THREE.BoxGeometry(width+0.1,0.09,hoodR*2),hoodMat);hoodBase.position.set(0,-0.045,-hoodR);scene.add(hoodBase);
  const strip=new THREE.Mesh(new THREE.BoxGeometry(width,0.004,0.008),new THREE.MeshStandardMaterial({color:0x003344,emissive:0x00d8ff,emissiveIntensity:2.5}));strip.position.set(0,0.004,0.006);scene.add(strip);
- const rails=[];for(const sgn of [-1,1]){
-  const pts=[];for(let i=0;i<=30;i++){const z=-0.02+(len+0.06)*i/30;pts.push(new THREE.Vector3(sgn*(width/2+0.022),curve(m,z).h+0.05,z));}
-  const tex=canvasTex(1024,64,(g,w,h)=>{const gr=g.createLinearGradient(0,0,w,0);['#ff2a6d','#ff8a00','#ffe600','#2bff88','#00c8ff','#7a5cff','#ff2a6d'].forEach((c,i,a)=>gr.addColorStop(i/(a.length-1),c));g.fillStyle=gr;g.fillRect(0,0,w,h);});tex.wrapS=THREE.RepeatWrapping;
-  const tube=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),40,0.016,16),new THREE.MeshStandardMaterial({color:0x111111,emissive:0xffffff,emissiveMap:tex,emissiveIntensity:2.2,roughness:0.3}));scene.add(tube);rails.push({tex});
-  const wallShape=new THREE.Shape();wallShape.moveTo(-0.02,curve(m,-0.02).h-0.02);for(let i=0;i<=30;i++){const z=-0.02+(len+0.06)*i/30;wallShape.lineTo(z,curve(m,z).h+0.045);}wallShape.lineTo(len+0.04,-0.08);wallShape.lineTo(-0.02,-0.08);
-  const wall=new THREE.Mesh(new THREE.ExtrudeGeometry(wallShape,{depth:0.012,bevelEnabled:false}),M.frame);wall.rotation.y=-Math.PI/2;wall.position.set(sgn*(width/2+0.008)+0.006,0,0);wall.receiveShadow=true;scene.add(wall);
-  const glow=new THREE.PointLight(sgn<0?0x33aaff:0xff3388,0.35,0.9,2);glow.position.set(sgn*(width/2),0.12,len*0.4);scene.add(glow);}
+ for(const sgn of [-1,1]){const glow=new THREE.PointLight(sgn<0?0x33aaff:0xff3388,0.35,0.9,2);glow.position.set(sgn*(width/2),0.12,len*0.4);scene.add(glow);}
  // 이음매(턱): 벨트 좌표의 조각들을 매 장면 흐르게 그림
  renderer.localClippingEnabled=true;const clip=[new THREE.Plane(new THREE.Vector3(0,0,-1),len),new THREE.Plane(new THREE.Vector3(0,0,1),0)];
  const seamMat=new THREE.MeshStandardMaterial({color:0x2c2f33,roughness:0.8,clippingPlanes:clip}),barMat=new THREE.MeshStandardMaterial({color:0xffc400,roughness:0.55,emissive:0x332200,clippingPlanes:clip});
@@ -278,14 +293,15 @@ export async function createView(container,race,names,opts={}){
   const tag=label(names[i]||('#'+(i+1)),i===opts.highlight);scene.add(tag);return {e,obj,wheels,tag};});
  const camera=new THREE.PerspectiveCamera(opts.fov||(W<H?46:30),W/H,0.01,30);if(opts.cam==='dollside'){camera.fov=30;camera.updateProjectionMatrix();camera.position.set(0.02,0.22,-0.22);camera.lookAt(0.35,0.05,0.10);}else if(opts.cam==='doll'||opts.cam==='dollback'){camera.fov=30;camera.updateProjectionMatrix();camera.position.set(0.35,0.34,opts.cam==='doll'?-0.38:0.58);camera.lookAt(0.35,0.05,0.10);}else if(opts.cam==='close'){camera.fov=38;camera.updateProjectionMatrix();camera.position.set(0.16,0.42,-0.42);camera.lookAt(0.0,0.03,0.34);}else if(m.len>1.7){camera.position.set(0,2.0,-0.9);camera.lookAt(0,0,0.95);}else{camera.position.set(0,2.2,-0.55);camera.lookAt(0,0,0.72);}
  const qs=new THREE.Quaternion(),xAxis=new THREE.Vector3(1,0,0);
- const place=(o,x,y,z,qx,qy,qz,qw)=>{const c=curve(m,z);qs.setFromAxisAngle(xAxis,-c.a);o.position.set(x,c.h+y*Math.cos(c.a),z-y*Math.sin(c.a));o.quaternion.set(qx,qy,qz,qw).premultiply(qs);};
- function update(snap,beltPos){
+ const place=(o,x,y,z,qx,qy,qz,qw)=>{const c=curve(m,z);qs.setFromAxisAngle(xAxis,-c.a);o.position.set(x,c.h+bankY(m,x)+y*Math.cos(c.a),z-y*Math.sin(c.a));o.quaternion.set(qx,qy,qz,qw).premultiply(qs);};
+ function update(snap,beltPos,rampDeg){
+  if(m.profile==='ramp'&&rampDeg!=null){RAMP=rampDeg;if(builtFor==null||Math.abs(builtFor-RAMP)>=0.2)buildTerrain();}
   let o=0;for(const it of items){place(it.obj,snap[o],snap[o+1],snap[o+2],snap[o+3],snap[o+4],snap[o+5],snap[o+6]);o+=7;
    for(const w of it.wheels){place(w,snap[o],snap[o+1],snap[o+2],snap[o+3],snap[o+4],snap[o+5],snap[o+6]);o+=7;}
    const k=KINDS[it.e.kind],hgt=k.r?k.r*Math.max(1,k.ax||1):k.hei;const out=it.e.outAt!=null&&snap[o-7*(1+it.wheels.length)+1]<-0.04;
    it.tag.position.set(it.obj.position.x,it.obj.position.y+Math.max(0.07,hgt*1.5),it.obj.position.z);it.tag.visible=!out;it.obj.visible=snap[o-7*(1+it.wheels.length)+1]>-0.3;for(const w of it.wheels)w.visible=it.obj.visible;}
   const z0=beltPos%loop;
-  for(const sm of seamMeshes){const u=sm.userData;let z=u.z+z0;if(z-u.half>len)z-=loop;const vis=z+u.half>0&&z-u.half<len;sm.visible=vis;if(vis){const c=curve(m,z);qs.setFromAxisAngle(xAxis,-c.a);sm.position.set(u.x,c.h+u.y,z);sm.quaternion.copy(u.q).premultiply(qs);}}
+  for(const sm of seamMeshes){const u=sm.userData;let z=u.z+z0;if(z-u.half>len)z-=loop;const vis=z+u.half>0&&z-u.half<len;sm.visible=vis;if(vis){const c=curve(m,z);qs.setFromAxisAngle(xAxis,-c.a);sm.position.set(u.x,c.h+bankY(m,u.x)+u.y,z);sm.quaternion.copy(u.q).premultiply(qs);}}
   M.belt.map.offset.y=beltPos/(len+0.04)*3;if(M.belt.bumpMap)M.belt.bumpMap.offset.y=M.belt.map.offset.y;if(M.belt.normalMap){M.belt.normalMap.offset.y=M.belt.roughnessMap.offset.y=beltPos/(len+0.04)*22;}for(const r of rails)r.tex.offset.x+=0.002;
   renderer.render(scene,camera);
  }

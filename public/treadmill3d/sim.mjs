@@ -137,7 +137,11 @@ export function createRace(RAPIER,kinds,seedHex,machine=MACHINE){
   e.pose={t:e.body.translation(),r:e.body.rotation()};
  }
  let t=0,frame=0,beltPos=0,beltOn=m.startDelay,lastFall=0,restarts=0;const order=[],events=[];
- const beltSpeed=()=>t<beltOn?0:m.speed*(1-dexp(-(t-beltOn)/m.spinUp));
+ // 3판(profile:'ramp'): 10초마다 단계가 하나씩 올라갑니다(바뀌는 1초 동안은 매끄럽게 이어짐). 단계마다 벨트가 빨라지고 뒤쪽 경사로가 내려옵니다.
+ const stageNow=()=>{if(m.profile!=='ramp'||t<=beltOn)return 0;const u=(t-beltOn)/m.stepSeconds,k=Math.floor(u),f=(u-k)*m.stepSeconds;return Math.min(m.stageMax,k+(k>0&&f<1?f-1:0)+(k>0?0:0));};
+ const speedNow=()=>m.profile==='ramp'?Math.min(m.speedMax,m.speed+m.speedStep*stageNow()):m.speed;
+ const rampNow=()=>m.profile==='ramp'?Math.max(m.rampMinDeg,m.rampDeg-m.rampStepDeg*stageNow()):0;
+ const beltSpeed=()=>t<beltOn?0:speedNow()*(1-dexp(-(t-beltOn)/m.spinUp));
  // 경사 모터: 출발 뒤 일정한 빠르기로 천천히 기울기를 바꿈(런닝머신 경사 조절 기능)
  const tiltNow=()=>m.tiltEndDeg==null?m.tiltDeg:m.tiltDeg+(m.tiltEndDeg-m.tiltDeg)*Math.min(1,Math.max(0,(t-m.startDelay)/m.tiltSeconds));
  const alive=()=>entries.filter(e=>!e.out);
@@ -159,26 +163,36 @@ export function createRace(RAPIER,kinds,seedHex,machine=MACHINE){
   belt.setTranslation({x:0,y:-0.05,z:m.len/2},true);belt.setNextKinematicTranslation({x:0,y:-0.05,z:m.len/2+v*DT});
   {const z0=(beltPos-v*DT)%loop;pattern.forEach((b,c)=>{const z=z0-c*loop;b.setTranslation({x:0,y:0,z},true);b.setNextKinematicTranslation({x:0,y:0,z:z+v*DT});});}
   if(m.tiltEndDeg!=null){const a=tiltNow()*Math.PI/180;world.gravity={x:0,y:-9.81*dcos(a),z:-9.81*dsin(a)};}
-  if(m.tiltFarDeg!=null)for(const e of entries){if(e.out)continue;for(const b of [e.body,...e.wheels.map(w=>w.body)]){
+  if(m.profile==='ramp'){const K=Math.PI/180,af=m.frontDeg*K,ar=rampNow()*K,z0=m.rampStart*m.len,bank=m.bankDeg*K,hw=m.width/2;
+   for(const e of entries){if(e.out)continue;for(const b of [e.body,...e.wheels.map(w=>w.body)]){const p=b.translation(),u=Math.max(0,Math.min(1,(p.z-z0)/m.rampBlend)),a=af+(ar-af)*u*u*(3-2*u);
+     // 양옆 바닥이 가운데 쪽으로 살짝 기울어 있어(가장자리에서 가장 큼) 물건이 천천히 가운데로 모임
+     const bx=Math.max(-1,Math.min(1,p.x/hw)),mass=b.mass();
+     b.resetForces(true);b.addForce({x:-mass*9.81*dsin(bank*bx),y:0,z:-mass*9.81*dsin(a)},true);}}}
+  else if(m.tiltFarDeg!=null)for(const e of entries){if(e.out)continue;for(const b of [e.body,...e.wheels.map(w=>w.body)]){
     const z=Math.max(0,Math.min(m.len,b.translation().z)),a=(m.tiltDeg+(m.tiltFarDeg-m.tiltDeg)*z/m.len)*Math.PI/180;
     b.resetForces(true);b.addForce({x:0,y:0,z:-b.mass()*9.81*dsin(a)},true);}}
   world.step();t+=DT;frame++;
   for(const e of entries){if(e.out)continue;const p=e.body.translation();
    // 벨트 밖으로 나가면 탈락(끝에서 떨어지거나 어디로든 튕겨 나감)
    if(p.y<-0.06||p.z>m.len+0.03||p.z<-m.hoodR-0.01||Math.abs(p.x)>m.width/2+0.1){e.out=true;e.outAt=frame;order.push(e.i);lastFall=t;events.push({frame,type:'fall',i:e.i});}}
-  if(alive().length>1&&t-lastFall>m.stuckSeconds)restart();
+  if(m.stuckSeconds>0&&alive().length>1&&t-lastFall>m.stuckSeconds)restart(); // 3판은 재출발 없음(stuckSeconds:0)
  }
  const finished=()=>alive().length<=1;
  // 먼저 떨어진 순 → 마지막이 1등. 시간이 다 되도록 남은 물건이 여럿이면 벨트 끝에 가까운(더 밀려난) 쪽을 먼저 떨어진 것으로 칩니다
  const result=()=>[...order,...alive().map(e=>({i:e.i,z:e.body.translation().z})).sort((a,b)=>b.z-a.z||a.i-b.i).map(x=>x.i)];
  function snapshot(){const s=[];for(const e of entries){const p=e.body.translation(),q=e.body.rotation();s.push(p.x,p.y,p.z,q.x,q.y,q.z,q.w);
    for(const w of e.wheels){const wp=w.body.translation(),wq=w.body.rotation();s.push(wp.x,wp.y,wp.z,wq.x,wq.y,wq.z,wq.w);}}return s;}
- return {world,entries,events,seams,loop,tiltNow,gateClosed:()=>!!gate,step,finished,result,snapshot,beltSpeed,get t(){return t;},get frame(){return frame;},get beltPos(){return beltPos;},get restarts(){return restarts;}};
+ return {world,entries,events,seams,loop,tiltNow,rampNow,speedNow,stageNow,gateClosed:()=>!!gate,step,finished,result,snapshot,beltSpeed,get t(){return t;},get frame(){return frame;},get beltPos(){return beltPos;},get restarts(){return restarts;}};
 }
 
 // ───────── 확정 설정 1판 (2026-11-22 사용자 결정). 기록에 판 번호를 남기고, 값을 바꾸면 새 판 번호를 씁니다(옛 기록은 옛 값으로 다시 봄).
 export const RACE_V1 = Object.freeze({...MACHINE,wave:2,crossAngleDeg:10,crossCount:4,seamZ0:0.75,seamGap:0.9,startDelay:0.3,rowZ:0.10,rowPitch:0.2,spinUp:2,seamLong:0.0005,
  wheelR:0.026,carLift:0.006,carRear:0.04,stuckSeconds:10,seamCrossR:0.06,tiltDeg:1,len:2.0,speed:3.4,tiltFarDeg:24,seamCross:0.034,waveBase:0.2,carW:0.334,carScale:1.5});
+// ───────── 확정 설정 3판 (2026-11-23 사용자 결정): 재출발 없음. 오목한 바닥 대신 평평한 벨트 + 뒤쪽의 높은 경사로,
+// 양옆 바닥이 가운데로 살짝 기울어 물건이 모여 부딪힘, 이음매는 낮게, 10초마다 벨트가 조금 빨라지고 경사로가 조금 내려옴.
+export const RACE_V3 = Object.freeze({...RACE_V1,profile:'ramp',tiltDeg:0,tiltFarDeg:null,stuckSeconds:0,frontDeg:1.2,rampStart:0.55,rampBlend:0.16,rampDeg:30,rampStepDeg:6,rampMinDeg:2,
+ bankDeg:3,stepSeconds:10,stageMax:9,speed:3.4,speedStep:0.25,speedMax:4.4,seamCross:0.012,waveBase:0.25,waveMid:0.6});
+export const raceFor=version=>version>=3?RACE_V3:RACE_V1;
 export const MAX_RACERS=15,MIN_RACERS=2,MAX_RACE_SECONDS=120;
 
 // ───────── 자리 정하기 핀볼(아주 단순한 판): 섞인 공이 사선(/) 하나를 타고 내려와 구멍 하나로 들어가고, 들어간 순서가 1번 자리부터의 주인.
@@ -262,5 +276,5 @@ export function createDrop2(RAPIER,n,seedHex,d=DROP2){
  return {world,balls,walls,order,events,step,finished,snapshot,bar:{x1,y1,x2,y2},get gateFrame(){return gateFrame;},get t(){return t;},get frame(){return frame;}};
 }
 // 기록의 판 번호에 맞는 자리 정하기 핀볼
-export const GAME_VERSION=2;
+export const GAME_VERSION=3; // 3판: 자리 정하기는 2판(바람 섞는 통)과 같고, 경기 설정이 RACE_V3
 export const dropFor=version=>version>=2?{create:createDrop2,spec:DROP2}:{create:createDrop,spec:DROP};

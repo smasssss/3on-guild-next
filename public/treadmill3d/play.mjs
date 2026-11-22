@@ -1,14 +1,14 @@
 // 런닝머신 레이스 한 판: 물건 정하기(슬롯머신) → 자리 정하기(핀볼) → 경기 → 결과.
 // 주소 뒤 #… 에 {seed, racers:[{id,name}], expect?:[id…]} 를 받아 시작합니다. 같은 seed 면 언제나 같은 판입니다.
-import {pickKinds,KINDS,RACE_V1,dropFor,MAX_RACERS,MIN_RACERS} from './sim.mjs';
+import {pickKinds,KINDS,raceFor,dropFor,MAX_RACERS,MIN_RACERS,GAME_VERSION} from './sim.mjs';
 import {createView} from './render.mjs';
 const $=id=>document.getElementById(id),wait=ms=>new Promise(r=>setTimeout(r,ms));
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const hueOf=i=>`hsl(${(i*47)%360} 85% 60%)`;
 let input;try{input=JSON.parse(decodeURIComponent(location.hash.slice(1)));}catch{input=null;}
 if(!input||!/^[0-9a-f]{8}$/.test(input.seed||'')||!Array.isArray(input.racers)||input.racers.length<MIN_RACERS||input.racers.length>MAX_RACERS){$('wait').hidden=false;$('waitText').textContent='경기 정보를 읽지 못했습니다.';throw new Error('bad input');}
-const {seed,racers}=input,n=racers.length,fast=!!input.fast,q=new URLSearchParams(location.search),version=input.version===1?1:2; // 판 번호가 없는 주문은 최신(2판)
-const kinds=pickKinds(seed,n,RACE_V1.carW);
+const {seed,racers}=input,n=racers.length,fast=!!input.fast,q=new URLSearchParams(location.search),version=[1,2,3].includes(input.version)?input.version:GAME_VERSION,RACE=raceFor(version); // 판 번호가 없는 주문은 최신 판
+const kinds=pickKinds(seed,n,RACE.carW);
 const say=(t,s='')=>{$('title').textContent=t;$('sub').textContent=s;};
 const toParent=m=>{try{if(parent!==window)parent.postMessage({source:'treadmill3d',...m},location.origin);}catch{}};
 
@@ -62,21 +62,21 @@ async function raceStage(){
  const R=raceData,owner=dropData.order,names=owner.map(i=>racers[i].name); // names[자리] = 그 자리 주인
  if(!view){$('wait').hidden=false;$('waitText').textContent='그림 불러오는 중…';
   const desc={...R.desc,entries:R.desc.entries.map(e=>({...e,wheels:Array.from({length:e.wheels},()=>0)}))};
-  view=await createView($('stage'),desc,names,{machine:RACE_V1,highlight:-1,low:q.has('low')});addEventListener('resize',()=>view.resize());$('wait').hidden=true;}
+  view=await createView($('stage'),desc,names,{machine:RACE,highlight:-1,low:q.has('low')});addEventListener('resize',()=>view.resize());$('wait').hidden=true;}
  const total=R.frames.length/R.stride,restarts=R.events.filter(e=>e.type==='restart').map(e=>e.frame),ents=R.desc.entries;
  // 출발 신호(2026-11-23 사용자 결정): 화면이 다 뜬 뒤 약 3초 동안 빨간불을 하나씩 켜고, 파란불로 바뀌면 출발합니다.
  // 그동안 첫 장면을 계속 그려 두어, 느린 기기에서도 '이미 돌아가는 중'으로 시작하지 않게 합니다.
  const L=$('lights'),lamps=[...L.children];L.className='';lamps.forEach(x=>x.className='');
  if(!fast){L.hidden=false;const hold=performance.now();
-  await new Promise(res=>{const tick=()=>{const s=(performance.now()-hold)/1000;view.update(R.frames.subarray(0,R.stride),R.beltPos[0]);lamps.forEach((x,i)=>x.classList.toggle('red',s>=0.6+i*0.8));$('status').hidden=false;$('status').textContent='준비…';
+  await new Promise(res=>{const tick=()=>{const s=(performance.now()-hold)/1000;view.update(R.frames.subarray(0,R.stride),R.beltPos[0],R.ramp[0]);lamps.forEach((x,i)=>x.classList.toggle('red',s>=0.6+i*0.8));$('status').hidden=false;$('status').textContent='준비…';
     if(s>=3.0)res();else requestAnimationFrame(tick);};tick();});
   L.className='go';setTimeout(()=>{L.hidden=true;},900);}
  toParent({type:'green'}); // 파란불: 바깥 화면이 경기 음악을 시작합니다
  $('status').hidden=false;const speed=fast?6:1,t0=performance.now();
  await new Promise(res=>{const loop=()=>{const f=Math.min(total-1,Math.floor((performance.now()-t0)/1000*60*speed));
-   view.update(R.frames.subarray(f*R.stride,(f+1)*R.stride),R.beltPos[f]);
+   view.update(R.frames.subarray(f*R.stride,(f+1)*R.stride),R.beltPos[f],R.ramp[f]);
    const out=ents.filter(e=>e.outAt!=null&&e.outAt<=f).sort((a,b)=>b.outAt-a.outAt),left=n-out.length;
-   $('status').textContent=`남은 ${left}명`+(out.length?` · 방금 탈락: ${out.slice(0,3).map(e=>names[e.i]).join(', ')}`:'');
+   $('status').textContent=(version>=3?`속도 ${R.speed[f].toFixed(1)} · 경사로 ${Math.round(R.ramp[f])}° · `:'')+`남은 ${left}명`+(out.length?` · 방금 탈락: ${out.slice(0,3).map(e=>names[e.i]).join(', ')}`:'');
    const rr=restarts.find(x=>f>=x-20&&f<x+110);$('banner').hidden=rr==null;if(rr!=null)$('banner').textContent='10초간 탈락 없음 · 남은 선수 재출발!';
    if(f>=total-1)res();else requestAnimationFrame(loop);};loop();});
  $('status').hidden=true;$('banner').hidden=true;toParent({type:'race-end'});

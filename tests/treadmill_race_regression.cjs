@@ -14,14 +14,14 @@ const race=(over={})=>{const p=racers(4);return {id:'a1b2c3d4-0000-4000-8000-000
  // 1) Record rules
  const ok=lib.validateRace(race());assert.equal(ok.seconds,29.8);assert.equal(ok.at,'');assert.deepEqual(ok.order,['m0','m3','m1','m2']);assert.equal(ok.pinballDrawId,undefined);
  assert.equal(lib.validateRace(race({source:'pinball',pinballDrawId:'b1b2c3d4-0000-4000-8000-000000000009'})).pinballDrawId,'b1b2c3d4-0000-4000-8000-000000000009');
- const bad=[[{participants:racers(1),items:['can'],slots:['m0'],order:['m0']},/참가 인원/],[{participants:racers(16)},/참가 인원/],[{seed:'XYZ'},/추첨 번호/],[{version:3},/설정 판/],[{version:0},/설정 판/],
+ const bad=[[{participants:racers(1),items:['can'],slots:['m0'],order:['m0']},/참가 인원/],[{participants:racers(16)},/참가 인원/],[{seed:'XYZ'},/추첨 번호/],[{version:4},/설정 판/],[{version:0},/설정 판/],
   [{items:['can','doll','doll','kei']},/물건/],[{items:['can','doll','orange']},/물건/],[{items:['can','rock','orange','kei']},/물건/],
   [{slots:['m2','m0','m3','m3']},/자리 주인/],[{order:['m0','m3','m1']},/탈락 순서/],[{order:['m0','m3','m1','zz']},/탈락 순서/],
   [{source:'pinball'},/핀볼 기록/],[{pinballDrawId:'b1b2c3d4-0000-4000-8000-000000000009'},/핀볼 기록/],[{source:'auto'},/고르는 방법/],
   [{seconds:0},/경기 시간/],[{restarts:-1},/재출발/],[{timedOut:'no'},/경기 설정/],[{participants:[...racers(3),{memberId:'m0',nickname:'또'}]},/참가자 정보/]];
  for(const [over,why] of bad)assert.throws(()=>lib.validateRace(race(over)),why,JSON.stringify(over));
  // 2026-11-23 user decision: version 2 mixes the balls in a hopper before the simple pinball; version 1 records stay valid and replay as version 1.
- assert.equal(ok.version,1);assert.equal(lib.validateRace(race({version:2})).version,2);
+ assert.equal(ok.version,1);assert.equal(lib.validateRace(race({version:2})).version,2);assert.equal(lib.validateRace(race({version:3})).version,3,'version 3: no restart, back ramp, banked sides, lower seams, a step every 10 seconds');
  const two=lib.addRace(lib.addRace(lib.emptyTreadmill(),{...ok,at:'t'}),{...ok,at:'t'});assert.equal(two.races.length,1,'the same race is not stored twice');
  // 2) Storage: its own document kind; admin only; anyone reads; other documents untouched
  const others=()=>JSON.stringify(f.sql.prepare("SELECT * FROM documents WHERE kind<>'treadmill3d' ORDER BY kind").all()),before=others();

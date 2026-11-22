@@ -5,10 +5,10 @@
 // slot owners come from the simple pinball (entry order = slot 1..N), fall order = last place first.
 import assert from 'node:assert/strict';
 import RAPIER from '../public/treadmill3d/vendor/rapier.mjs';
-import {createRace,createDrop,createDrop2,dropFor,pickKinds,RACE_V1,KINDS,MAX_RACE_SECONDS,GAME_VERSION,HZ,DROP2,dsin,dcos,dexp} from '../public/treadmill3d/sim.mjs';
+import {createRace,createDrop,createDrop2,dropFor,pickKinds,RACE_V1,RACE_V3,raceFor,KINDS,MAX_RACE_SECONDS,GAME_VERSION,HZ,DROP2,dsin,dcos,dexp} from '../public/treadmill3d/sim.mjs';
 await RAPIER.init();
 function play(seed,n,version=1){const d=dropFor(version).create(RAPIER,n,seed);while(!d.finished())d.step();const owner=d.order.slice();d.world.free();
- const kinds=pickKinds(seed,n,RACE_V1.carW),g=createRace(RAPIER,kinds,seed,RACE_V1);while(!g.finished()&&g.t<MAX_RACE_SECONDS)g.step();
+ const R=raceFor(version),kinds=pickKinds(seed,n,R.carW),g=createRace(RAPIER,kinds,seed,R);while(!g.finished()&&g.t<MAX_RACE_SECONDS)g.step();
  const out={kinds,slots:owner,order:g.result().map(s=>owner[s]),restarts:g.restarts,seconds:Math.round(g.t*10)/10,finished:g.finished()};g.world.free();return out;}
 const GOLD=[
  ['00c51d27',15,{kinds:['kei','tissue','can','tape','orange','baseball','doll','baseball','can','tissue','orange','kei','tape','baseball','watermelon'],slots:[13,6,8,2,11,7,5,3,4,1,9,10,0,14,12],order:[10,5,13,6,1,8,7,2,12,9,0,14,3,11,4],restarts:0,seconds:30.9,finished:true}],
@@ -22,7 +22,17 @@ const GOLD2=[
  ['00c51d27',15,{kinds:['kei','tissue','can','tape','orange','baseball','doll','baseball','can','tissue','orange','kei','tape','baseball','watermelon'],slots:[11,13,12,0,8,6,4,14,5,10,3,2,1,9,7],order:[2,4,11,13,10,12,6,0,7,3,1,9,14,8,5],restarts:0,seconds:30.9,finished:true}],
  ['1a2b3c4d',4,{kinds:['watermelon','tape','baseball','orange'],slots:[0,2,3,1],order:[2,1,3,0],restarts:0,seconds:9.8,finished:true}],
 ];
-assert.equal(GAME_VERSION,2);assert.equal(dropFor(1).create,createDrop);assert.equal(dropFor(2).create,createDrop2);
+// 2026-11-23 user decision: version 3 drops the 10-second restart and the concave belt. A flat belt with a bold ramp at the back, sides banked
+// slightly toward the middle, much lower seams; every 10 seconds the belt gets a little faster and the ramp a little lower, so every race ends by itself.
+const GOLD3=[
+ ['00c51d27',15,{kinds:['kei','tissue','can','tape','orange','baseball','doll','baseball','can','tissue','orange','kei','tape','baseball','watermelon'],slots:[11,13,12,0,8,6,4,14,5,10,3,2,1,9,7],order:[2,4,11,12,10,5,13,1,0,9,7,8,3,14,6],restarts:0,seconds:48.5,finished:true}],
+ ['1a2b3c4d',4,{kinds:['watermelon','tape','baseball','orange'],slots:[0,2,3,1],order:[2,3,0,1],restarts:0,seconds:44.1,finished:true}],
+];
+for(const [seed,n,want] of GOLD3)assert.deepEqual(play(seed,n,3),want,'version 3 seed '+seed+' must replay exactly');
+assert.equal(raceFor(1),RACE_V1);assert.equal(raceFor(2),RACE_V1,'version 2 keeps the version 1 race');assert.equal(raceFor(3),RACE_V3);assert.equal(RACE_V3.stuckSeconds,0,'no restart in version 3');
+{const g=createRace(RAPIER,['orange','baseball'],'00c51d27',RACE_V3);const at=sec=>{while(g.t<sec)g.step();return [g.beltSpeed(),g.rampNow()];};
+ const [v5,r5]=at(8),[v15,r15]=at(18),[v25,r25]=at(28);assert.ok(v15>v5&&v25>v15,'the belt gets faster every 10 seconds');assert.ok(r15<r5&&r25<r15,'the ramp gets lower every 10 seconds');assert.equal(r5,RACE_V3.rampDeg);g.world.free();}
+assert.equal(GAME_VERSION,3);assert.equal(dropFor(1).create,createDrop);assert.equal(dropFor(2).create,createDrop2);
 for(const [seed,n,want] of GOLD2)assert.deepEqual(play(seed,n,2),want,'version 2 seed '+seed+' must replay exactly');
 {const firstIn=new Array(15).fill(0);for(let s=0;s<40;s++){const d=createDrop2(RAPIER,15,((s*40503+0xbeef01)>>>0).toString(16).padStart(8,'0'));while(!d.finished())d.step();
   assert.ok(d.events.every(e=>!e.forced),'no forced finish');assert.ok(d.events.every(e=>e.frame/HZ>DROP2.mixSeconds),'no ball leaves before the gate opens');assert.ok(d.t<15);firstIn[d.order[0]]++;d.world.free();}
