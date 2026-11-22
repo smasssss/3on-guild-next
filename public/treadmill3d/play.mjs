@@ -71,6 +71,7 @@ async function raceStage(){
   await new Promise(res=>{const tick=()=>{const s=(performance.now()-hold)/1000;view.update(R.frames.subarray(0,R.stride),R.beltPos[0]);lamps.forEach((x,i)=>x.classList.toggle('red',s>=0.6+i*0.8));$('status').hidden=false;$('status').textContent='준비…';
     if(s>=3.0)res();else requestAnimationFrame(tick);};tick();});
   L.className='go';setTimeout(()=>{L.hidden=true;},900);}
+ toParent({type:'green'}); // 파란불: 바깥 화면이 경기 음악을 시작합니다
  $('status').hidden=false;const speed=fast?6:1,t0=performance.now();
  await new Promise(res=>{const loop=()=>{const f=Math.min(total-1,Math.floor((performance.now()-t0)/1000*60*speed));
    view.update(R.frames.subarray(f*R.stride,(f+1)*R.stride),R.beltPos[f]);
@@ -78,7 +79,7 @@ async function raceStage(){
    $('status').textContent=`남은 ${left}명`+(out.length?` · 방금 탈락: ${out.slice(0,3).map(e=>names[e.i]).join(', ')}`:'');
    const rr=restarts.find(x=>f>=x-20&&f<x+110);$('banner').hidden=rr==null;if(rr!=null)$('banner').textContent='10초간 탈락 없음 · 남은 선수 재출발!';
    if(f>=total-1)res();else requestAnimationFrame(loop);};loop();});
- $('status').hidden=true;$('banner').hidden=true;
+ $('status').hidden=true;$('banner').hidden=true;toParent({type:'race-end'});
 }
 
 // 4) 결과: 마지막까지 남은 사람이 1등

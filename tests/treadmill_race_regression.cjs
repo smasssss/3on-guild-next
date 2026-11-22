@@ -42,5 +42,9 @@ const race=(over={})=>{const p=racers(4);return {id:'a1b2c3d4-0000-4000-8000-000
  // 4) Wiring in the page
  const html=fs.readFileSync('public/legacy.html','utf8');assert.match(html,/<button data-tab="pinball">추첨 게임<\/button>/);assert.match(html,/<script src="\/pinball\.js\?v=\d+" defer><\/script><script src="\/treadmill-race\.js\?v=\d+" defer><\/script>/);
  for(const file of ['play.html','play.mjs','play.css','worker.mjs','sim.mjs','render.mjs','vendor/rapier.mjs','vendor/three/three.module.js','assets/doll.png',...lib.ITEMS.map(k=>'assets/icons/'+k+'.png')])assert.ok(fs.existsSync('public/treadmill3d/'+file),file);
+ // 2026-11-23 user decision: the user's own race music starts at the go signal (blue lamps) and fades when the race ends; a sound switch turns it off.
+ const page=fs.readFileSync('public/treadmill-race.js','utf8'),game=fs.readFileSync('public/treadmill3d/play.mjs','utf8');
+ assert.ok(fs.statSync('public/treadmill3d/assets/music/race01.mp3').size>100000);assert.match(game,/toParent\(\{type:'green'\}\)/);assert.match(game,/toParent\(\{type:'race-end'\}\)/);
+ assert.match(page,/if\(m\.type==='green'\)return musicStart\(\);/);assert.match(page,/id="trSound" type="checkbox" checked/);assert.match(game,/s>=3\.0\)res\(\)/,'three seconds of start lamps before the go signal');
  console.log('PASS: 런닝머신 레이스 records validated (2-15 racers, items by slot, owners and fall order are permutations), own document kind, admin-only save with backup, pinball import 1..N, wired into the 추첨 게임 tab');
 })().catch(e=>{console.error(e);process.exitCode=1;});

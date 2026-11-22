@@ -4,7 +4,7 @@
    - 경기 화면과 계산은 /treadmill3d/ 의 별도 화면이 맡고, 이 파일은 참가자 고르기·기록 저장·기록 목록을 맡습니다.
    - 경기는 관리자만 돌릴 수 있고, 기록은 누구나 보고 다시 볼 수 있습니다. 같은 추첨 번호면 언제나 같은 경기입니다. */
 (function(root){'use strict';
- const MIN=2,MAX=15,PLAY='/treadmill3d/play.html?v=2',VERSION=2; // 2판(2026-11-23): 자리 정하기 전에 섞는 통에서 공을 섞음. 1판 기록은 1판 그대로 다시 봄
+ const MIN=2,MAX=15,PLAY='/treadmill3d/play.html?v=3',MUSIC='/treadmill3d/assets/music/race01.mp3?v=1',VERSION=2; // 2판(2026-11-23): 자리 정하기 전에 섞는 통에서 공을 섞음. 1판 기록은 1판 그대로 다시 봄
  const ITEM={orange:'오렌지',baseball:'야구공',watermelon:'미니 수박',can:'참치캔',tissue:'두루마리 휴지',tape:'박스테이프',sedan:'승용차',racer:'레이싱카',kei:'경차',doll:'핵불잙 인형'};
  const $=id=>document.getElementById(id);
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -48,16 +48,36 @@
   el.textContent=(s==='manual'?'직접 선택':'핀볼 기록에서 가져오기')+' · 참가 '+list.length+'명'+(list.length<MIN?' · '+MIN+'명 이상 골라 주세요.':list.length>MAX?' · 한 판에 '+MAX+'명까지입니다.':' · 마지막까지 버틴 사람이 1등입니다.');
   $('trStart').disabled=list.length<MIN||list.length>MAX;
  }
+ // 경기 음악(2026-11-23 사용자 결정): 사용자가 직접 만든 곡을 파란불에 맞춰 틀고, 경기가 끝나면 서서히 줄입니다.
+ // 휴대폰은 누르는 순간에만 소리를 낼 수 있어, 경기 시작·다시 보기 버튼을 누를 때 소리를 준비합니다(핀볼과 같은 방식).
+ const sound={ctx:null,buf:null,src:null,gain:null,token:0};
+ const soundOn=()=>!!$('trSound')?.checked;
+ function audioPrepare(){
+  if(!soundOn())return;const AC=root.AudioContext||root.webkitAudioContext;if(!AC)return;
+  if(!sound.ctx){try{if(navigator.audioSession)navigator.audioSession.type='playback';}catch{/* 지원하지 않는 브라우저 */}sound.ctx=new AC();}
+  if(sound.ctx.state!=='running')sound.ctx.resume().catch(()=>{});
+  if(!sound.buf){const c=sound.ctx;sound.buf=fetch(MUSIC).then(r=>{if(!r.ok)throw Error('music');return r.arrayBuffer();}).then(b=>new Promise((ok,no)=>c.decodeAudioData(b,ok,no)));sound.buf.catch(()=>{sound.buf=null;});}
+ }
+ function musicStop(now){
+  sound.token++;const s=sound.src,g=sound.gain,c=sound.ctx;if(!s||!c)return;sound.src=null;
+  try{if(now)s.stop();else{const t=c.currentTime;g.gain.setValueAtTime(g.gain.value,t);g.gain.linearRampToValueAtTime(0,t+2.2);s.stop(t+2.3);}}catch{/* 이미 멈춤 */}
+ }
+ function musicStart(){
+  musicStop(true);if(!soundOn()||!sound.ctx||!sound.buf)return;const token=++sound.token,c=sound.ctx;
+  sound.buf.then(buf=>{if(token!==sound.token||!soundOn())return;const src=c.createBufferSource(),g=c.createGain();src.buffer=buf;src.loop=true;g.gain.value=0.6;src.connect(g);g.connect(c.destination);src.start();sound.src=src;sound.gain=g;root.__trMusic=(root.__trMusic||0)+1;}).catch(()=>{});
+ }
  // 경기 화면(별도 화면)을 화면 전체에 띄웁니다
  function open(payload){
   const box=$('trOverlay');box.hidden=false;document.documentElement.classList.add('tr-open');
   $('trFrame').src=PLAY+'#'+encodeURIComponent(JSON.stringify(payload));
  }
- function close(){const box=$('trOverlay');if(!box||box.hidden)return;box.hidden=true;$('trFrame').src='about:blank';document.documentElement.classList.remove('tr-open');current=null;}
+ function close(){musicStop(true);const box=$('trOverlay');if(!box||box.hidden)return;box.hidden=true;$('trFrame').src='about:blank';document.documentElement.classList.remove('tr-open');current=null;}
  const tell=m=>{try{$('trFrame').contentWindow.postMessage({source:'treadmill-race',...m},location.origin);}catch{/* 화면이 이미 닫힘 */}};
  async function onMessage(e){
   if(e.origin!==location.origin||!e.data||e.data.source!=='treadmill3d')return;const m=e.data;
   if(m.type==='close')return close();
+  if(m.type==='green')return musicStart();
+  if(m.type==='race-end'||m.type==='error')return musicStop(m.type==='error');
   if(m.type==='result'&&current&&current.mode==='new'&&m.seed===current.seed&&!current.saved){
    current.saved=true;
    const race={id:crypto.randomUUID(),seed:m.seed,version:VERSION,source:current.source,...(current.source==='pinball'?{pinballDrawId:current.pinballDrawId}:{}),participants:current.participants,items:m.kinds,slots:m.slots,order:m.order,restarts:m.restarts,seconds:m.seconds,timedOut:!m.finished};
@@ -68,11 +88,12 @@
  async function start(){
   if(typeof ensureAdmin==='function'&&!ensureAdmin())return;
   const list=chosen();if(!list||list.length<MIN||list.length>MAX)return;
+  audioPrepare();
   const seed=Array.from(crypto.getRandomValues(new Uint8Array(4)),x=>x.toString(16).padStart(2,'0')).join('');
   const s=source();current={mode:'new',seed,source:s,pinballDrawId:s==='pinball'?pickedDraw().id:undefined,participants:list.map(m=>({memberId:m.memberId,nickname:m.nickname}))};
   open({seed,version:VERSION,hold:true,racers:list.map(m=>({id:m.memberId,name:m.nickname}))});
  }
- function replay(d){current={mode:'replay'};open({seed:d.seed,version:d.version,expect:d.order,racers:d.participants.map(p=>({id:p.memberId,name:p.nickname}))});}
+ function replay(d){audioPrepare();current={mode:'replay'};open({seed:d.seed,version:d.version,expect:d.order,racers:d.participants.map(p=>({id:p.memberId,name:p.nickname}))});}
  async function loadRecords(){try{records=await api('/api/treadmill');}catch(e){records={revision:0,races:[],error:e.message};}renderRecords();}
  async function loadPinball(){try{const r=await api('/api/pinball');pinball=(r.draws||[]).filter(d=>!d.game);}catch{pinball=[];}renderDraws();summary();}
  function renderRecords(){
@@ -103,6 +124,7 @@
    +'<div class="pb-source" role="radiogroup" aria-label="참가자 고르는 방법"><label><input type="radio" name="trSource" value="manual" checked> 직접 선택</label><label><input type="radio" name="trSource" value="pinball"> 핀볼 기록에서 가져오기</label></div>'
    +'<div id="trManual"><div class="field"><label for="trSearch">이름 검색</label><input id="trSearch" placeholder="닉네임"></div><div class="actions"><button type="button" class="smallbtn" id="trSelNone">모두 해제</button></div><div class="pb-manual-list" id="trManualList"></div></div>'
    +'<div id="trPinball" hidden><div class="formgrid"><div class="field"><label for="trDraw">핀볼 추첨 기록</label><select id="trDraw"></select></div><div class="field"><label for="trCount">1등부터 몇 명 (2~15)</label><input id="trCount" type="number" min="'+MIN+'" max="'+MAX+'" value="10" inputmode="numeric"></div></div><p class="sub" id="trPreview"></p></div>'
+   +'<div class="field pb-check"><label><input id="trSound" type="checkbox" checked> 소리 켜기 (경기 음악)</label></div>'
    +'<p class="sub" id="trSummary" role="status"></p><div class="actions"><button type="button" class="btn primary" id="trStart">경기 시작</button></div></div>'
    +'<div class="card"><h2>경기 기록</h2><div id="trRecords"><p class="sub">기록을 불러오는 중입니다.</p></div></div>';
   page.append(sw,pb,tr);pages.pinball=pb;pages.treadmill=tr;shows.treadmill=()=>{renderManual();loadPinball();summary();};
@@ -112,7 +134,7 @@
   tr.querySelectorAll('input,select').forEach(el=>{el.addEventListener('input',summary);el.addEventListener('change',summary);});
   $('trSearch').addEventListener('input',renderManual);
   $('trSelNone').onclick=()=>{manual=new Set();renderManual();summary();};
-  $('trStart').onclick=start;$('trClose').onclick=close;
+  $('trStart').onclick=start;$('trClose').onclick=close;$('trSound').addEventListener('change',()=>{if(!soundOn())musicStop(true);});
   root.addEventListener('message',onMessage);
   loadRecords();summary();
   if(typeof refreshCarriageVip==='function'&&!view())refreshCarriageVip().then(()=>{renderManual();summary();},summary);
