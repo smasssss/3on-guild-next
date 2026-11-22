@@ -64,6 +64,13 @@ async function raceStage(){
   const desc={...R.desc,entries:R.desc.entries.map(e=>({...e,wheels:Array.from({length:e.wheels},()=>0)}))};
   view=await createView($('stage'),desc,names,{machine:RACE_V1,highlight:-1,low:q.has('low')});addEventListener('resize',()=>view.resize());$('wait').hidden=true;}
  const total=R.frames.length/R.stride,restarts=R.events.filter(e=>e.type==='restart').map(e=>e.frame),ents=R.desc.entries;
+ // 출발 신호(2026-11-23 사용자 결정): 화면이 다 뜬 뒤 약 3초 동안 빨간불을 하나씩 켜고, 파란불로 바뀌면 출발합니다.
+ // 그동안 첫 장면을 계속 그려 두어, 느린 기기에서도 '이미 돌아가는 중'으로 시작하지 않게 합니다.
+ const L=$('lights'),lamps=[...L.children];L.className='';lamps.forEach(x=>x.className='');
+ if(!fast){L.hidden=false;const hold=performance.now();
+  await new Promise(res=>{const tick=()=>{const s=(performance.now()-hold)/1000;view.update(R.frames.subarray(0,R.stride),R.beltPos[0]);lamps.forEach((x,i)=>x.classList.toggle('red',s>=0.6+i*0.8));$('status').hidden=false;$('status').textContent='준비…';
+    if(s>=3.0)res();else requestAnimationFrame(tick);};tick();});
+  L.className='go';setTimeout(()=>{L.hidden=true;},900);}
  $('status').hidden=false;const speed=fast?6:1,t0=performance.now();
  await new Promise(res=>{const loop=()=>{const f=Math.min(total-1,Math.floor((performance.now()-t0)/1000*60*speed));
    view.update(R.frames.subarray(f*R.stride,(f+1)*R.stride),R.beltPos[f]);
