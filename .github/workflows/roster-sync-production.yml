@@ -37,6 +37,7 @@ name: Promote roster sync to Production after a fresh Staging verification (user
 # Release 35 (user-approved 2026-11-20 "국가원정 탭 Production 배포 승인"): 국가원정 tab (server 295 alliance power loss and kills from lastasylum.gg public pages, Saturday 22:00 / Sunday 01-12 KST only; contribution statistics; Korean/English/Russian/Spanish), recorded as its own document kind 'kvk'; its regression test joins the checks below.
 # Release 36 (user-approved 2026-11-22 "국가원정 화면 Production 배포 승인"): 국가원정 tables fit one phone screen (tag kept, name cut with an ellipsis, key numbers shown and the rest on tap, source links); the phone menu fits one row.
 # Release 37 (user-approved 2026-11-23 "프로덕션 올려서 배포하자"): 런닝머신 레이스 as a second game in the 추첨 게임 tab (the renamed 핀볼 추첨 tab): items by slot (slot machine), slot owners by a one-ramp pinball, a 3D treadmill race (same seed = same race), racers picked by hand or from a saved pinball draw (finish order 1..N, 2-15 racers), records in their own kind 'treadmill3d' (admin-only save with backup, anyone reads and replays).
+# Release 38 (user-approved 2026-11-23 "바람으로 섞는 통, 로또 추첨기, 출발 신호등 함께 프로덕션에 올려서 배포해"): 로또 추첨기 in the 추첨 게임 tab (number balls blown in a glass drum and drawn one by one; range of 2-60 balls and the count typed each time; drawn order recorded in its own kind 'lotto'); 런닝머신 레이스 version 2 mixes the slot-owner balls with air before they drop (version 1 records replay as version 1); start lights (3 seconds of red lamps, then go) before the treadmill starts.
 on:
   push:
     branches: [claude/new-session-narazy]
@@ -75,6 +76,7 @@ jobs:
           npx --no-install eslint lib/growth-roster.ts lib/growth.ts lib/growth-automation.ts app/api/growth/legacy/route.ts tests/growth_roster_regression.cjs tests/roster_restored_check.cjs tests/roster_sync_regression.cjs public/growth-auto.js
           npx --no-install eslint lib/kvk.ts app/api/kvk/route.ts public/kvk.js tests/kvk_regression.cjs lib/pinball.ts app/api/pinball/route.ts public/pinball.js public/arena.js public/treadmill.js tests/pinball_regression.cjs tests/arena_regression.cjs tests/treadmill_regression.cjs
           npx --no-install eslint lib/treadmill.ts app/api/treadmill/route.ts public/treadmill-race.js tests/treadmill_race_regression.cjs tests/treadmill_race_engine.mjs
+          npx --no-install eslint lib/lotto.ts app/api/lotto/route.ts public/lotto-draw.js tests/lotto_regression.cjs tests/lotto_engine.mjs
           npx --no-install tsc --noEmit
           python tests/vip_release_guards.py
           python tests/weekly_release_guards.py
@@ -99,6 +101,8 @@ jobs:
           node tests/kvk_regression.cjs
           node tests/treadmill_race_regression.cjs
           node tests/treadmill_race_engine.mjs
+          node tests/lotto_regression.cjs
+          node tests/lotto_engine.mjs
           node tests/arena_regression.cjs
           node tests/treadmill_regression.cjs
           node tests/vip_sunday_regression.cjs
