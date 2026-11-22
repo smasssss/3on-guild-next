@@ -1,12 +1,12 @@
 <!doctype html><meta charset="utf-8"><body style="margin:0;background:transparent">
-<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/","@dimforge/rapier3d-deterministic-compat":"./node_modules/@dimforge/rapier3d-deterministic-compat/dist/rapier.mjs"}}</script>
+<script type="importmap">{"imports":{"three":"../../public/treadmill3d/vendor/three/three.module.js","three/addons/":"../../public/treadmill3d/vendor/three/addons/"}}</script>
 <script type="module">
 import * as THREE from 'three';
-import {loadAssets,materials,makeObject,makeWheel} from './render.mjs';
-import {KINDS,POOL,RACE_V1} from './sim.mjs';
+import {loadAssets,materials,makeObject,makeWheel} from '../../public/treadmill3d/render.mjs';
+import {KINDS,POOL,RACE_V1} from '../../public/treadmill3d/sim.mjs';
 const S=384,r=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});r.setSize(S,S);r.setPixelRatio(1);r.outputColorSpace=THREE.SRGBColorSpace;r.toneMapping=THREE.ACESFilmicToneMapping;r.setClearColor(0,0);
 document.body.appendChild(r.domElement);
-const M=materials(),A=await loadAssets('assets/');const dollTex=await new THREE.TextureLoader().loadAsync('assets/doll.png');dollTex.colorSpace=THREE.SRGBColorSpace;
+const M=materials(),A=await loadAssets("../../public/treadmill3d/assets/");const dollTex=await new THREE.TextureLoader().loadAsync("../../public/treadmill3d/assets/doll.png");dollTex.colorSpace=THREE.SRGBColorSpace;
 const pm=new THREE.PMREMGenerator(r);A.env.mapping=THREE.EquirectangularReflectionMapping;const env=pm.fromEquirectangular(A.env).texture;
 M.watermelon.map=A.melon;M.watermelon.clearcoat=0.45;M.watermelon.roughness=0.5;M.tissue.map=A.tissue;M.tissue.bumpMap=A.tissueBump;M.tissue.bumpScale=1.6;
 const out={};

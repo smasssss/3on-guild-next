@@ -1,9 +1,0 @@
-{
-  "name": "treadmill3d-prototype",
-  "private": true,
-  "description": "런닝머신 레이스 3D 시험판 (사이트에 배포되지 않는 작업용 폴더)",
-  "dependencies": {
-    "@dimforge/rapier3d-deterministic-compat": "0.21.0",
-    "three": "0.187.0"
-  }
-}

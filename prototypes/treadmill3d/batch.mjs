@@ -1,6 +1,6 @@
 // node batch.mjs '<json overrides>' races n cap  → 한 줄 요약(길이, 끝남 여부, 드라마 지표)
-import RAPIER from '@dimforge/rapier3d-deterministic-compat';
-import {createRace,pickKinds,MACHINE,HZ} from './sim.mjs';
+import RAPIER from '../../public/treadmill3d/vendor/rapier.mjs';
+import {createRace,pickKinds,MACHINE,HZ} from '../../public/treadmill3d/sim.mjs';
 await RAPIER.init();
 const over=Object.fromEntries((process.argv[2]||'').split(',').filter(Boolean).map(kv=>{const [k,v]=kv.split('=');return [k,v==='null'?null:Number(v)];})),count=Number(process.argv[3]??12),n=Number(process.argv[4]??15),cap=Number(process.argv[5]??90);
 const m={...MACHINE,...over};

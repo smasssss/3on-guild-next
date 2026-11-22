@@ -10,8 +10,8 @@ export async function loadAssets(base){
  const gl=new GLTFLoader(),tl=new THREE.TextureLoader(),A={};
  const model=async n=>(await gl.loadAsync(`${base}models/${n}/${n}.gltf`)).scene;
  const tex=async(p,srgb,rx=1,ry=1)=>{const x=await tl.loadAsync(base+p);x.wrapS=x.wrapT=THREE.RepeatWrapping;x.repeat.set(rx,ry);x.anisotropy=8;if(srgb)x.colorSpace=THREE.SRGBColorSpace;return x;};
- [A.baseball,A.lime,A.tape,A.orangeMap,A.rubberN,A.rubberR,A.woodMap,A.woodN,A.woodR,A.terryN,A.env]=await Promise.all([
-  model('baseball_01'),model('food_lime_01'),model('medical_tape'),tex('models/food_lime_01/textures/orange_diff.jpg',true),
+ [A.baseball,A.lime,A.orangeMap,A.rubberN,A.rubberR,A.woodMap,A.woodN,A.woodR,A.terryN,A.env]=await Promise.all([
+  model('baseball_01'),model('food_lime_01'),tex('models/food_lime_01/textures/orange_diff.jpg',true),
   tex('tex/rubberized_track/nor_gl.jpg',false,10,22),tex('tex/rubberized_track/Rough.jpg',false,10,22),
   tex('tex/wood_table_001/Diffuse.jpg',true,2,2),tex('tex/wood_table_001/nor_gl.jpg',false,2,2),tex('tex/wood_table_001/Rough.jpg',false,2,2),
   tex('tex/terry_cloth/nor_gl.jpg',false,2,2),new EXRLoader().loadAsync(base+'hdri/lobby.exr')]);
@@ -133,7 +133,16 @@ export function makeObject(kind,M,dollTex,variant,A){
   const metal=new THREE.MeshStandardMaterial({color:0xd9dbde,metalness:1,roughness:0.26,bumpMap:rings,bumpScale:1.2});
   for(const sgn of [-1,1]){const lid=new THREE.Mesh(new THREE.CylinderGeometry(k.r*0.97,k.r*0.97,k.h*0.05,72),[M.canMetal,metal,metal]);lid.position.y=sgn*k.h*0.455;mesh.add(lid);
    const rim=new THREE.Mesh(new THREE.TorusGeometry(k.r*0.985,k.h*0.035,12,72),M.canMetal);rim.rotation.x=Math.PI/2;rim.position.y=sgn*k.h*0.455;mesh.add(rim);}}
- else if(A&&kind==='tape')mesh=fit(A.tape,2*k.r,k.h,2*k.r);
+ else if(kind==='tape'){ // 한국에서 흔히 쓰는 누런(황색) 박스테이프: 반투명 누런 테이프가 겹겹이 감긴 옆면 + 두꺼운 종이 심
+  mesh=new THREE.Group();
+  const film=new THREE.MeshPhysicalMaterial({color:0xa87424,roughness:0.16,clearcoat:1,clearcoatRoughness:0.08,sheen:0.3,sheenColor:new THREE.Color(0xffe2a0)});
+  const outer=new THREE.Mesh(new THREE.CylinderGeometry(k.r,k.r,k.h,72,1,true),film);mesh.add(outer);
+  const rings=canvasTex(512,512,(g,w,h)=>{g.fillStyle='#a8772a';g.fillRect(0,0,w,h);const R=w/2,ri=R*k.ri/k.r;for(let r=ri;r<R;r+=1.6){g.strokeStyle=`rgba(${70+Math.random()*60|0},${45+Math.random()*30|0},10,${0.25+Math.random()*0.3})`;g.lineWidth=0.8;g.beginPath();g.arc(R,R,r,0,7);g.stroke();}});
+  const sideMat=new THREE.MeshPhysicalMaterial({map:rings,roughness:0.35,clearcoat:0.5,side:THREE.DoubleSide});
+  const board=new THREE.MeshStandardMaterial({color:0x9b7a55,roughness:0.95,side:THREE.DoubleSide}),coreR=k.ri,coreIn=k.ri-0.004;
+  for(const sgn of [-1,1]){const side=new THREE.Mesh(new THREE.RingGeometry(coreR,k.r,72),sideMat);side.rotation.x=-sgn*Math.PI/2;side.position.y=sgn*k.h/2;mesh.add(side);
+   const lip=new THREE.Mesh(new THREE.RingGeometry(coreIn,coreR,72),board);lip.rotation.x=-sgn*Math.PI/2;lip.position.y=sgn*k.h/2;mesh.add(lip);}
+  mesh.add(new THREE.Mesh(new THREE.CylinderGeometry(coreIn,coreIn,k.h,72,1,true),board));}
  else if(k.shape==='ball'){mesh=new THREE.Mesh(new THREE.SphereGeometry(k.r,48,32),M[kind]);mesh.scale.set(1,k.ax,1);}
  else if(kind==='can'){mesh=new THREE.Group();mesh.add(new THREE.Mesh(new THREE.CylinderGeometry(k.r,k.r,k.h*0.86,48,1,true),M.canSide));for(const s of [-1,1]){const lid=new THREE.Mesh(new THREE.CylinderGeometry(k.r*1.01,k.r*1.01,k.h*0.07,48),M.canMetal);lid.position.y=s*k.h*0.465;mesh.add(lid);}}
  else if(k.shape==='cyl'){mesh=new THREE.Group();const prof=[[k.ri,-k.h/2],[k.r,-k.h/2],[k.r,k.h/2],[k.ri,k.h/2],[k.ri,-k.h/2]].map(([x,y])=>new THREE.Vector2(x,y));

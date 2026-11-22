@@ -1,6 +1,6 @@
 // node scan.mjs 'k=v,..' from to cap → 판마다 한 줄: 씨앗, 길이, 다시시작, 초반 탈락, 되살아남, 마지막 3명 접전 시간, 떨어진 시각
-import RAPIER from '@dimforge/rapier3d-deterministic-compat';
-import {createRace,pickKinds,MACHINE,HZ} from './sim.mjs';
+import RAPIER from '../../public/treadmill3d/vendor/rapier.mjs';
+import {createRace,pickKinds,MACHINE,HZ} from '../../public/treadmill3d/sim.mjs';
 await RAPIER.init();
 const over=Object.fromEntries((process.argv[2]||'').split(',').filter(Boolean).map(kv=>{const [k,v]=kv.split('=');return [k,v==='null'?null:Number(v)];}));
 const a=Number(process.argv[3]),b=Number(process.argv[4]),cap=Number(process.argv[5]||70),m={...MACHINE,...over};

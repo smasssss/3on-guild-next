@@ -1,6 +1,6 @@
 // 초반(6초 안) 탈락의 원인 분류: 떨어지기 0.3초 전 상태(벨트와 같은 속도로 실려 감? 방향 틀어짐? 뒤집힘?)
-import RAPIER from '@dimforge/rapier3d-deterministic-compat';
-import {createRace,pickKinds,MACHINE,KINDS,HZ} from './sim.mjs';
+import RAPIER from '../../public/treadmill3d/vendor/rapier.mjs';
+import {createRace,pickKinds,MACHINE,KINDS,HZ} from '../../public/treadmill3d/sim.mjs';
 await RAPIER.init();
 const over=Object.fromEntries((process.argv[2]||'').split(',').filter(Boolean).map(kv=>{const [k,v]=kv.split('=');return [k,Number(v)];})),m={...MACHINE,...over};
 const tally={},N=Number(process.argv[3]||10);let total=0;

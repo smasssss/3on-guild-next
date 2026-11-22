@@ -1,6 +1,6 @@
 // 턱 없는 벨트에 승용차 1대: 바퀴가 실제로 도는지(바퀴 회전속도 × 반지름 = 벨트 속도여야 함)
-import RAPIER from '@dimforge/rapier3d-deterministic-compat';
-import {createRace,MACHINE,HZ} from './sim.mjs';
+import RAPIER from '../../public/treadmill3d/vendor/rapier.mjs';
+import {createRace,MACHINE,HZ} from '../../public/treadmill3d/sim.mjs';
 await RAPIER.init();
 const over=Object.fromEntries((process.argv[2]||'').split(',').filter(Boolean).map(kv=>{const [k,v]=kv.split('=');return [k,Number(v)];})),m={...MACHINE,...over,stuckSeconds:999};
 const g=createRace(RAPIER,['sedan'],'0000a001',m),e=g.entries[0],wr=m.wheelR;

@@ -40,7 +40,6 @@ async function dropStage(){
  const {frames,stride,walls,events}=dropData,total=frames.length/stride;
  const draw=f=>{g.clearRect(0,0,W,H);g.fillStyle='#596273';
   for(const w of walls){g.save();g.translate(X(w.cx),Y(w.cy));if(w.bar)g.rotate(-Math.atan2(w.sin,w.cos));else if(w.rot)g.rotate(-w.rot);g.fillRect(-w.hx*sc,-w.hy*sc,w.hx*2*sc,w.hy*2*sc);g.restore();}
-  g.fillStyle='#ffc400';g.font='bold 12px system-ui';g.textAlign='left';g.fillText('구멍 ↓',X(-d.w/2)+4,Y(d.barLowY)-18);
   const o=f*stride,r=d.ballR*sc;g.textAlign='center';
   for(let i=0;i<n;i++){const x=X(frames[o+i*4]),y=Y(frames[o+i*4+1]);if(y>H+r)continue;g.beginPath();g.arc(x,y,r,0,7);g.fillStyle=hueOf(i);g.fill();g.lineWidth=1.5;g.strokeStyle='#0008';g.stroke();}
   g.font=`bold ${Math.max(10,Math.min(13,r*0.95))}px system-ui`;g.lineWidth=3;g.strokeStyle='#000c';g.fillStyle='#fff';
@@ -87,6 +86,10 @@ try{
  // 결과(탈락 순서)를 먼저 바깥 화면에 알립니다: 기록 저장은 바깥 화면이 합니다
  const res={type:'result',seed,kinds,slots:dropData.order.map(i=>racers[i].id),order:raceData.order.map(slot=>racers[dropData.order[slot]].id),restarts:raceData.restarts,seconds:Math.round(raceData.secs*10)/10,finished:raceData.finished};
  window.__result=res;toParent(res);
+ // 새 경기는 바깥 화면이 기록을 저장한 뒤에만 경기를 보여 줍니다(저장 실패면 시작하지 않음)
+ if(input.hold){$('wait').hidden=false;$('waitText').textContent='기록 저장 중…';
+  const ok=await new Promise(r=>{const h=e=>{if(e.origin!==location.origin||!e.data||e.data.source!=='treadmill-race')return;if(e.data.type==='go'||e.data.type==='abort'){removeEventListener('message',h);r(e.data.type==='go');}};addEventListener('message',h);});
+  $('wait').hidden=true;if(!ok)throw new Error('기록을 저장하지 못해 경기를 시작하지 않았습니다.');}
  if(input.expect&&JSON.stringify(input.expect)!==JSON.stringify(res.order)){$('banner').hidden=false;$('banner').textContent='이 기기의 계산이 기록과 다릅니다';await wait(2500);$('banner').hidden=true;}
  await raceStage();resultStage();window.__done=true;toParent({type:'finished'});
 }catch(err){console.error(err.stack||err);$('wait').hidden=false;document.querySelector('.spin').style.display='none';$('waitText').textContent='문제가 생겼습니다: '+(err.message||err);toParent({type:'error',message:String(err.message||err)});}

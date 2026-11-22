@@ -1,6 +1,6 @@
 // node verify.mjs <seed> <인원> → 화면 없이 같은 판을 계산해 결과(자리 주인, 탈락 순서)를 냅니다. 화면에서 나온 결과와 같아야 합니다.
-import RAPIER from './vendor/rapier.mjs';
-import {createRace,createDrop,pickKinds,RACE_V1,MAX_RACE_SECONDS} from './sim.mjs';
+import RAPIER from '../../public/treadmill3d/vendor/rapier.mjs';
+import {createRace,createDrop,pickKinds,RACE_V1,MAX_RACE_SECONDS} from '../../public/treadmill3d/sim.mjs';
 await RAPIER.init();
 export function play(seed,n){const d=createDrop(RAPIER,n,seed);while(!d.finished())d.step();const owner=d.order.slice();d.world.free();
  const kinds=pickKinds(seed,n,RACE_V1.carW),g=createRace(RAPIER,kinds,seed,RACE_V1);while(!g.finished()&&g.t<MAX_RACE_SECONDS)g.step();

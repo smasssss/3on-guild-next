@@ -32,7 +32,7 @@ python3 -m http.server 8777 --bind 127.0.0.1
 
 ## 자료 출처
 
-- `assets/models/`, `assets/tex/`: Poly Haven (CC0, 저작권 없음) — baseball_01, food_lime_01(색을 주황으로 바꿈), medical_tape, rubberized_track, wood_table_001, terry_cloth
+- `assets/models/`, `assets/tex/`: Poly Haven (CC0, 저작권 없음) — baseball_01, food_lime_01(색을 주황으로 바꿈), rubberized_track, wood_table_001, terry_cloth
 - `assets/hdri/lobby.exr`: @pmndrs/assets (CC0)
 - `assets/gpt/`: 코덱스 내장 그림 생성으로 만든 그림(참치캔 상표, 수박 껍질, 휴지 무늬, 인형 뒷모습)
 - `assets/doll.png`: 사용자가 보내 준 핵불잙 캐릭터 인형 그림

@@ -321,3 +321,20 @@ html.ops-wait body{visibility:hidden}
 @media(max-width:520px){#kvk .kvk-fit th,#kvk .kvk-fit td{padding:7px 3px;font-size:13px}#kvk .kvk-fit .c-rank{width:1.8em}#kvk .kvk-n4 .c-num{width:4.4em}#kvk .kvk-n2 .c-num{width:5.4em}#kvk .kvk-n1 .c-num{width:7em}}
 /* 휴대폰 아래 메뉴를 한 줄로 (2026-11-22): 칸 수를 보이는 메뉴 수에 맞추고 간격을 좁힘 */
 @media(max-width:999px){.tabs{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);padding-left:2px;padding-right:2px}.tabs button{min-width:0;padding:6px 0;font-size:10.5px;letter-spacing:-.03em;gap:3px}.tabs button::before{width:20px;height:20px}}
+
+/* 추첨 게임 탭(2026-11-22): 핀볼 추첨 / 런닝머신 레이스 고르기, 런닝머신 경기 화면(treadmill-race.js) */
+.tr-switch{display:flex;gap:8px;margin:0 0 12px}
+.tr-switch button{flex:1 1 0;min-height:46px;padding:8px 10px;border:1px solid var(--line);border-radius:14px;background:var(--well);color:var(--text);font:inherit;font-size:16px;cursor:pointer}
+.tr-switch button.on{background:#d6578a;border-color:#d6578a;color:#fff;font-weight:700}
+#trPage .pb-person input:disabled+b{opacity:.45}
+.tr-rank{list-style:none;margin:8px 0 0;padding:0;counter-reset:tr}
+.tr-rank li{counter-increment:tr;display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--hair)}
+.tr-rank li::before{content:counter(tr) "등";min-width:2.6em;font-weight:700;color:var(--muted)}
+.tr-rank li:first-child::before{color:#d6578a}
+.tr-rank li img{width:30px;height:30px;object-fit:contain;flex:0 0 auto}
+.tr-rank li span{margin-left:auto;color:var(--muted);font-size:13px;white-space:nowrap}
+#trOverlay{position:fixed;inset:0;z-index:1000;background:#15171b}
+#trOverlay[hidden]{display:none}
+#trFrame{position:absolute;inset:0;width:100%;height:100%;border:0}
+#trClose{position:absolute;top:calc(8px + env(safe-area-inset-top));right:10px;z-index:1;min-height:40px;padding:6px 14px;border-radius:999px;border:1px solid #ffffff55;background:#000a;color:#fff;font:inherit;font-size:14px;cursor:pointer}
+html.tr-open,html.tr-open body{overflow:hidden}
