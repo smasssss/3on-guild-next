@@ -35,6 +35,7 @@ name: Promote roster sync to Production after a fresh Staging verification (user
 # Release 34 rerun 1: the first run stopped on Staging (nothing changed in Production) because the carriage-vip.js address carried ?v=2; the address is back to the plain form the build check expects.
 # Release 34 rerun 2: rerun 1 deployed but the Production check refused it and rolled back, because before 11:00 KST the new rule switched the week in force during the deploy (the check requires the week in force to stay the same). After 11:00 KST both rules use the same week, so the check is unchanged and this runs at 11:05 KST.
 # Release 35 (user-approved 2026-11-20 "국가원정 탭 Production 배포 승인"): 국가원정 tab (server 295 alliance power loss and kills from lastasylum.gg public pages, Saturday 22:00 / Sunday 01-12 KST only; contribution statistics; Korean/English/Russian/Spanish), recorded as its own document kind 'kvk'; its regression test joins the checks below.
+# Release 36 (user-approved 2026-11-22 "국가원정 화면 Production 배포 승인"): 국가원정 tables fit one phone screen (tag kept, name cut with an ellipsis, key numbers shown and the rest on tap, source links); the phone menu fits one row.
 on:
   push:
     branches: [claude/new-session-narazy]
