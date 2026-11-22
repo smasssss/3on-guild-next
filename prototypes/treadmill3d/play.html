@@ -1,0 +1,14 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>런닝머신 레이스</title>
+<link rel="stylesheet" href="play.css">
+<script type="importmap">{"imports":{"three":"./vendor/three/three.module.js","three/addons/":"./vendor/three/addons/"}}</script>
+</head><body>
+<div id="stage"></div>
+<header id="top"><b id="title">런닝머신 레이스</b><span id="sub"></span></header>
+<section id="slot" class="panel" hidden><div id="slotGrid"></div></section>
+<section id="drop" class="panel" hidden><canvas id="dropCanvas"></canvas><ol id="dropList"></ol></section>
+<div id="banner" hidden></div>
+<div id="status" hidden></div>
+<section id="result" class="panel" hidden><h2>결과</h2><ol id="resultList"></ol><div class="btns"><button id="again">다시 보기</button><button id="close">닫기</button></div></section>
+<div id="wait" hidden><div class="spin"></div><span id="waitText">준비 중…</span></div>
+<script type="module" src="play.mjs"></script>
+</body></html>

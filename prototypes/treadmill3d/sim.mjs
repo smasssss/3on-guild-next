@@ -27,6 +27,15 @@ export const KINDS = {
 };
 export const POOL = ['orange','baseball','watermelon','can','tissue','tape','sedan','racer','kei','doll'];
 
+// 어느 기기에서 다시 계산해도 결과가 같도록, 삼각함수·지수함수는 사칙연산만으로 계산합니다(제곱근은 모든 기기에서 같은 값).
+const TAU=6.283185307179586,HALF_PI=1.5707963267948966;
+export function dsin(x){x-=TAU*Math.round(x/TAU);if(x>HALF_PI)x=Math.PI-x;else if(x<-HALF_PI)x=-Math.PI-x;const y=x*x;
+ return x*(1+y*(-1/6+y*(1/120+y*(-1/5040+y*(1/362880+y*(-1/39916800+y*(1/6227020800+y*(-1/1307674368000))))))));}
+export function dcos(x){return dsin(x+HALF_PI);}
+export function dtan(x){return dsin(x)/dcos(x);}
+export function dexp(x){if(x>0)return 1/dexp(-x);if(x<-700)return 0;let k=0;while(x<-0.5){x/=2;k++;}
+ let r=1+x*(1+x*(1/2+x*(1/6+x*(1/24+x*(1/120+x*(1/720+x*(1/5040+x*(1/40320+x*(1/362880+x/3628800)))))))));for(;k>0;k--)r*=r;return r;}
+const len3=(x,y,z)=>Math.sqrt(x*x+y*y+z*z);
 export function rng(seedHex){let a=parseInt(seedHex,16)>>>0;return ()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
 // 슬롯머신: 1번 자리부터 차례로 물건을 정합니다. 인형은 한 판에 최대 1개.
 export function pickKinds(seedHex,n,carW=1){const r=rng(seedHex),out=[];let doll=false;
@@ -46,13 +55,13 @@ export function seamLayout(m,loop=2*m.len+0.2){
  // 반대쪽 끝으로 갈수록 낮아져 벨트 속으로 사라짐. 물건을 사선으로 쳐 내고, 낮은 쪽에서는 그냥 넘어감. 번갈아 좌·우에서 나옴
  // 물결 턱(wave): 벨트를 이어 붙인 자리. 폭 전체를 살짝 비스듬히 가로지르고, 높이가 자리마다 다름(높은 봉우리 몇 곳 + 낮은 곳).
  // 한 바퀴에 crossCount 번 지나가므로 일정한 박자로 '턱이 온다'. 봉우리 위치는 턱마다 달라 안전한 줄이 없음
- if(m.wave&&m.seamCross>0){const t=Math.tan(m.crossAngleDeg*Math.PI/180),W=m.width/2-0.012,lo=m.waveLow??1;
+ if(m.wave&&m.seamCross>0){const t=dtan(m.crossAngleDeg*Math.PI/180),W=m.width/2-0.012,lo=m.waveLow??1;
   // wave=2: 대부분 낮고(L), 턱마다 높은 봉우리 1곳(1)과 중간 혹 1곳(M). 봉우리에 맞으면 크게 밀려남
   const L=m.waveBase??0.12,M=m.waveMid??0.6;
   const P=m.wave===2?[[L,L,1,L,L,L,M,L,L],[L,M,L,L,L,1,L,L,L],[L,L,L,M,L,L,L,1,L],[1,L,L,L,M,L,L,L,L]]:[[0.3,1,0.3,0.2,0.45,1,0.35],[1,0.35,0.25,1,0.3,0.2,0.5],[0.25,0.4,1,0.3,0.25,0.35,1],[0.5,0.2,0.3,0.4,1,0.3,0.25]];
   for(let c=0;c<m.crossCount;c++){const zc=m.seamZ0!=null?m.seamZ0+c*m.seamGap:(c+(m.seamPhase??0.6))*loop/m.crossCount,sg=c%2?-1:1,pr=P[c%P.length],n=pr.length-1,hh=f=>m.seamCross*(f>=1?1:f*lo);
    for(let i=0;i<n;i++){const xa=-W+2*W*i/n,xb=-W+2*W*(i+1)/n;out.push({x1:xa,z1:zc+sg*t*xa,x2:xb,z2:zc+sg*t*xb,h:hh(pr[i]),h2:hh(pr[i+1]),r:m.seamCrossR,kind:'cross'});}}}
- else if(m.seamCross>0){const t=Math.tan(m.crossAngleDeg*Math.PI/180),W=m.width/2-0.012;
+ else if(m.seamCross>0){const t=dtan(m.crossAngleDeg*Math.PI/180),W=m.width/2-0.012;
   // 종류를 번갈아: 왼쪽 난간에서 시작(가운데로 밀어냄) → 가운데 꺾쇠(양옆으로 밀어냄) → 오른쪽 난간에서 시작 → 가운데 꺾쇠. 안전한 줄이 없게 함
   const bar=(xl,xt,zc)=>{const dzh=t*Math.abs(xl-xt)/2;out.push({x1:xl,z1:zc+dzh,x2:xt,z2:zc-dzh,h:m.seamCross,h2:-0.004,r:m.seamCrossR,kind:'cross'});};
   for(let c=0;c<m.crossCount;c++){const zc=(c+0.6)*loop/m.crossCount,type=c%4;
@@ -62,7 +71,7 @@ export function seamLayout(m,loop=2*m.len+0.2){
 }
 export function createRace(RAPIER,kinds,seedHex,machine=MACHINE){
  const m=machine,rand=rng(seedHex),tilt=(m.tiltFarDeg!=null?0:m.tiltDeg)*Math.PI/180;
- const world=new RAPIER.World({x:0,y:-9.81*Math.cos(tilt),z:-9.81*Math.sin(tilt)});world.timestep=DT;if(m.iters)world.numSolverIterations=m.iters;world.lengthUnit=m.lengthUnit??0.05;
+ const world=new RAPIER.World({x:0,y:-9.81*dcos(tilt),z:-9.81*dsin(tilt)});world.timestep=DT;if(m.iters)world.numSolverIterations=m.iters;world.lengthUnit=m.lengthUnit??0.05;
  const fixed=world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
  // 본체 덮개: 고정된 둥근 플라스틱 덮개. 벨트는 그 아래로 들어감. 벨트가 돌리는 물건이 닿으면 마찰로 덮개를 타고 오르려 함(엔진이 계산)
  world.createCollider(RAPIER.ColliderDesc.cylinder(m.width/2+0.05,m.hoodR).setRotation({x:0,y:0,z:Math.SQRT1_2,w:Math.SQRT1_2}).setTranslation(0,0,-m.hoodR).setFriction(0.5).setRestitution(m.hoodRest),fixed);
@@ -75,10 +84,10 @@ export function createRace(RAPIER,kinds,seedHex,machine=MACHINE){
  // 벨트 한 바퀴 무늬를 두 벌 이어서 돌림(한 벌이 끝을 지나면 앞으로 돌아옴)
  const loop=2*m.len+0.2,seams=seamLayout(m,loop),pattern=[];
  // y축 원통을 두 점 사이에 놓는 회전
- const quatTo=(dx,dy,dz)=>{const L=Math.hypot(dx,dy,dz),ux=dx/L,uy=dy/L,uz=dz/L,ax=uz,az=-ux,sl=Math.hypot(ax,az);if(sl<1e-9)return {x:0,y:0,z:0,w:1};
-  const ang=Math.acos(Math.max(-1,Math.min(1,uy))),sn=Math.sin(ang/2)/sl;return {x:ax*sn,y:0,z:az*sn,w:Math.cos(ang/2)};};
+ const quatTo=(dx,dy,dz)=>{const L=len3(dx,dy,dz),ux=dx/L,uy=dy/L,uz=dz/L,w=1+uy;if(w<1e-9)return {x:1,y:0,z:0,w:0};
+  const n=len3(uz,-ux,w);return {x:uz/n,y:0,z:-ux/n,w:w/n};};
  if(seams.length)for(let c=0;c<2;c++){const b=world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0,0,-c*loop));
-  for(const g of seams){const y1=g.h-g.r,y2=(g.h2??g.h)-g.r,dx=g.x2-g.x1,dy=y2-y1,dz=g.z2-g.z1,L=Math.hypot(dx,dy,dz);
+  for(const g of seams){const y1=g.h-g.r,y2=(g.h2??g.h)-g.r,dx=g.x2-g.x1,dy=y2-y1,dz=g.z2-g.z1,L=len3(dx,dy,dz);
    world.createCollider(RAPIER.ColliderDesc.cylinder(L/2,g.r).setTranslation((g.x1+g.x2)/2,(y1+y2)/2,(g.z1+g.z2)/2).setRotation(quatTo(dx,dy,dz)).setFriction(g.kind==='cross'?0.4:1.0).setRestitution(g.kind==='cross'?0.4:m.beltRest),b);}
   pattern.push(b);}
  const entries=kinds.map((kind,i)=>({i,kind,body:null,wheels:[],out:false,outAt:null,pose:null}));
@@ -88,8 +97,8 @@ export function createRace(RAPIER,kinds,seedHex,machine=MACHINE){
   const k=KINDS[e.kind],p=slotOf(e.i,m);
   if(k.shape==='ball'){
    // 완벽한 공이 아닌 살짝 길쭉하거나(수박·야구공: 럭비공처럼) 납작한(오렌지) 매끈한 모양. 놓이는 방향은 추첨 번호로
-   const u=rand()*2-1,ph=rand()*Math.PI*2,sq=Math.sqrt(1-u*u),ang=rand()*Math.PI*2,sn=Math.sin(ang/2);
-   const q={x:sq*Math.cos(ph)*sn,y:sq*Math.sin(ph)*sn,z:u*sn,w:Math.cos(ang/2)};
+   const u=rand()*2-1,ph=rand()*Math.PI*2,sq=Math.sqrt(1-u*u),ang=rand()*Math.PI*2,sn=dsin(ang/2);
+   const q={x:sq*dcos(ph)*sn,y:sq*dsin(ph)*sn,z:u*sn,w:dcos(ang/2)};
    e.body=world.createRigidBody(dyn().setTranslation(p.x,k.r*Math.max(1,k.ax)+0.002,p.z).setRotation(q));
    world.createCollider((k.ax>=1?RAPIER.ColliderDesc.capsule(k.r*(k.ax-1),k.r):RAPIER.ColliderDesc.roundCylinder(0.0002,k.r*(1-k.ax),k.r*k.ax)).setMass(k.mass*(1-k.off)).setFriction(k.friction).setRestitution(k.restitution),e.body);
    world.createCollider(RAPIER.ColliderDesc.ball(k.r*0.1).setTranslation(k.r*0.5,0,0).setMass(k.mass*k.off).setFriction(k.friction),e.body); // 치우친 무게(씨·꼭지 쪽)
@@ -128,7 +137,7 @@ export function createRace(RAPIER,kinds,seedHex,machine=MACHINE){
   e.pose={t:e.body.translation(),r:e.body.rotation()};
  }
  let t=0,frame=0,beltPos=0,beltOn=m.startDelay,lastFall=0,restarts=0;const order=[],events=[];
- const beltSpeed=()=>t<beltOn?0:m.speed*(1-Math.exp(-(t-beltOn)/m.spinUp));
+ const beltSpeed=()=>t<beltOn?0:m.speed*(1-dexp(-(t-beltOn)/m.spinUp));
  // 경사 모터: 출발 뒤 일정한 빠르기로 천천히 기울기를 바꿈(런닝머신 경사 조절 기능)
  const tiltNow=()=>m.tiltEndDeg==null?m.tiltDeg:m.tiltDeg+(m.tiltEndDeg-m.tiltDeg)*Math.min(1,Math.max(0,(t-m.startDelay)/m.tiltSeconds));
  const alive=()=>entries.filter(e=>!e.out);
@@ -149,10 +158,10 @@ export function createRace(RAPIER,kinds,seedHex,machine=MACHINE){
   const v=beltSpeed();beltPos+=v*DT;
   belt.setTranslation({x:0,y:-0.05,z:m.len/2},true);belt.setNextKinematicTranslation({x:0,y:-0.05,z:m.len/2+v*DT});
   {const z0=(beltPos-v*DT)%loop;pattern.forEach((b,c)=>{const z=z0-c*loop;b.setTranslation({x:0,y:0,z},true);b.setNextKinematicTranslation({x:0,y:0,z:z+v*DT});});}
-  if(m.tiltEndDeg!=null){const a=tiltNow()*Math.PI/180;world.gravity={x:0,y:-9.81*Math.cos(a),z:-9.81*Math.sin(a)};}
+  if(m.tiltEndDeg!=null){const a=tiltNow()*Math.PI/180;world.gravity={x:0,y:-9.81*dcos(a),z:-9.81*dsin(a)};}
   if(m.tiltFarDeg!=null)for(const e of entries){if(e.out)continue;for(const b of [e.body,...e.wheels.map(w=>w.body)]){
     const z=Math.max(0,Math.min(m.len,b.translation().z)),a=(m.tiltDeg+(m.tiltFarDeg-m.tiltDeg)*z/m.len)*Math.PI/180;
-    b.resetForces(true);b.addForce({x:0,y:0,z:-b.mass()*9.81*Math.sin(a)},true);}}
+    b.resetForces(true);b.addForce({x:0,y:0,z:-b.mass()*9.81*dsin(a)},true);}}
   world.step();t+=DT;frame++;
   for(const e of entries){if(e.out)continue;const p=e.body.translation();
    // 벨트 밖으로 나가면 탈락(끝에서 떨어지거나 어디로든 튕겨 나감)
@@ -160,8 +169,51 @@ export function createRace(RAPIER,kinds,seedHex,machine=MACHINE){
   if(alive().length>1&&t-lastFall>m.stuckSeconds)restart();
  }
  const finished=()=>alive().length<=1;
- const result=()=>[...order,...alive().map(e=>e.i)]; // 먼저 떨어진 순 → 마지막이 1등
+ // 먼저 떨어진 순 → 마지막이 1등. 시간이 다 되도록 남은 물건이 여럿이면 벨트 끝에 가까운(더 밀려난) 쪽을 먼저 떨어진 것으로 칩니다
+ const result=()=>[...order,...alive().map(e=>({i:e.i,z:e.body.translation().z})).sort((a,b)=>b.z-a.z||a.i-b.i).map(x=>x.i)];
  function snapshot(){const s=[];for(const e of entries){const p=e.body.translation(),q=e.body.rotation();s.push(p.x,p.y,p.z,q.x,q.y,q.z,q.w);
    for(const w of e.wheels){const wp=w.body.translation(),wq=w.body.rotation();s.push(wp.x,wp.y,wp.z,wq.x,wq.y,wq.z,wq.w);}}return s;}
  return {world,entries,events,seams,loop,tiltNow,gateClosed:()=>!!gate,step,finished,result,snapshot,beltSpeed,get t(){return t;},get frame(){return frame;},get beltPos(){return beltPos;},get restarts(){return restarts;}};
+}
+
+// ───────── 확정 설정 1판 (2026-11-22 사용자 결정). 기록에 판 번호를 남기고, 값을 바꾸면 새 판 번호를 씁니다(옛 기록은 옛 값으로 다시 봄).
+export const RACE_V1 = Object.freeze({...MACHINE,wave:2,crossAngleDeg:10,crossCount:4,seamZ0:0.75,seamGap:0.9,startDelay:0.3,rowZ:0.10,rowPitch:0.2,spinUp:2,seamLong:0.0005,
+ wheelR:0.026,carLift:0.006,carRear:0.04,stuckSeconds:10,seamCrossR:0.06,tiltDeg:1,len:2.0,speed:3.4,tiltFarDeg:24,seamCross:0.034,waveBase:0.2,carW:0.334});
+export const MAX_RACERS=15,MIN_RACERS=2,MAX_RACE_SECONDS=120;
+
+// ───────── 자리 정하기 핀볼(아주 단순한 판): 섞인 공이 사선(/) 하나를 타고 내려와 구멍 하나로 들어가고, 들어간 순서가 1번 자리부터의 주인.
+// 세로로 선 얇은 판 안에서만 움직임(앞뒤로는 못 움직임). 길이 단위 m.
+// g: 비스듬히 세운 판이라 공이 천천히 굴러 내려옴. gap: 구멍 폭(공 두 개가 끼어 막히지 않도록 공 지름의 2배 남짓)
+export const DROP = Object.freeze({w:0.50,h:0.62,ballR:0.016,barLowY:0.10,barHighY:0.20,gap:0.070,goalY:0.045,g:3.0,friction:0.05,maxSeconds:25});
+export function createDrop(RAPIER,n,seedHex,d=DROP){
+ const rand=rng(((parseInt(seedHex,16)^0x9e3779b9)>>>0).toString(16).padStart(8,'0'));
+ const world=new RAPIER.World({x:0,y:-d.g,z:0});world.timestep=DT;world.lengthUnit=0.02;
+ const fixed=world.createRigidBody(RAPIER.RigidBodyDesc.fixed());
+ const wall=(cx,cy,hx,hy,rot=0)=>{const c=RAPIER.ColliderDesc.cuboid(hx,hy,0.03).setTranslation(cx,cy,0).setFriction(d.friction).setRestitution(0.35);
+  if(rot)c.setRotation({x:0,y:0,z:dsin(rot/2),w:dcos(rot/2)});world.createCollider(c,fixed);return {cx,cy,hx,hy,rot};};
+ const walls=[];
+ walls.push(wall(-d.w/2-0.01,d.h/2,0.01,d.h/2),wall(d.w/2+0.01,d.h/2,0.01,d.h/2)); // 양옆 벽
+ // 사선(/): 왼쪽 아래가 낮음. 왼쪽 벽과의 사이에 공 하나 지나갈 틈(구멍)
+ const x1=-d.w/2+d.gap,y1=d.barLowY,x2=d.w/2,y2=d.barHighY,L=Math.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1)),sn=(y2-y1)/L,cs=(x2-x1)/L;
+ {const half=L/2,th=0.008,cx=(x1+x2)/2+sn*th,cy=(y1+y2)/2-cs*th; // 윗면이 (x1,y1)-(x2,y2)에 오도록 두께만큼 내림
+  const c=RAPIER.ColliderDesc.cuboid(half,th,0.03).setTranslation(cx,cy,0).setRotation({x:0,y:0,z:Math.sqrt((1-cs)/2),w:Math.sqrt((1+cs)/2)}).setFriction(d.friction).setRestitution(0.35);world.createCollider(c,fixed);
+  walls.push({cx,cy,hx:half,hy:th,cos:cs,sin:sn,bar:true});}
+ // 구멍 아래 통로의 오른쪽 벽
+ walls.push(wall(x1+0.006,d.barLowY/2-0.01,0.006,d.barLowY/2-0.004));
+ // 공: 위쪽에 섞어서 배치(누가 어느 칸에 놓일지는 추첨 번호로)
+ const cols=5,rows=Math.ceil(n/cols),pitch=d.ballR*2.6,slots=[];for(let i=0;i<n;i++)slots.push(i);
+ for(let i=n-1;i>0;i--){const j=Math.floor(rand()*(i+1));[slots[i],slots[j]]=[slots[j],slots[i]];}
+ const balls=[];for(let i=0;i<n;i++){const s=slots[i],r=Math.floor(s/cols),c=s%cols;
+  const x=(c-(cols-1)/2)*pitch+0.05+(rand()-0.5)*0.008,y=d.h-0.05-r*pitch+(rand()-0.5)*0.008;
+  const b=world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(x,y,0).setCanSleep(false).setCcdEnabled(true).enabledTranslations(true,true,false).enabledRotations(false,false,true));
+  world.createCollider(RAPIER.ColliderDesc.ball(d.ballR).setMass(0.03).setFriction(d.friction).setRestitution(0.45),b);balls.push({i,body:b,done:false});}
+ const order=[];let t=0,frame=0;const events=[];
+ function step(){world.step();t+=DT;frame++;
+  for(const b of balls){if(b.done)continue;const p=b.body.translation();if(p.y<d.goalY&&p.x<x1+0.02){b.done=true;order.push(b.i);events.push({frame,i:b.i});}}
+  if(t>=d.maxSeconds&&order.length<n){ // 혹시 걸린 공이 있으면 구멍에 가까운 순서로 마무리
+   const rest=balls.filter(b=>!b.done).map(b=>{const p=b.body.translation();return {b,k:(p.x-x1)*(p.x-x1)+(p.y-d.goalY)*(p.y-d.goalY)};}).sort((a,c)=>a.k-c.k||a.b.i-c.b.i);
+   for(const r of rest){r.b.done=true;order.push(r.b.i);events.push({frame,i:r.b.i,forced:true});}}}
+ const finished=()=>order.length>=n;
+ function snapshot(){const s=[];for(const b of balls){const p=b.body.translation(),q=b.body.rotation();s.push(p.x,p.y,q.z,q.w);}return s;}
+ return {world,balls,walls,order,events,step,finished,snapshot,bar:{x1,y1,x2,y2},get t(){return t;},get frame(){return frame;}};
 }

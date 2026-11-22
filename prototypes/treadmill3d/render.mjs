@@ -6,7 +6,7 @@ import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {EXRLoader} from 'three/addons/loaders/EXRLoader.js';
 
 // 실사 자료(모두 무료·저작권 없음, Poly Haven / pmndrs): 실제 물건을 촬영한 3D 자료와 표면 사진, 실내 조명 사진
-async function loadAssets(base){
+export async function loadAssets(base){
  const gl=new GLTFLoader(),tl=new THREE.TextureLoader(),A={};
  const model=async n=>(await gl.loadAsync(`${base}models/${n}/${n}.gltf`)).scene;
  const tex=async(p,srgb,rx=1,ry=1)=>{const x=await tl.loadAsync(base+p);x.wrapS=x.wrapT=THREE.RepeatWrapping;x.repeat.set(rx,ry);x.anisotropy=8;if(srgb)x.colorSpace=THREE.SRGBColorSpace;return x;};
@@ -30,7 +30,7 @@ const canvasTex=(w,h,draw,repeat)=>{const c=document.createElement('canvas');c.w
 const noise=(g,w,h,base,amp,count,size)=>{g.fillStyle=base;g.fillRect(0,0,w,h);for(let i=0;i<count;i++){const v=Math.random()*amp-amp/2;g.fillStyle=`rgba(${v>0?255:0},${v>0?255:0},${v>0?255:0},${Math.abs(v)})`;g.beginPath();g.arc(Math.random()*w,Math.random()*h,Math.random()*size+0.5,0,7);g.fill();}};
 const bumpOf=(w,h,count,size,amp=0.5)=>{const t=canvasTex(w,h,g=>noise(g,w,h,'#808080',amp,count,size));t.colorSpace=THREE.NoColorSpace;return t;};
 
-function materials(){
+export function materials(){
  const M={};
  M.orange=new THREE.MeshPhysicalMaterial({map:canvasTex(512,256,(g,w,h)=>{noise(g,w,h,'#f07a10',0.18,9000,1.4);g.fillStyle='#6b8f2a';g.beginPath();g.arc(w*0.5,3,6,0,7);g.fill();}),bumpMap:bumpOf(512,256,14000,1.6,0.9),bumpScale:0.6,roughness:0.55,clearcoat:0.35,clearcoatRoughness:0.5});
  M.baseball=new THREE.MeshStandardMaterial({map:canvasTex(1024,512,(g,w,h)=>{noise(g,w,h,'#f2ede1',0.06,4000,2);g.strokeStyle='#c22';g.lineWidth=3;for(const off of [0,Math.PI]){g.beginPath();for(let x=0;x<=w;x+=4){const u=x/w*Math.PI*2;const y=h/2+Math.sin(u*2+off)*h*0.28;x?g.lineTo(x,y):g.moveTo(x,y);}g.stroke();
@@ -69,7 +69,7 @@ function makeCar(k,color,M){
  for(const s of [-1,1]){const l=new THREE.Mesh(new THREE.BoxGeometry(0.008,0.004,0.002),new THREE.MeshStandardMaterial({color:0xffffee,emissive:0xffffcc,emissiveIntensity:1}));l.position.set(s*k.wid*0.32,-k.hei*0.15,-k.len/2-0.001);g.add(l);}
  g.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});return g;
 }
-function makeWheel(M,r=MACHINE.wheelR,w=0.008){const g=new THREE.Group();const t=new THREE.Mesh(new THREE.CylinderGeometry(r,r,w,24),M.tire);t.rotation.z=Math.PI/2;const h=new THREE.Mesh(new THREE.CylinderGeometry(r*0.6,r*0.6,w+0.001,16),M.rim);h.rotation.z=Math.PI/2;g.add(t,h);t.castShadow=true;return g;}
+export function makeWheel(M,r=MACHINE.wheelR,w=0.008){const g=new THREE.Group();const t=new THREE.Mesh(new THREE.CylinderGeometry(r,r,w,24),M.tire);t.rotation.z=Math.PI/2;const h=new THREE.Mesh(new THREE.CylinderGeometry(r*0.6,r*0.6,w+0.001,16),M.rim);h.rotation.z=Math.PI/2;g.add(t,h);t.castShadow=true;return g;}
 
 // 솜인형 입체: 앞 그림의 윤곽을 그대로 따서 가장자리에서 멀수록 두껍게 부풀림(몸통은 통통, 볏·팔·꼬리·발은 가늘게 튀어나옴).
 // 앞면에는 앞 그림, 뒷면에는 뒤에서 본 그림을 입힘
@@ -122,7 +122,7 @@ function makeDoll(k,dollTex,backTex,fuzzN){
  g.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});return g;
 }
 
-function makeObject(kind,M,dollTex,variant,A){
+export function makeObject(kind,M,dollTex,variant,A){
  const k=KINDS[kind];let mesh;
  if(A&&kind==='baseball')mesh=fit(A.baseball,2*k.r,2*k.r*k.ax,2*k.r);
  else if(A&&kind==='orange'){mesh=fit(A.lime,2*k.r,2*k.r*k.ax,2*k.r);mesh.traverse(o=>{if(o.isMesh){o.material=o.material.clone();o.material.map=A.orangeMap;o.material.roughness=0.5;}});}

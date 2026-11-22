@@ -1,0 +1,23 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:transparent">
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/","@dimforge/rapier3d-deterministic-compat":"./node_modules/@dimforge/rapier3d-deterministic-compat/dist/rapier.mjs"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import {loadAssets,materials,makeObject,makeWheel} from './render.mjs';
+import {KINDS,POOL,RACE_V1} from './sim.mjs';
+const S=384,r=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});r.setSize(S,S);r.setPixelRatio(1);r.outputColorSpace=THREE.SRGBColorSpace;r.toneMapping=THREE.ACESFilmicToneMapping;r.setClearColor(0,0);
+document.body.appendChild(r.domElement);
+const M=materials(),A=await loadAssets('assets/');const dollTex=await new THREE.TextureLoader().loadAsync('assets/doll.png');dollTex.colorSpace=THREE.SRGBColorSpace;
+const pm=new THREE.PMREMGenerator(r);A.env.mapping=THREE.EquirectangularReflectionMapping;const env=pm.fromEquirectangular(A.env).texture;
+M.watermelon.map=A.melon;M.watermelon.clearcoat=0.45;M.watermelon.roughness=0.5;M.tissue.map=A.tissue;M.tissue.bumpMap=A.tissueBump;M.tissue.bumpScale=1.6;
+const out={};
+for(const kind of POOL){const scene=new THREE.Scene();scene.environment=env;scene.environmentIntensity=1.0;
+ const key=new THREE.DirectionalLight(0xffffff,2.2);key.position.set(0.4,1,-0.8);scene.add(key);
+ const k=KINDS[kind],o=makeObject(kind,M,dollTex,kind==='racer'?0:kind==='kei'?2:1,A);const g=new THREE.Group();g.add(o);
+ if(k.shape==='car'){const wr=RACE_V1.wheelR,cy=wr+k.hei/2-0.006+RACE_V1.carLift;for(const [dx,dz] of [[-1,-1],[1,-1],[-1,1],[1,1]]){const w=makeWheel(M,wr,0.014);w.position.set(dx*(k.wid/2+0.006),wr-cy,dz*(k.len/2-Math.min(0.02,k.len/2-wr-0.002)));g.add(w);}}
+ if(k.shape==='cyl')g.rotation.z=Math.PI/2; // 구르는 자세(옆으로 누움)
+ if(k.shape==='car')g.rotation.y=Math.PI*0.2;else if(k.shape==='cyl')g.rotation.y=-0.5;else if(kind==='baseball')g.rotation.set(0.5,0.4,0.2);else if(kind!=='doll')g.rotation.set(0.3,0.5,0);
+ scene.add(g);const b=new THREE.Box3().setFromObject(g),c=b.getCenter(new THREE.Vector3()),sz=b.getSize(new THREE.Vector3()),R=Math.max(sz.x,sz.y,sz.z)*0.62;
+ const cam=new THREE.PerspectiveCamera(30,1,0.01,10);const dist=R/Math.tan(15*Math.PI/180);cam.position.set(c.x+dist*0.25,c.y+dist*0.35,c.z-dist*0.9);cam.lookAt(c);
+ r.render(scene,cam);out[kind]=r.domElement.toDataURL('image/png');}
+window.__icons=out;
+</script>
