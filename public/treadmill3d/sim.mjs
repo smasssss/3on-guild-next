@@ -217,3 +217,49 @@ export function createDrop(RAPIER,n,seedHex,d=DROP){
  function snapshot(){const s=[];for(const b of balls){const p=b.body.translation(),q=b.body.rotation();s.push(p.x,p.y,q.z,q.w);}return s;}
  return {world,balls,walls,order,events,step,finished,snapshot,bar:{x1,y1,x2,y2},get t(){return t;},get frame(){return frame;}};
 }
+
+// ───────── 자리 정하기 핀볼 2판 (2026-11-23 사용자 결정): 위쪽 섞는 통에서 날개가 돌며 공을 실제로 뒤섞은 뒤, 통 바닥 문이 열려 사선으로 떨어집니다.
+// 1판(섞는 통 없음)으로 남긴 기록은 1판 그대로 다시 봅니다.
+export const DROP2 = Object.freeze({...DROP,h:0.84,boxX:0.17,boxY0:0.52,boxY1:0.80,padY:0.655,padLen:0.118,padTh:0.006,padSpeed:7.5,mixSeconds:3.0,maxSeconds:32});
+export function createDrop2(RAPIER,n,seedHex,d=DROP2){
+ const rand=rng(((parseInt(seedHex,16)^0x9e3779b9)>>>0).toString(16).padStart(8,'0'));
+ const world=new RAPIER.World({x:0,y:-d.g,z:0});world.timestep=DT;world.lengthUnit=0.02;
+ const fixed=world.createRigidBody(RAPIER.RigidBodyDesc.fixed()),walls=[];
+ const wall=(cx,cy,hx,hy,extra={})=>{const c=RAPIER.ColliderDesc.cuboid(hx,hy,0.03).setTranslation(cx,cy,0).setFriction(d.friction).setRestitution(0.35);const col=world.createCollider(c,fixed);const w={cx,cy,hx,hy,...extra};walls.push(w);return col;};
+ wall(-d.w/2-0.01,d.h/2,0.01,d.h/2);wall(d.w/2+0.01,d.h/2,0.01,d.h/2);
+ // 사선(/)과 구멍 아래 통로: 1판과 같음
+ const x1=-d.w/2+d.gap,y1=d.barLowY,x2=d.w/2,y2=d.barHighY,L=Math.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1)),sn=(y2-y1)/L,cs=(x2-x1)/L;
+ {const half=L/2,th=0.008,cx=(x1+x2)/2+sn*th,cy=(y1+y2)/2-cs*th;
+  world.createCollider(RAPIER.ColliderDesc.cuboid(half,th,0.03).setTranslation(cx,cy,0).setRotation({x:0,y:0,z:Math.sqrt((1-cs)/2),w:Math.sqrt((1+cs)/2)}).setFriction(d.friction).setRestitution(0.35),fixed);
+  walls.push({cx,cy,hx:half,hy:th,cos:cs,sin:sn,bar:true});}
+ wall(x1+0.006,d.barLowY/2-0.01,0.006,d.barLowY/2-0.004);
+ // 섞는 통: 양옆·위 벽 + 바닥 문(섞기가 끝나면 사라짐)
+ const bh=(d.boxY1-d.boxY0)/2,bc=(d.boxY1+d.boxY0)/2;
+ wall(-d.boxX-0.006,bc,0.006,bh+0.006,{box:true});wall(d.boxX+0.006,bc,0.006,bh+0.006,{box:true});wall(0,d.boxY1+0.006,d.boxX+0.012,0.006,{box:true});
+ let gate=wall(0,d.boxY0-0.006,d.boxX+0.012,0.006,{gate:true});
+ // 날개: 통 한가운데서 도는 십자 막대(정해진 속도로 돌고, 공에 밀리지 않음)
+ const pad=world.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0,d.padY,0));
+ for(const rot of [0,1]){const c=RAPIER.ColliderDesc.cuboid(d.padLen,d.padTh,0.03).setFriction(0.3).setRestitution(0.5);if(rot)c.setRotation({x:0,y:0,z:Math.SQRT1_2,w:Math.SQRT1_2});world.createCollider(c,pad);}
+ // 공: 통 안에 줄지어 넣음(자리는 추첨 번호로 섞음). 날개 막대와 겹치지 않게 네 칸에 나눠 넣음
+ const spots=[];for(const sx of [-1,1])for(const sy of [-1,1])for(let r=0;r<2;r++)for(let c=0;c<2;c++)spots.push({x:sx*(0.045+c*0.062),y:d.padY+sy*(0.040+r*0.050)});
+ for(let i=spots.length-1;i>0;i--){const j=Math.floor(rand()*(i+1));[spots[i],spots[j]]=[spots[j],spots[i]];}
+ const balls=[];for(let i=0;i<n;i++){const s=spots[i];
+  const b=world.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(s.x+(rand()-0.5)*0.006,s.y+(rand()-0.5)*0.006,0).setCanSleep(false).setCcdEnabled(true).enabledTranslations(true,true,false).enabledRotations(false,false,true));
+  world.createCollider(RAPIER.ColliderDesc.ball(d.ballR).setMass(0.03).setFriction(d.friction).setRestitution(0.55),b);balls.push({i,body:b,done:false});}
+ const order=[],events=[];let t=0,frame=0,gateFrame=null;
+ const padAngle=()=>d.padSpeed*t;
+ function step(){
+  const a=padAngle()+d.padSpeed*DT;pad.setNextKinematicRotation({x:0,y:0,z:dsin(a/2),w:dcos(a/2)});
+  if(gate&&t>=d.mixSeconds){world.removeCollider(gate,true);gate=null;gateFrame=frame;}
+  world.step();t+=DT;frame++;
+  for(const b of balls){if(b.done)continue;const p=b.body.translation();if(p.y<d.goalY&&p.x<x1+0.02){b.done=true;order.push(b.i);events.push({frame,i:b.i});}}
+  if(t>=d.maxSeconds&&order.length<n){
+   const rest=balls.filter(b=>!b.done).map(b=>{const p=b.body.translation();return {b,k:(p.x-x1)*(p.x-x1)+(p.y-d.goalY)*(p.y-d.goalY)};}).sort((p,q)=>p.k-q.k||p.b.i-q.b.i);
+   for(const r of rest){r.b.done=true;order.push(r.b.i);events.push({frame,i:r.b.i,forced:true});}}}
+ const finished=()=>order.length>=n;
+ function snapshot(){const s=[];for(const b of balls){const p=b.body.translation(),q=b.body.rotation();s.push(p.x,p.y,q.z,q.w);}return s;}
+ return {world,balls,walls,order,events,step,finished,snapshot,padAngle,bar:{x1,y1,x2,y2},get gateFrame(){return gateFrame;},get t(){return t;},get frame(){return frame;}};
+}
+// 기록의 판 번호에 맞는 자리 정하기 핀볼
+export const GAME_VERSION=2;
+export const dropFor=version=>version>=2?{create:createDrop2,spec:DROP2}:{create:createDrop,spec:DROP};

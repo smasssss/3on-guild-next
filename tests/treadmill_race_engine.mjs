@@ -5,9 +5,9 @@
 // slot owners come from the simple pinball (entry order = slot 1..N), fall order = last place first.
 import assert from 'node:assert/strict';
 import RAPIER from '../public/treadmill3d/vendor/rapier.mjs';
-import {createRace,createDrop,pickKinds,RACE_V1,KINDS,MAX_RACE_SECONDS,dsin,dcos,dexp} from '../public/treadmill3d/sim.mjs';
+import {createRace,createDrop,createDrop2,dropFor,pickKinds,RACE_V1,KINDS,MAX_RACE_SECONDS,GAME_VERSION,HZ,DROP2,dsin,dcos,dexp} from '../public/treadmill3d/sim.mjs';
 await RAPIER.init();
-function play(seed,n){const d=createDrop(RAPIER,n,seed);while(!d.finished())d.step();const owner=d.order.slice();d.world.free();
+function play(seed,n,version=1){const d=dropFor(version).create(RAPIER,n,seed);while(!d.finished())d.step();const owner=d.order.slice();d.world.free();
  const kinds=pickKinds(seed,n,RACE_V1.carW),g=createRace(RAPIER,kinds,seed,RACE_V1);while(!g.finished()&&g.t<MAX_RACE_SECONDS)g.step();
  const out={kinds,slots:owner,order:g.result().map(s=>owner[s]),restarts:g.restarts,seconds:Math.round(g.t*10)/10,finished:g.finished()};g.world.free();return out;}
 const GOLD=[
@@ -15,6 +15,17 @@ const GOLD=[
  ['1a2b3c4d',4,{kinds:['watermelon','tape','baseball','orange'],slots:[2,3,1,0],order:[3,0,1,2],restarts:0,seconds:9.8,finished:true}],
  ['deadbeef',2,{kinds:['doll','watermelon'],slots:[1,0],order:[1,0],restarts:0,seconds:2.1,finished:true}],
 ];
+// 2026-11-23 user decision: version 2 first mixes the balls in a hopper (a turning paddle for 3 seconds, then the floor gate opens).
+// Version 1 records keep replaying as version 1 (GOLD above); version 2 races were computed when version 2 was fixed.
+const GOLD2=[
+ ['00c51d27',15,{kinds:['kei','tissue','can','tape','orange','baseball','doll','baseball','can','tissue','orange','kei','tape','baseball','watermelon'],slots:[0,11,1,3,12,4,13,2,5,14,8,6,7,9,10],order:[6,13,0,11,14,1,4,3,10,8,7,9,2,12,5],restarts:0,seconds:30.9,finished:true}],
+ ['1a2b3c4d',4,{kinds:['watermelon','tape','baseball','orange'],slots:[0,2,3,1],order:[2,1,3,0],restarts:0,seconds:9.8,finished:true}],
+];
+assert.equal(GAME_VERSION,2);assert.equal(dropFor(1).create,createDrop);assert.equal(dropFor(2).create,createDrop2);
+for(const [seed,n,want] of GOLD2)assert.deepEqual(play(seed,n,2),want,'version 2 seed '+seed+' must replay exactly');
+{const firstIn=new Array(15).fill(0);for(let s=0;s<40;s++){const d=createDrop2(RAPIER,15,((s*40503+0xbeef01)>>>0).toString(16).padStart(8,'0'));while(!d.finished())d.step();
+  assert.ok(d.events.every(e=>!e.forced),'no forced finish');assert.ok(d.events.every(e=>e.frame/HZ>DROP2.mixSeconds),'no ball leaves before the gate opens');assert.ok(d.t<15);firstIn[d.order[0]]++;d.world.free();}
+ assert.ok(Math.max(...firstIn)<=10,'mixing leaves no favourite: '+firstIn.join(' '));}
 for(const [seed,n,want] of GOLD){const got=play(seed,n);assert.deepEqual(got,want,'seed '+seed+' must replay exactly');
  assert.deepEqual([...got.slots].sort((a,b)=>a-b),Array.from({length:n},(_,i)=>i),'every racer owns exactly one slot');assert.deepEqual([...got.order].sort((a,b)=>a-b),Array.from({length:n},(_,i)=>i));}
 assert.deepEqual(play('1a2b3c4d',4),GOLD[1][2],'computing the same race twice gives the same result');
@@ -28,4 +39,4 @@ assert.ok(Math.max(...first)<=12,'no ball wins the pinball too often: '+first.jo
 for(let x=-9;x<9;x+=0.37){assert.ok(Math.abs(dsin(x)-Math.sin(x))<1e-9);assert.ok(Math.abs(dcos(x)-Math.cos(x))<1e-9);}for(let x=-12;x<=0;x+=0.41)assert.ok(Math.abs(dexp(x)-Math.exp(x))<1e-9);
 const src=(await import('node:fs')).readFileSync(new URL('../public/treadmill3d/sim.mjs',import.meta.url),'utf8');
 assert.ok(!/Math\.(sin|cos|tan|exp|pow|hypot|acos|asin|atan|atan2|log|random|cbrt)\b/.test(src),'the race maths uses no device-dependent functions');
-console.log('PASS: 런닝머신 레이스 replays exactly from its seed (3 saved races), items and slot owners follow the rules, the simple pinball never jams, device-independent maths');
+console.log('PASS: 런닝머신 레이스 replays exactly from its seed (version 1: 3 races, version 2 with the mixing hopper: 2 races), items and slot owners follow the rules, the simple pinball never jams, device-independent maths');

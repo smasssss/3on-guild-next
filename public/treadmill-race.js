@@ -4,7 +4,7 @@
    - 경기 화면과 계산은 /treadmill3d/ 의 별도 화면이 맡고, 이 파일은 참가자 고르기·기록 저장·기록 목록을 맡습니다.
    - 경기는 관리자만 돌릴 수 있고, 기록은 누구나 보고 다시 볼 수 있습니다. 같은 추첨 번호면 언제나 같은 경기입니다. */
 (function(root){'use strict';
- const MIN=2,MAX=15,PLAY='/treadmill3d/play.html?v=1';
+ const MIN=2,MAX=15,PLAY='/treadmill3d/play.html?v=2',VERSION=2; // 2판(2026-11-23): 자리 정하기 전에 섞는 통에서 공을 섞음. 1판 기록은 1판 그대로 다시 봄
  const ITEM={orange:'오렌지',baseball:'야구공',watermelon:'미니 수박',can:'참치캔',tissue:'두루마리 휴지',tape:'박스테이프',sedan:'승용차',racer:'레이싱카',kei:'경차',doll:'핵불잙 인형'};
  const $=id=>document.getElementById(id);
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -60,7 +60,7 @@
   if(m.type==='close')return close();
   if(m.type==='result'&&current&&current.mode==='new'&&m.seed===current.seed&&!current.saved){
    current.saved=true;
-   const race={id:crypto.randomUUID(),seed:m.seed,version:1,source:current.source,...(current.source==='pinball'?{pinballDrawId:current.pinballDrawId}:{}),participants:current.participants,items:m.kinds,slots:m.slots,order:m.order,restarts:m.restarts,seconds:m.seconds,timedOut:!m.finished};
+   const race={id:crypto.randomUUID(),seed:m.seed,version:VERSION,source:current.source,...(current.source==='pinball'?{pinballDrawId:current.pinballDrawId}:{}),participants:current.participants,items:m.kinds,slots:m.slots,order:m.order,restarts:m.restarts,seconds:m.seconds,timedOut:!m.finished};
    try{records=await api('/api/treadmill',{method:'POST',body:JSON.stringify({revision:records.revision,mutation:crypto.randomUUID(),race})});renderRecords();tell({type:'go'});}
    catch(err){tell({type:'abort'});close();notice('경기 기록을 저장하지 못해 경기를 시작하지 않았습니다. '+err.message);loadRecords();}
   }
@@ -70,9 +70,9 @@
   const list=chosen();if(!list||list.length<MIN||list.length>MAX)return;
   const seed=Array.from(crypto.getRandomValues(new Uint8Array(4)),x=>x.toString(16).padStart(2,'0')).join('');
   const s=source();current={mode:'new',seed,source:s,pinballDrawId:s==='pinball'?pickedDraw().id:undefined,participants:list.map(m=>({memberId:m.memberId,nickname:m.nickname}))};
-  open({seed,hold:true,racers:list.map(m=>({id:m.memberId,name:m.nickname}))});
+  open({seed,version:VERSION,hold:true,racers:list.map(m=>({id:m.memberId,name:m.nickname}))});
  }
- function replay(d){current={mode:'replay'};open({seed:d.seed,expect:d.order,racers:d.participants.map(p=>({id:p.memberId,name:p.nickname}))});}
+ function replay(d){current={mode:'replay'};open({seed:d.seed,version:d.version,expect:d.order,racers:d.participants.map(p=>({id:p.memberId,name:p.nickname}))});}
  async function loadRecords(){try{records=await api('/api/treadmill');}catch(e){records={revision:0,races:[],error:e.message};}renderRecords();}
  async function loadPinball(){try{const r=await api('/api/pinball');pinball=(r.draws||[]).filter(d=>!d.game);}catch{pinball=[];}renderDraws();summary();}
  function renderRecords(){

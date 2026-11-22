@@ -14,7 +14,7 @@ html,body{margin:0;height:100%;background:#15171b;color:#fff;font-family:system-
 .cell.doll.done{border-color:#ff4d6d;box-shadow:0 0 12px #ff4d6d88}
 @keyframes pop{0%{transform:scale(.9)}60%{transform:scale(1.06)}100%{transform:scale(1)}}
 #drop{display:flex;flex-direction:column;gap:8px;align-items:center}
-#dropCanvas{width:min(100%,calc((100vh - 250px)*0.79),520px);aspect-ratio:54/68;background:#1d2026;border:1px solid #3a3f49;border-radius:12px}
+#dropCanvas{width:min(100%,calc((100vh - 250px)*0.6),520px);aspect-ratio:54/90;background:#1d2026;border:1px solid #3a3f49;border-radius:12px}
 #dropList{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(5,1fr);gap:5px;width:min(100%,560px);font-size:11px}
 #dropList li{position:relative;display:flex;flex-direction:column;align-items:center;background:#23262d;border:1px solid #3a3f49;border-radius:9px;padding:2px 2px 3px;color:#8b90a0;min-width:0}
 #dropList li img{height:26px;width:26px;object-fit:contain}

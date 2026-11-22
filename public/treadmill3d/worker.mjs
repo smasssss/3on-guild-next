@@ -1,16 +1,16 @@
 // 계산 전담 일꾼: 자리 정하기 핀볼과 런닝머신 경기를 미리 계산해 화면 쪽에 넘깁니다(화면이 멈추지 않도록 따로 돕니다).
 import RAPIER from './vendor/rapier.mjs';
-import {createRace,createDrop,pickKinds,RACE_V1,HZ,MAX_RACE_SECONDS} from './sim.mjs';
+import {createRace,dropFor,pickKinds,RACE_V1,HZ,MAX_RACE_SECONDS} from './sim.mjs';
 const ready=RAPIER.init();
 const EVERY=HZ/60;
 self.onmessage=async e=>{
  try{
-  const {seed,n}=e.data;await ready;
+  const {seed,n,version}=e.data;await ready;
   // 1) 자리 정하기 핀볼
-  {const d=createDrop(RAPIER,n,seed),fr=[];let k=0;const rec=()=>{if(k++%EVERY===0)fr.push(...d.snapshot());};
+  {const d=dropFor(version).create(RAPIER,n,seed),fr=[],pad=[];let k=0;const rec=()=>{if(k++%EVERY===0){fr.push(...d.snapshot());if(d.padAngle)pad.push(d.padAngle());}};
    while(!d.finished()){d.step();rec();}for(let i=0;i<HZ;i++){d.step();rec();}
    const frames=Float32Array.from(fr);
-   self.postMessage({type:'drop',order:d.order.slice(),events:d.events.map(x=>({frame:Math.floor(x.frame/EVERY),i:x.i})),frames,stride:n*4,walls:d.walls,bar:d.bar},[frames.buffer]);d.world.free();}
+   self.postMessage({type:'drop',order:d.order.slice(),events:d.events.map(x=>({frame:Math.floor(x.frame/EVERY),i:x.i})),frames,stride:n*4,walls:d.walls,bar:d.bar,pad:pad.length?Float32Array.from(pad):null,gateFrame:d.gateFrame==null?null:Math.floor(d.gateFrame/EVERY)},[frames.buffer]);d.world.free();}
   // 2) 경기
   const kinds=pickKinds(seed,n,RACE_V1.carW),g=createRace(RAPIER,kinds,seed,RACE_V1);
   const stride=g.snapshot().length,chunks=[],belt=[];let k=0,last=0;
