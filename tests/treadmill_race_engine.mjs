@@ -15,10 +15,11 @@ const GOLD=[
  ['1a2b3c4d',4,{kinds:['watermelon','tape','baseball','orange'],slots:[2,3,1,0],order:[3,0,1,2],restarts:0,seconds:9.8,finished:true}],
  ['deadbeef',2,{kinds:['doll','watermelon'],slots:[1,0],order:[1,0],restarts:0,seconds:2.1,finished:true}],
 ];
-// 2026-11-23 user decision: version 2 first mixes the balls in a hopper (a turning paddle for 3 seconds, then the floor gate opens).
+// 2026-11-23 user decision: version 2 first mixes the balls in a hopper by blowing air (like a lottery machine: an upward jet, an inflow
+// along the floor and gusts set by the seed, for about 3 seconds), then the floor gate opens.
 // Version 1 records keep replaying as version 1 (GOLD above); version 2 races were computed when version 2 was fixed.
 const GOLD2=[
- ['00c51d27',15,{kinds:['kei','tissue','can','tape','orange','baseball','doll','baseball','can','tissue','orange','kei','tape','baseball','watermelon'],slots:[0,11,1,3,12,4,13,2,5,14,8,6,7,9,10],order:[6,13,0,11,14,1,4,3,10,8,7,9,2,12,5],restarts:0,seconds:30.9,finished:true}],
+ ['00c51d27',15,{kinds:['kei','tissue','can','tape','orange','baseball','doll','baseball','can','tissue','orange','kei','tape','baseball','watermelon'],slots:[11,13,12,0,8,6,4,14,5,10,3,2,1,9,7],order:[2,4,11,13,10,12,6,0,7,3,1,9,14,8,5],restarts:0,seconds:30.9,finished:true}],
  ['1a2b3c4d',4,{kinds:['watermelon','tape','baseball','orange'],slots:[0,2,3,1],order:[2,1,3,0],restarts:0,seconds:9.8,finished:true}],
 ];
 assert.equal(GAME_VERSION,2);assert.equal(dropFor(1).create,createDrop);assert.equal(dropFor(2).create,createDrop2);

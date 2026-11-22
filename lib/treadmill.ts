@@ -8,7 +8,7 @@ export const MAX_RACERS = 15;
 // 물건 종류. 인형(doll)은 한 판에 최대 1개(걸리면 불리한 물건).
 export const ITEMS = ['orange','baseball','watermelon','can','tissue','tape','sedan','racer','kei','doll'] as const;
 // 경기 설정 판 번호: 화면 쪽 물리 설정(public/treadmill3d/sim.mjs 의 RACE_V1)과 짝입니다. 설정을 바꾸면 새 번호를 씁니다.
-// 2판(2026-11-23 사용자 결정): 자리 정하기 핀볼 앞에 섞는 통(날개가 돌며 공을 섞고 문이 열림)을 넣음. 경기 설정은 1판과 같음.
+// 2판(2026-11-23 사용자 결정): 자리 정하기 핀볼 앞에 섞는 통(바람으로 공을 날려 섞은 뒤 문이 열림)을 넣음. 경기 설정은 1판과 같음.
 export const VERSIONS = [1,2] as const;
 export type Racer = {memberId:string;nickname:string};
 export type Race = {id:string;at:string;actor?:string;seed:string;version:1|2;source:'manual'|'pinball';pinballDrawId?:string;participants:Racer[];items:string[];slots:string[];order:string[];restarts:number;seconds:number;timedOut:boolean};

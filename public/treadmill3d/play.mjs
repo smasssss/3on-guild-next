@@ -33,14 +33,15 @@ async function slotStage(){
 
 // 2) 자리 정하기 핀볼: 구멍에 들어간 순서대로 1번 자리부터 주인이 됩니다
 async function dropStage(){
- say(version>=2?'섞는 중…':'자리 정하기',version>=2?'다 섞이면 문이 열립니다':'구멍에 들어간 순서대로 1번 자리부터');await until(()=>dropData,()=>'핀볼 준비 중…');
+ say(version>=2?'섞는 중…':'자리 정하기',version>=2?'바람으로 섞은 뒤 문이 열립니다':'구멍에 들어간 순서대로 1번 자리부터');await until(()=>dropData,()=>'핀볼 준비 중…');
  $('drop').hidden=false;const list=$('dropList');list.innerHTML=kinds.map((k,i)=>`<li><b>${i+1}</b><img alt="" src="assets/icons/${k}.png"><span>—</span></li>`).join('');
  const cv=$('dropCanvas'),g=cv.getContext('2d'),dpr=Math.min(2,devicePixelRatio||1);const W=cv.clientWidth,H=cv.clientHeight;cv.width=W*dpr;cv.height=H*dpr;g.scale(dpr,dpr);
  const d=dropFor(version).spec,pad=14,sc=Math.min((W-pad*2)/(d.w+0.04),(H-pad*2)/(d.h+0.06)),ox=W/2,oy=H-pad-0.02*sc,X=x=>ox+x*sc,Y=y=>oy-y*sc;
- const {frames,stride,walls,events}=dropData,total=frames.length/stride,gateFrame=dropData.gateFrame,padA=dropData.pad;
+ const {frames,stride,walls,events}=dropData,total=frames.length/stride,gateFrame=dropData.gateFrame;
  const draw=f=>{g.clearRect(0,0,W,H);g.fillStyle='#596273';
   for(const w of walls){if(w.gate&&gateFrame!=null&&f>=gateFrame)continue;g.fillStyle=w.gate?'#ffc400':w.box?'#7b8798':'#596273';g.save();g.translate(X(w.cx),Y(w.cy));if(w.bar)g.rotate(-Math.atan2(w.sin,w.cos));else if(w.rot)g.rotate(-w.rot);g.fillRect(-w.hx*sc,-w.hy*sc,w.hx*2*sc,w.hy*2*sc);g.restore();}
-  if(padA){const a=padA[Math.min(f,padA.length-1)];g.save();g.translate(X(0),Y(d.padY));g.rotate(-a);g.fillStyle='#c9d2e0';for(let k=0;k<2;k++){g.fillRect(-d.padLen*sc,-d.padTh*sc,d.padLen*2*sc,d.padTh*2*sc);g.rotate(Math.PI/2);}g.beginPath();g.arc(0,0,d.padTh*2.2*sc,0,7);g.fillStyle='#ffc400';g.fill();g.restore();}
+  if(gateFrame==null||f<gateFrame){if(d.boxY0!=null){ // 바람: 통 바닥 가운데에서 위로 솟는 줄무늬
+    g.save();g.strokeStyle='#9fd8ff';g.lineCap='round';for(let k=0;k<9;k++){const u=((f*0.045+k/9)%1),x=(k%3-1)*d.jetWidth*0.55+Math.sin(f*0.2+k)*0.006,y=d.boxY0+0.012+u*(d.boxY1-d.boxY0-0.04);g.globalAlpha=0.55*(1-u);g.lineWidth=2;g.beginPath();g.moveTo(X(x),Y(y));g.lineTo(X(x),Y(y+0.022));g.stroke();}g.restore();}}
   const o=f*stride,r=d.ballR*sc;g.textAlign='center';
   for(let i=0;i<n;i++){const x=X(frames[o+i*4]),y=Y(frames[o+i*4+1]);if(y>H+r)continue;g.beginPath();g.arc(x,y,r,0,7);g.fillStyle=hueOf(i);g.fill();g.lineWidth=1.5;g.strokeStyle='#0008';g.stroke();}
   g.font=`bold ${Math.max(10,Math.min(13,r*0.95))}px system-ui`;g.lineWidth=3;g.strokeStyle='#000c';g.fillStyle='#fff';
