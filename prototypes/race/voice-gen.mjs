@@ -5,14 +5,20 @@ import fs from 'node:fs';import {execFileSync} from 'node:child_process';
 import {TYPES} from '../../public/race/sim.mjs';
 const dir=new URL('../../public/race/voice/',import.meta.url).pathname,lines=JSON.parse(fs.readFileSync(dir+'lines.json','utf8')),jobs=Object.entries(lines);
 for(const [type,T] of Object.entries(TYPES))for(let no=1;no<=10;no++)jobs.push(['n'+no+'_'+type,no+'번 '+T.name+'!']);
-const MODEL=process.env.VOICE_MODEL||'gpt-4o-mini-tts',VOICE=process.env.VOICE_NAME||'ash';
-const STYLE='한국 경마 중계 캐스터. 매우 흥분해서 빠르고 힘차게, 숨 가쁘게 외치듯 말한다. 또박또박 들리게 발음하고, 문장 끝을 힘 있게 올려 친다.';
+// 말투를 '연기'시킬 수 있는 음성 모델을 씁니다(읽어 주기 전용 모델은 중계치고 너무 차분했음, 2026-11-23 사용자 의견).
+const MODEL=process.env.VOICE_MODEL||'gpt-audio-1.5',VOICE=process.env.VOICE_NAME||'echo';
+const STYLE='You are a voice actor. Speak ONLY the exact Korean line the user gives, word for word, nothing before or after. Performance direction: a frantic Korean horse-racing play-by-play announcer at the climax of the race. He is SHOUTING at the top of his lungs, voice straining and almost cracking with excitement. Pacing: extremely fast and breathless, words tumbling out. Pitch: high and rising, peaking hard on every exclamation. Energy: absolute maximum, like a last-second goal call in a World Cup final. Never calm, never soft, never slow.';
+const plain=t=>t.replace(/유에프오/g,'UFO').replace(/[^0-9A-Za-z가-힣]/g,'');
 const index={};let made=0,failed=0;
 for(const [key,text] of jobs){const out=dir+key+'.mp3',raw='/tmp/voice_raw_'+key+'.mp3';
  if(!fs.existsSync(out)){
-  const res=await fetch('https://api.openai.com/v1/audio/speech',{method:'POST',headers:{Authorization:'Bearer dummy','Content-Type':'application/json'},body:JSON.stringify({model:MODEL,voice:VOICE,input:text,instructions:STYLE,response_format:'mp3'})});
-  if(!res.ok){failed++;console.log('실패',key,res.status,(await res.text()).slice(0,160));if(res.status===429||res.status===401)break;continue;}
-  fs.writeFileSync(raw,Buffer.from(await res.arrayBuffer()));
+  // 이 환경은 정해진 통로(프록시)로만 밖에 나갈 수 있어 curl 로 요청합니다. 받은 소리의 받아쓰기가 문장과 다르면(말을 덧붙였으면) 세 번까지 다시 시킵니다.
+  const body=JSON.stringify({model:MODEL,modalities:['text','audio'],audio:{voice:VOICE,format:'mp3'},messages:[{role:'system',content:STYLE},{role:'user',content:text}]});
+  let ok=false,why='';for(let k=0;k<3&&!ok;k++){try{const d=JSON.parse(execFileSync('curl',['-s','-m','180','https://api.openai.com/v1/chat/completions','-H','Authorization: Bearer dummy','-H','Content-Type: application/json','-d',body],{maxBuffer:64*1024*1024}).toString());
+    if(d.error){why=d.error.code||d.error.message;if(/quota|credit|key/i.test(JSON.stringify(d.error)))break;continue;}
+    const a=d.choices[0].message.audio;if(plain(a.transcript||'')!==plain(text)){why='다르게 읽음: '+(a.transcript||'').slice(0,60);continue;}
+    fs.writeFileSync(raw,Buffer.from(a.data,'base64'));ok=true;}catch(e){why=String(e.message).slice(0,120);}}
+  if(!ok){failed++;console.log('실패',key,why);if(/quota|credit|key/i.test(why))break;continue;}
   // 앞뒤 무음을 잘라 내고 소리 크기를 고르게 맞춘 뒤 작은 파일로 저장
   execFileSync('ffmpeg',['-y','-loglevel','error','-i',raw,'-af','silenceremove=start_periods=1:start_threshold=-45dB,areverse,silenceremove=start_periods=1:start_threshold=-45dB,areverse,loudnorm=I=-16:TP=-1.5','-ac','1','-ar','24000','-b:a','48k',out]);fs.unlinkSync(raw);made++;}
  index[key]=Math.round(parseFloat(execFileSync('ffprobe',['-v','error','-show_entries','format=duration','-of','csv=p=0',out]).toString())*100)/100;}
