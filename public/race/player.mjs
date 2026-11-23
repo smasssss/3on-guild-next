@@ -36,7 +36,7 @@ export function voiceOf(e,types,rank){
 export const nameText=key=>{const m=/^n(\d+)_(\w+)$/.exec(key);return m&&TYPES[m[2]]?m[1]+'번 '+TYPES[m[2]].name+'!':null;};
 /** 경기 한 판을 준비합니다. ctx 는 누르는 순간 만들어 둔 소리 장치(없으면 소리 없이 진행). */
 export async function open(box,{seed,n,ctx=null,voice=true,music=true,onEnd=null}){
- box.innerHTML='<div class="rg-stage"><canvas class="rg-canvas" aria-label="엉뚱 경주 화면"></canvas><p class="rg-wait" role="status">경기를 준비하는 중입니다…</p></div><div class="rg-bar"><button type="button" class="rg-skip" hidden>결과 바로 보기</button><span class="rg-hint">휴대폰을 가로로 돌리면 더 크게 보입니다.</span></div>';
+ box.innerHTML='<div class="rg-stage"><canvas class="rg-canvas" aria-label="엉뚱 경주 화면"></canvas><p class="rg-wait" role="status">경기를 준비하는 중입니다…</p></div><div class="rg-bar"><button type="button" class="rg-skip" hidden>결과 바로 보기</button><span class="rg-hint">휴대폰을 옆으로 돌려서 보세요.</span></div>';
  const cv=box.querySelector('canvas'),wait=box.querySelector('.rg-wait'),skipBtn=box.querySelector('.rg-skip');
  const show=await createShow(cv,{seed,n}),race=show.race,ranks=new Map();{let k=0;for(const e of race.events)if(e.kind==='finish')ranks.set(e,++k);}
  // 이번 경기에 필요한 목소리 조각만 미리 받아 둠

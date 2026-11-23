@@ -355,6 +355,8 @@ html.tr-open,html.tr-open body{overflow:hidden}
 .rg-bar{display:flex;gap:12px;align-items:center;justify-content:space-between;min-height:48px;padding:6px 12px}
 .rg-skip{min-height:38px;padding:6px 16px;border:0;border-radius:999px;background:#ffd92e;color:#111;font:inherit;font-weight:700;font-size:15px;cursor:pointer}.rg-skip[hidden]{display:none}
 .rg-hint{color:#9fb0c4;font-size:13px}@media (orientation:landscape){.rg-hint{display:none}}
+/* 세로로 든 휴대폰: 화면을 옆으로 눕혀 크게 보여 줍니다(휴대폰을 옆으로 돌려 보면 됩니다. 화면 회전 잠금이 켜져 있어도 됩니다) */
+@media (orientation:portrait){#rgBox{position:absolute;top:50%;left:50%;width:100vh;max-width:none;transform:translate(-50%,-50%) rotate(90deg)}.rg-stage,.rg-bar{max-width:calc((100vw - 56px)*16/9);margin:0 auto}}
 #rgClose{position:absolute;top:calc(8px + env(safe-area-inset-top));right:10px;z-index:1;min-height:40px;padding:6px 14px;border-radius:999px;border:1px solid #ffffff55;background:#000a;color:#fff;font:inherit;font-size:14px;cursor:pointer}
 .rg-chip{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;border:1px solid #0006;font-weight:800;font-size:13px;flex:none}
 .rg-top{display:inline-flex;align-items:center;gap:4px;margin-right:6px}
