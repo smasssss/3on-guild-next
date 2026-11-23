@@ -5,7 +5,7 @@ type Row={revision:number;payload:string;updated_at:string};
 async function readRaces(){const row=await db().prepare('SELECT revision,payload,updated_at FROM documents WHERE kind=?').bind(RACE_KIND).first<Row>();return {revision:row?.revision||0,data:row?JSON.parse(row.payload) as RaceData:emptyRaces(),updatedAt:row?.updated_at||null};}
 export function OPTIONS(req:Request){return response(req,{},204);}
 // 누구나 볼 수 있습니다(기록 목록).
-export async function GET(req:Request){try{const doc=await readRaces();return response(req,{schema:'3on-race-v1',revision:doc.revision,races:doc.data.races});}catch{return response(req,{error:'엉뚱 경주 기록을 읽지 못했습니다.'},503);}}
+export async function GET(req:Request){try{const doc=await readRaces();return response(req,{schema:'3on-race-v1',revision:doc.revision,races:doc.data.races});}catch{return response(req,{error:'정통 경마 기록을 읽지 못했습니다.'},503);}}
 // 관리자만 경기 기록을 남깁니다. 저장 전 자료는 자동 백업하고, 다른 기기와 동시에 저장하면 한쪽만 들어갑니다.
 export async function POST(req:Request){
  let committed:(()=>Promise<Response|null>)|null=null;

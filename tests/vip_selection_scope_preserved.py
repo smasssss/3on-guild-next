@@ -3,7 +3,7 @@ import subprocess
 from pathlib import Path
 base='82daba8f3032198bdec65c2e9dda7057d7da6309'
 allowed={'lib/race.ts','app/api/race/route.ts','public/race-game.js','lib/lotto.ts','app/api/lotto/route.ts','public/lotto-draw.js','lib/treadmill.ts','app/api/treadmill/route.ts','public/treadmill-race.js','lib/kvk.ts','app/api/kvk/route.ts','public/kvk.js','build/sites-worker.ts','lib/vip-weekly.ts','lib/validate.ts','app/api/carriage/vip/route.ts','public/carriage-vip.js','public/ops-theme.css','public/ops-theme-growth.css','public/fonts/cafe24-syongsyong.woff','public/ops-select.js','public/legacy.html','lib/growth-roster.ts','lib/growth-automation.ts','app/api/growth/legacy/route.ts','public/growth-auto.js','app/api/state/route.ts','lib/pinball.ts','app/api/pinball/route.ts','public/pinball.js','public/arena.js','public/treadmill.js'}
-# 2026-11-23: 엉뚱 경주 (user request; third game in the 추첨 게임 tab): lib/race.ts, app/api/race/route.ts, public/race-game.js
+# 2026-11-23: 정통 경마 (first named 엉뚱 경주; user request; third game in the 추첨 게임 tab): lib/race.ts, app/api/race/route.ts, public/race-game.js
 # (its own record kind 'race'), plus static game files under public/race/ (maths, drawing, player, pictures, voice lines, music).
 # 2026-11-23: 로또 추첨기 (user request; another game in the 추첨 게임 tab): lib/lotto.ts, app/api/lotto/route.ts, public/lotto-draw.js
 # (its own record kind 'lotto'), plus static game files under public/lotto3d/.

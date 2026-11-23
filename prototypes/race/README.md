@@ -1,4 +1,4 @@
-# 엉뚱 경주 개발 도구
+# 정통 경마 개발 도구
 
 '추첨 게임' 탭의 세 번째 게임입니다. 실제 파일은 `public/race/`(계산 `sim.mjs`, 그리기 `view.mjs`, 재생·소리 `player.mjs`, 그림 `assets/`, 중계 문장 `voice/`, 음악 `music/`)와 `public/race-game.js`(탭 화면), `lib/race.ts`·`app/api/race/route.ts`(기록)에 있습니다.
 

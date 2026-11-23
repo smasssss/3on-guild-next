@@ -1,4 +1,4 @@
-// 엉뚱 경주 화면(시안 2). sim.mjs 가 미리 계산한 경기를 그대로 다시 보여 줍니다.
+// 정통 경마 화면(시안 2). sim.mjs 가 미리 계산한 경기를 그대로 다시 보여 줍니다.
 // createShow(캔버스,{seed,n}) 가 경기 한 판을 준비해, 원하는 순간을 그리는 render(초) 를 돌려줍니다. 재생과 소리는 player.mjs 가 맡습니다.
 import {runRace,TYPES,TRACK,HZ} from './sim.mjs';
 import {timeline,PRE,COUNTDOWN,POST} from './timeline.mjs';
@@ -179,7 +179,7 @@ function hud(f,ts,pip,readRank){const ord=orderAt(Math.max(0,f));
  rr(176,14,1088,42,21);g.fillStyle='rgba(10,20,30,.62)';g.fill();const bx0=206,bx1=1214;g.strokeStyle='rgba(255,255,255,.55)';g.lineWidth=4;g.beginPath();g.moveTo(bx0,35);g.lineTo(bx1,35);g.stroke();
  for(let k=0;k<3;k++)for(let r=0;r<3;r++){g.fillStyle=(k+r)&1?'#111':'#fff';g.fillRect(bx1+6+k*8,23+r*8,8,8);}
  for(const no of ord.slice().reverse())chip(bx0+Math.min(1,dispX(no-1,f)/TRACK)*(bx1-bx0),35,12,no);
- rr(16,14,148,42,12);g.fillStyle='rgba(10,20,30,.78)';g.fill();g.fillStyle='#ffd92e';g.font='900 22px system-ui,sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText('엉뚱 경주',90,36);
+ rr(16,14,148,42,12);g.fillStyle='rgba(10,20,30,.78)';g.fill();g.fillStyle='#ffd92e';g.font='900 22px system-ui,sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText('정통 경마',90,36);
  rr(16,62,148,14+n*25,12);g.fillStyle='rgba(10,20,30,.62)';g.fill();
  ord.forEach((no,r)=>{const y=82+r*25;g.fillStyle=r<3?'#ffd92e':'#dfe6ee';g.font='800 15px system-ui,sans-serif';g.textAlign='right';g.textBaseline='middle';g.fillText((r+1)+'위',56,y);chip(74,y,10,no);g.fillStyle='#fff';g.font='600 14px system-ui,sans-serif';g.textAlign='left';g.fillText(TYPES[race.types[no-1]].name,90,y+1);});
  const left=Math.max(0,Math.round(TRACK-Math.max(...ord.map(no=>Math.min(TRACK,dispX(no-1,f))))));

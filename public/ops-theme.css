@@ -323,7 +323,8 @@ html.ops-wait body{visibility:hidden}
 @media(max-width:999px){.tabs{grid-template-columns:none;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);padding-left:2px;padding-right:2px}.tabs button{min-width:0;padding:6px 0;font-size:10.5px;letter-spacing:-.03em;gap:3px}.tabs button::before{width:20px;height:20px}}
 
 /* 추첨 게임 탭(2026-11-22): 핀볼 추첨 / 런닝머신 레이스 고르기, 런닝머신 경기 화면(treadmill-race.js) */
-.tr-switch{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+/* 게임 고르기: 두 칸씩 나란히(게임 네 개면 2개씩 두 줄, 2026-11-23 사용자 의견) */
+.tr-switch{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0 0 12px}
 .tr-switch button{flex:1 1 30%;white-space:nowrap;min-height:46px;padding:8px 10px;border:1px solid var(--line);border-radius:14px;background:var(--well);color:var(--text);font:inherit;font-size:16px;cursor:pointer}
 .tr-switch button.on{background:#d6578a;border-color:#d6578a;color:#fff;font-weight:700}
 #trPage .pb-person input:disabled+b{opacity:.45}
@@ -347,7 +348,7 @@ html.tr-open,html.tr-open body{overflow:hidden}
 .tr-overlay iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 .tr-overlay button{position:absolute;top:calc(8px + env(safe-area-inset-top));right:10px;z-index:1;min-height:40px;padding:6px 14px;border-radius:999px;border:1px solid #ffffff55;background:#000a;color:#fff;font:inherit;font-size:14px;cursor:pointer}
 
-/* 엉뚱 경주(추첨 게임 탭): 경기 화면 덮개와 기록의 번호표 */
+/* 정통 경마(추첨 게임 탭): 경기 화면 덮개와 기록의 번호표 */
 .rg-overlay{position:fixed;inset:0;z-index:1000;background:#0b1118;display:flex;align-items:center;justify-content:center}.rg-overlay[hidden]{display:none}
 #rgBox{width:100%;max-width:calc((100vh - 56px)*16/9)}
 .rg-stage{position:relative}.rg-canvas{display:block;width:100%;aspect-ratio:16/9;background:#16324a}

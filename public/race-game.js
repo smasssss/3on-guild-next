@@ -1,4 +1,5 @@
-/* 엉뚱 경주 (2026-11-23 사용자 결정) — '추첨 게임' 탭 안의 게임
+/* 정통 경마 (2026-11-23 사용자 결정) — '추첨 게임' 탭 안의 게임
+   - 이름: 처음에는 '엉뚱 경주'였으나, 이름이 내용을 미리 알려 준다는 사용자 의견으로 '정통 경마'로 바꿨습니다. 화면 설명에도 무슨 일이 벌어지는지 적지 않습니다.
    - 번호를 단 선수 2~10명이 달립니다. 누가 몇 번을 다는지(경주마·치타·거북이 등 열한 종류 중 하나씩)와 순위는 추첨 번호로 정해집니다.
    - 들어온 순서대로 기록으로 남습니다. 경기는 관리자만 돌릴 수 있고, 기록은 누구나 보고 다시 볼 수 있습니다.
    - 경기 계산과 화면은 /race/ 의 파일(sim.mjs, view.mjs, player.mjs)이 맡고, 이 파일은 설정·기록 저장·기록 목록을 맡습니다. 같은 추첨 번호면 언제나 같은 경기입니다. */
@@ -76,12 +77,12 @@
   if(!root.gameSwitch){setTimeout(init,200);return;} // 게임 고르기(treadmill-race.js)가 만들어진 뒤에 붙입니다
   if($('rgPage'))return;
   const el=document.createElement('div');el.id='rgPage';
-  el.innerHTML='<div class="card"><h2>엉뚱 경주</h2><p class="sub">번호를 단 선수들이 경주합니다. 경주마, 치타, 판다, 기린, 코끼리, 거북이 같은 열한 종류 가운데 누가 몇 번을 다는지는 경기마다 무작위입니다. 넘어지고, 덮치고, 날아가는 온갖 일이 벌어지지만 어느 선수든 1등을 할 수 있습니다. 경기는 관리자만 돌릴 수 있고, 들어온 순서대로 기록에 남아 누구나 볼 수 있습니다.</p>'
+  el.innerHTML='<div class="card"><h2>정통 경마</h2><p class="sub">번호를 단 선수 '+MIN_RACERS+'~'+MAX_RACERS+'명이 결승선까지 달려 순위를 가리는 정통 경마입니다. 누가 몇 번을 다는지는 경기마다 무작위로 정해집니다. 경기는 관리자만 돌릴 수 있고, 들어온 순서대로 기록에 남아 누구나 볼 수 있습니다.</p>'
    +'<div class="formgrid"><div class="field"><label for="rgCount">선수 수</label><input id="rgCount" type="number" min="'+MIN_RACERS+'" max="'+MAX_RACERS+'" value="'+MAX_RACERS+'" inputmode="numeric"></div>'
    +'<div class="field pb-check"><label><input id="rgSound" type="checkbox" checked> 소리 켜기 (경기 음악)</label></div></div>'
    +'<p class="sub" id="rgSummary" role="status"></p><div class="actions"><button type="button" class="btn primary" id="rgStart">경기 시작</button></div></div>'
    +'<div class="card"><h2>경기 기록</h2><div id="rgRecords"><p class="sub">기록을 불러오는 중입니다.</p></div></div>';
-  root.gameSwitch.add('race','엉뚱 경주',el,()=>{summary();});
+  root.gameSwitch.add('race','정통 경마',el,()=>{summary();});
   const ov=document.createElement('div');ov.id='rgOverlay';ov.className='rg-overlay';ov.hidden=true;ov.innerHTML='<div id="rgBox"></div><button type="button" id="rgClose" aria-label="경주 화면 닫기">닫기</button>';document.body.appendChild(ov);
   const input=$('rgCount');input.addEventListener('input',summary);input.addEventListener('change',summary);
   $('rgStart').onclick=start;$('rgClose').onclick=close;

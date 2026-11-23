@@ -1,4 +1,4 @@
-// 2026-11-23 user decision: a saved 엉뚱 경주 record is replayed by recomputing the race from its seed (추첨 번호),
+// 2026-11-23 user decision: a saved 정통 경마 record is replayed by recomputing the race from its seed (추첨 번호),
 // so the same seed must always give the same racers and the same finishing order. These races were computed when rules
 // version 1 (RACE_VERSION) was fixed; if any of them changes, saved records would no longer replay — add a new version instead.
 // User rules checked here: each kind of racer appears at most once per race (only one cheetah), every racer reaches the
@@ -44,4 +44,4 @@ assert.ok(last.turtle>=100,'the turtle is usually last: '+last.turtle);assert.ok
 for(const n of [2,3,5,7,9])for(let s=0;s<6;s++)checkRace(runRace(((s*7919+n*104729)>>>0).toString(16).padStart(8,'0'),n),n);
 for(const k of ['start','lead','fall','finish','end','stomp','shellhit','split','ufo','ufodrop','tornado','pounce','bowl','panic','wait','bonk','dig','eat','nap','slip','home'])assert.ok(kinds.has(k),'event seen: '+k);
 assert.ok(!/Math\.(sin|cos|tan|exp|pow|hypot|acos|asin|atan|atan2|log|random|cbrt|sqrt)\b/.test(fs.readFileSync(new URL('../public/race/sim.mjs',import.meta.url),'utf8')),'the race maths uses no device-dependent functions');
-console.log('PASS: 엉뚱 경주 replays exactly from its seed (5 saved races), one racer per kind, everyone finishes, every kind wins sometimes, every event has a voice line');
+console.log('PASS: 정통 경마 replays exactly from its seed (5 saved races), one racer per kind, everyone finishes, every kind wins sometimes, every event has a voice line');

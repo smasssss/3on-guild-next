@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports -- Node CommonJS regression harness, matching existing tests. */
-// 2026-11-23 user decision: 엉뚱 경주 in the 추첨 게임 tab. Numbered racers (2-10) run; which kind of racer wears which number and
+// 2026-11-23 user decision: 정통 경마 in the 추첨 게임 tab. Numbered racers (2-10) run; which kind of racer wears which number and
 // the finishing order come from the seed. The result is recorded in finishing order. Records are their own document kind 'race'
 // (no other document is touched), readable by anyone and written by admins only. A commentary voice and the user's own race
 // music play when the sound switch is on; a "결과 바로 보기" button skips to the result.
@@ -37,7 +37,7 @@ const race=(over={})=>({id:'d1b2c3d4-0000-4000-8000-000000000001',seed:'00c51d27
  assert.match(sim,/export const RACE_VERSION=1,MIN_RACERS=2;/);assert.equal(ui.VERSION,1);
  // 4) Wiring: the game is added to the 추첨 게임 tab's game switch; the record is saved before the race is shown; a skip button exists
  const html=fs.readFileSync('public/legacy.html','utf8');assert.match(html,/<script src="\/lotto-draw\.js\?v=\d+" defer><\/script><script src="\/race-game\.js\?v=\d+" defer><\/script>/);
- const js=fs.readFileSync('public/race-game.js','utf8');assert.match(js,/root\.gameSwitch\.add\('race','엉뚱 경주'/);assert.match(js,/ensureAdmin/);
+ const js=fs.readFileSync('public/race-game.js','utf8');assert.match(js,/root\.gameSwitch\.add\('race','정통 경마'/);assert.match(js,/ensureAdmin/);
  assert.ok(js.indexOf("api('/api/race',{method:'POST'")<js.indexOf('show.play()'),'the record is saved before the race plays');
  const player=fs.readFileSync('public/race/player.mjs','utf8');assert.match(player,/결과 바로 보기/);assert.match(player,/voice\/index\.json/);assert.match(player,/music\/race\.mp3/);
  for(const file of ['sim.mjs','view.mjs','player.mjs','timeline.mjs','commentary.mjs','voice/lines.json','music/race.mp3','music/CREDITS.md','assets/track.jpg','assets/panda.png','assets/shell.png','assets/kangaroo.png','assets/ufo.png','assets/mouse.png','assets/cbike.png','assets/cride.png','assets/cfront_0.png','assets/cback_1.png'])assert.ok(fs.existsSync('public/race/'+file),file);
@@ -46,5 +46,5 @@ const race=(over={})=>({id:'d1b2c3d4-0000-4000-8000-000000000001',seed:'00c51d27
  const idx=JSON.parse(fs.readFileSync('public/race/voice/index.json','utf8'));for(const k of Object.keys(idx))assert.ok(fs.existsSync('public/race/voice/'+k+'.mp3'),'clip '+k);
  // The commentary starts calm (a greeting by the caster), rises with the race, and ends with a calm wrap-up reading the finishers
  const lines=JSON.parse(fs.readFileSync('public/race/voice/lines.json','utf8'));assert.match(lines.i_hello,/안녕하십니까.*해설을 맡은/);assert.match(lines.w_intro,/결과를 정리/);assert.match(lines.p_start,/경기 시작했습니다/);for(let k=1;k<=10;k++)assert.equal(lines['r'+k],k+'위,');
- console.log('PASS: 엉뚱 경주 records validated (one racer per kind, full finishing order), own document kind, admin-only save, input checks, wired into the 추첨 게임 tab');
+ console.log('PASS: 정통 경마 records validated (one racer per kind, full finishing order), own document kind, admin-only save, input checks, wired into the 추첨 게임 tab');
 })().catch(e=>{console.error(e);process.exitCode=1;});

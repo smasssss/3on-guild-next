@@ -1,4 +1,4 @@
-// 엉뚱 경주 재생 시간표. 경기 계산(sim.mjs)의 장면 번호를 화면에 트는 시각(초)으로 바꿉니다. 그림·소리가 같은 시간표를 씁니다.
+// 정통 경마 재생 시간표. 경기 계산(sim.mjs)의 장면 번호를 화면에 트는 시각(초)으로 바꿉니다. 그림·소리가 같은 시간표를 씁니다.
 import {HZ} from './sim.mjs';
 export const PRE=7,COUNTDOWN=3,POST=5.5; // 출발 전 인사 시간(마지막 3초는 3·2·1), 경기 뒤 결과판을 보여 주는 최소 시간
 export function timeline(race){

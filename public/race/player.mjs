@@ -1,4 +1,4 @@
-// 엉뚱 경주 재생과 소리. open(상자,{seed,n,...}) 이 경기 한 판을 준비하고, play() 로 틀어 줍니다.
+// 정통 경마 재생과 소리. open(상자,{seed,n,...}) 이 경기 한 판을 준비하고, play() 로 틀어 줍니다.
 // 중계 목소리: 미리 짠 중계 순서(commentary.mjs)대로, voice/index.json 에 적힌 녹음 조각을 이어 붙여 틉니다.
 //   녹음이 아직 없으면(index.json 이 비어 있으면) 기기에 들어 있는 읽어 주는 목소리로 같은 문장을 읽습니다.
 // 배경음악: music/race.mp3 를 출발 신호부터 틀고, 말하는 동안은 작게 줄이며, 경기가 끝나면 서서히 끕니다.
@@ -13,7 +13,7 @@ const clipIndex=()=>indexP||(indexP=fetch(url('voice/index.json?v='+VOICE_VERSIO
 const decode=(ctx,p)=>fetch(url(p)).then(r=>r.ok?r.arrayBuffer():Promise.reject(Error(p))).then(b=>new Promise((ok,no)=>ctx.decodeAudioData(b,ok,no)));
 /** 경기 한 판을 준비합니다. ctx 는 누르는 순간 만들어 둔 소리 장치(없으면 소리 없이 진행). */
 export async function open(box,{seed,n,ctx=null,voice=true,music=true,onEnd=null}){
- box.innerHTML='<div class="rg-stage"><canvas class="rg-canvas" aria-label="엉뚱 경주 화면"></canvas><p class="rg-wait" role="status">경기를 준비하는 중입니다…</p></div><div class="rg-bar"><button type="button" class="rg-skip" hidden>결과 바로 보기</button><span class="rg-hint">휴대폰을 옆으로 돌려서 보세요.</span></div>';
+ box.innerHTML='<div class="rg-stage"><canvas class="rg-canvas" aria-label="정통 경마 화면"></canvas><p class="rg-wait" role="status">경기를 준비하는 중입니다…</p></div><div class="rg-bar"><button type="button" class="rg-skip" hidden>결과 바로 보기</button><span class="rg-hint">휴대폰을 옆으로 돌려서 보세요.</span></div>';
  const cv=box.querySelector('canvas'),wait=box.querySelector('.rg-wait'),skipBtn=box.querySelector('.rg-skip');
  const show=await createShow(cv,{seed,n,greeting:voice}),race=show.race,text=await lines(),index=ctx&&voice?await clipIndex():null,plan=planCommentary(race,show.tl,text,index),buffers=new Map();
  // 이번 경기에 필요한 목소리 조각만 미리 받아 둠(오래 걸리면 받은 것까지만 쓰고 시작)
