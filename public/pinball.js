@@ -283,6 +283,8 @@
  // 소리(모두 CC0 공개 저작물, 출처는 /pinball-music/CREDITS.md). 휴대폰은 누르는 순간에만 소리를 낼 수 있어 시작 버튼에서 켭니다.
  // 2026-11-10: 휴대폰(특히 아이폰)에서 효과음(new Audio)이 나면 배경음악이 끊기는 문제 → 웹 오디오 한 곳에서 음악과 효과음을 섞어 냅니다.
  // 음악은 소리 버퍼를 끊김 없이 반복하고, 아이폰 무음 스위치에도 들리도록 재생용 오디오 세션을 요청합니다.
+ // 2026-11-23: 소리가 너무 크다는 의견으로 배경음악과 효과음(도착 소리, 결과 소리)을 작게 줄였습니다.
+ const BGM_VOLUME=.28,EFFECT_VOLUME=.3;
  const sound={ctx:null,bgm:null,want:false,token:0,buffers:new Map()};
  function soundOn(){return !!$('pbSound')?.checked;}
  function audioCtx(){
@@ -300,7 +302,7 @@
   // 배틀로얄은 '추첨마다 자동'일 때 전투 음악 중에서 고릅니다(곡을 직접 고르면 그 곡).
   const name=game==='arena'&&pick==='auto'&&battle.length?battle[parseInt(seed,16)%battle.length].key:'bgm'+String(n).padStart(2,'0');
   const token=++sound.token;sound.want=true;soundBuffer('goal');soundBuffer('win');if(game==='arena')soundBuffer('boom').catch(()=>{});
-  soundBuffer(name).then(buf=>{if(token!==sound.token||!soundOn())return;const src=c.createBufferSource(),g=c.createGain();src.buffer=buf;src.loop=true;g.gain.value=.55;src.connect(g);g.connect(c.destination);src.start();sound.bgm={src,g};}).catch(()=>{});
+  soundBuffer(name).then(buf=>{if(token!==sound.token||!soundOn())return;const src=c.createBufferSource(),g=c.createGain();src.buffer=buf;src.loop=true;g.gain.value=BGM_VOLUME;src.connect(g);g.connect(c.destination);src.start();sound.bgm={src,g};}).catch(()=>{});
  }
  function stopMusic(now){
   sound.token++;sound.want=false;const m=sound.bgm,c=sound.ctx;if(!m||!c)return;sound.bgm=null;
@@ -308,7 +310,7 @@
  }
  function effect(name){
   if(!soundOn()||!sound.ctx)return;const c=sound.ctx;
-  soundBuffer(name).then(buf=>{const src=c.createBufferSource(),g=c.createGain();src.buffer=buf;g.gain.value=.8;src.connect(g);g.connect(c.destination);src.start();}).catch(()=>{});
+  soundBuffer(name).then(buf=>{const src=c.createBufferSource(),g=c.createGain();src.buffer=buf;g.gain.value=EFFECT_VOLUME;src.connect(g);g.connect(c.destination);src.start();}).catch(()=>{});
  }
  // 배틀로얄 탈락 소리: 파일 없이 만드는 짧은 8비트 '뿅'(높은 음에서 낮은 음으로 떨어짐)
  function blip(){
@@ -448,7 +450,7 @@
   if(!voice.on||typeof speechSynthesis==='undefined'||!text)return;
   if(speechSynthesis.speaking||speechSynthesis.pending){if(!major)return;speechSynthesis.cancel();}
   const u=new SpeechSynthesisUtterance(text);u.lang='ko-KR';u.rate=1.25;u.pitch=1.1;u.volume=1;
-  const duck=v=>{try{if(sound.bgm)sound.bgm.g.gain.value=v;}catch{/* 음악 없음 */}};u.onstart=()=>duck(.2);u.onend=u.onerror=()=>duck(.55);
+  const duck=v=>{try{if(sound.bgm)sound.bgm.g.gain.value=v;}catch{/* 음악 없음 */}};u.onstart=()=>duck(.1);u.onend=u.onerror=()=>duck(BGM_VOLUME);
   speechSynthesis.speak(u);
  }
  function stopVoice(){voice.on=false;try{if(typeof speechSynthesis!=='undefined')speechSynthesis.cancel();}catch{/* 지원하지 않는 브라우저 */}}
