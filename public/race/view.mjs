@@ -1,7 +1,9 @@
 // 엉뚱 경주 화면(시안 2). sim.mjs 가 미리 계산한 경기를 그대로 다시 보여 줍니다.
 // createShow(캔버스,{seed,n}) 가 경기 한 판을 준비해, 원하는 순간을 그리는 render(초) 를 돌려줍니다. 재생과 소리는 player.mjs 가 맡습니다.
 import {runRace,TYPES,TRACK,HZ} from './sim.mjs';
-export const W=1280,H=720,PRE=3,POST=5.5;
+import {timeline,PRE,COUNTDOWN,POST} from './timeline.mjs';
+import {HELLO,READY} from './commentary.mjs';
+export const W=1280,H=720;
 const PPU=11,HOR=392,ASSET_VERSION='1';
 const LOOK={horse:{h:135,stride:16},biped:{h:158,stride:11},cheetah:{h:90,stride:20},panda:{h:112,stride:0},ostrich:{h:165,stride:10},costume:{h:150,stride:9},giraffe:{h:185,stride:18},elephant:{h:178,stride:13},cow:{h:132,stride:15},zebra:{h:138,stride:16},turtle:{h:66,stride:4}};
 const EXTRA={shell:60,kangaroo:200,cfront_0:150,cfront_1:150,cback_0:150,cback_1:150,cbike:170,cride:165,mouse:36,ufo:100};
@@ -22,7 +24,7 @@ const FAR=tileOf(track,230,330),FENCE=tileOf(track,560,215),GRASS=tileOf(track,7
 const SKY=(()=>{const d=FAR.getContext('2d').getImageData(10,2,1,1).data;return 'rgb('+d[0]+','+d[1]+','+d[2]+')';})();
 // ---- 경기 자료 정리 ----
 const F0=-PRE*HZ,F1=F+Math.round(POST*HZ),clampF=f=>Math.max(0,Math.min(F-1,f));
-const doneF=new Array(n).fill(null);for(const e of race.events)if(e.kind==='finish')doneF[e.a-1]=Math.min(F-1,e.frame);
+const tl=timeline(race),{doneF,firstF,speedAt,frameAt,total}=tl;
 const fr=(i,f)=>race.frames[clampF(f)][i];
 const dispX=(i,f)=>{if(f<0)return 0;const d=doneF[i];if(d!=null&&f>d)return TRACK+Math.max(12,fr(i,d).v)*0.8*(f-d)/HZ;return fr(i,f).x;};
 const MOVING=['run','sprint','burst','panic','crawl','split','roll','bike','shell'];
@@ -42,7 +44,7 @@ const SHOT={pounce:{o:'b',pre:.5,post:1.7,z:1.45,p:3},bowl:{o:'b',pre:.4,post:1.
  split:{o:'a',pre:.6,post:2.3,z:1.4,p:4},bike:{o:'a',pre:.2,post:2.5,z:1.25,p:5},ride:{o:'a',pre:.4,post:2.3,z:1.3,p:5},rideoff:{o:'a',pre:.2,post:1.5,z:1.4,p:3},leap:{o:'a',pre:.3,post:1.6,z:1,p:6,flat:1},
  stomp:{o:'a',pre:1.5,post:2.2,z:1.2,p:5},ricochet:{o:'a',pre:.3,post:1.7,z:1.2,p:4},unshell:{o:'a',pre:.2,post:1.4,z:1.45,p:2},ufo:{o:'a',pre:1,post:3.4,z:1.05,p:5},ufofail:{o:'a',pre:1,post:2.3,z:1.1,p:4},
  panic:{o:'a',pre:.3,post:2,z:1.25,p:3},cele:{o:'a',pre:.2,post:2.3,z:1.4,p:5},tornado:{o:'a',pre:.4,post:2.3,z:1,p:5},slip:{o:'a',pre:.3,post:1.3,z:1.4,p:1}};
-const firstF=race.events.find(e=>e.kind==='finish')?.frame??F,shots=[];{let lastCutEnd=-1e9;
+const shots=[];{let lastCutEnd=-1e9;
  for(const e of race.events){const S=SHOT[e.kind];if(!S)continue;const who=(S.o==='b'&&e.b?e.b:e.a)-1,f0=Math.max(0,Math.round(e.frame-S.pre*HZ)),f1=Math.min(F-1,Math.round(e.frame+S.post*HZ));if(f1-f0<40)continue;
   const cut=!inLead(dispX(who,e.frame),e.frame),last=shots[shots.length-1];
   if(cut){if(S.p<5&&f0<firstF+1.2*HZ&&f1>firstF-4.5*HZ)continue;if(S.p<4&&f0<lastCutEnd+2.2*HZ)continue;}
@@ -64,11 +66,6 @@ const camX=new Float32Array(NF),camZ=new Float32Array(NF),camH=new Float32Array(
   if(s){const lf=laneF(s.who);tz=s.z;tc=dispX(s.who,f)-7+(s.kind==='stomp'||s.kind==='bike'?10:0);th=s.flat?HOR+40:clamp(505-laneY(lf)*tz,HOR-230,HOR+70);rate=4.5;}
   const snap=(s!==prev)&&((s&&s.cut)||(prev&&prev.cut));if(snap){c=tc;z=tz;h=th;snaps.push(f);}else{c+=(tc-c)*rate/HZ;z+=(tz-z)*rate/HZ;h+=(th-h)*rate/HZ;}
   camX[f-F0]=c;camZ[f-F0]=z;camH[f-F0]=h;prev=s;}}
-// 빨리 감기: 선두가 들어온 뒤, 느린 선수(기어가는 거북이·갈라진 인형탈)만 남고 별일이 없는 구간은 6배로 돌림
-const speedAt=new Float32Array(F).fill(1),tOf=new Float64Array(F+1);{const busy=new Uint8Array(F);for(const e of race.events){if(e.kind==='fall'||e.kind==='end')continue;for(let f=Math.max(0,e.frame-Math.round(2.5*HZ));f<Math.min(F,e.frame+HZ);f++)busy[f]=1;}
- for(let f=firstF+1;f<F;f++){if(busy[f])continue;let slow=true;for(let i=0;i<n&&slow;i++){if(doneF[i]!=null&&f>doneF[i])continue;const d=race.frames[f][i];slow=(race.types[i]==='turtle'&&d.s==='crawl')||(d.sp&&(d.s==='split'||d.s==='down'));}if(slow)speedAt[f]=6;}
- for(let f=0;f<F;f++)tOf[f+1]=tOf[f]+1/(HZ*speedAt[f]);}
-const total=PRE+tOf[F]+POST,frameAt=ts=>{const u=ts-PRE;if(u<0)return Math.floor(u*HZ);if(u>=tOf[F])return F+Math.floor((u-tOf[F])*HZ);let a=0,b=F;while(b-a>1){const m=(a+b)>>1;if(tOf[m]<=u)a=m;else b=m;}return a;};
 // ---- 그리기 도구 ----
 let g=main;
 function strip(tile,dy,dh,scroll){const s=dh/tile.height,tw=tile.width*s;let x=-(((scroll%tw)+tw)%tw);for(;x<W;x+=tw-1)g.drawImage(tile,x,dy,tw,dh);}
@@ -166,7 +163,7 @@ function world(f,ts,C){const {L,z,hy}=C,X=x=>(x-L)*PPU*z,Yof=lf=>hy+laneY(lf)*z,
 }
 function orderAt(f){const fin=race.events.filter(e=>e.kind==='finish'&&e.frame<=f).map(e=>e.a),rest=[];for(let i=0;i<n;i++)if(!fin.includes(i+1))rest.push(i+1);rest.sort((a,b)=>dispX(b-1,f)-dispX(a-1,f));return [...fin,...rest];}
 const LOWKEY=['lead','finish','home','unshell'];
-function render(ts){ts=clamp(ts,0,total-1e-6);const f=clamp(frameAt(ts),F0,F1-1),k=f-F0,shot=shotAt[k];g=main;
+function render(ts,opts={}){ts=clamp(ts,0,total-1e-6);const f=clamp(frameAt(ts),F0,F1-1),k=f-F0,shot=shotAt[k];g=main;
  let shake=0;for(const e of race.events)if(['pounce','bowl','trample','shellhit','stomp','bounce','ricochet'].includes(e.kind)&&f>=e.frame&&f-e.frame<16)shake=Math.max(shake,1-(f-e.frame)/16);
  g.save();if(shake)g.translate(Math.sin(f*2.1)*8*shake,Math.cos(f*2.7)*6*shake);
  world(f,ts,{L:camX[k]-W/(2*PPU*camZ[k]),z:camZ[k],hy:camH[k]});g.restore();
@@ -175,10 +172,10 @@ function render(ts){ts=clamp(ts,0,total-1e-6);const f=clamp(frameAt(ts),F0,F1-1)
   rr(px+8,py+8,58,26,6);g.fillStyle='rgba(10,20,30,.8)';g.fill();g.fillStyle='#ffd92e';g.font='800 15px system-ui,sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText(f>firstF?'결승선':'선두',px+37,py+22);
   g.font='800 21px system-ui,sans-serif';const lw=g.measureText(shot.label).width+54;rr(180,66,lw,36,18);g.fillStyle='rgba(10,20,30,.78)';g.fill();g.beginPath();g.arc(200,84,7,0,7);g.fillStyle=Math.floor(ts*2)%2?'#ff3b2f':'#a01912';g.fill();g.fillStyle='#fff';g.textAlign='left';g.fillText(shot.label,214,85);}
  for(const sf of snaps){const d=f-sf;if(d>=0&&d<6){g.fillStyle='rgba(255,255,255,'+(0.55*(1-d/6))+')';g.fillRect(0,0,W,H);}}
- hud(f,ts,!!(shot&&shot.cut));
+ hud(f,ts,!!(shot&&shot.cut),opts.readRank||0);
  if(f>=0&&f<F&&speedAt[f]>1){rr(W/2-96,112,192,40,20);g.fillStyle='rgba(10,20,30,.78)';g.fill();g.fillStyle='#ffd92e';g.font='800 21px system-ui,sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText('▶▶ 빨리 감기',W/2,133);}
 }
-function hud(f,ts,pip){const ord=orderAt(Math.max(0,f));
+function hud(f,ts,pip,readRank){const ord=orderAt(Math.max(0,f));
  rr(176,14,1088,42,21);g.fillStyle='rgba(10,20,30,.62)';g.fill();const bx0=206,bx1=1214;g.strokeStyle='rgba(255,255,255,.55)';g.lineWidth=4;g.beginPath();g.moveTo(bx0,35);g.lineTo(bx1,35);g.stroke();
  for(let k=0;k<3;k++)for(let r=0;r<3;r++){g.fillStyle=(k+r)&1?'#111':'#fff';g.fillRect(bx1+6+k*8,23+r*8,8,8);}
  for(const no of ord.slice().reverse())chip(bx0+Math.min(1,dispX(no-1,f)/TRACK)*(bx1-bx0),35,12,no);
@@ -190,16 +187,16 @@ function hud(f,ts,pip){const ord=orderAt(Math.max(0,f));
  // 중계 자막(웃긴 사건이 순위 알림에 바로 덮이지 않게 함)
  let ev=null,hi=null;for(const e of race.events){if(e.frame>f)break;if(f-e.frame<3*HZ){ev=e;if(!LOWKEY.includes(e.kind))hi=e;}}
  if(ev&&hi&&LOWKEY.includes(ev.kind)&&f-hi.frame<1.7*HZ)ev=hi;
- if(f<0)ev={text:'선수들이 출발선에 섰습니다. 곧 출발합니다!',frame:f-30};
+ if(f<0)ev={text:-f/HZ>COUNTDOWN?HELLO:READY+' 곧 출발합니다!',frame:-f/HZ>COUNTDOWN?F0-30:-COUNTDOWN*HZ-1};
  if(ev&&f<F+0.6*HZ){g.globalAlpha=Math.min(1,(f-ev.frame)/8+0.2);let size=27;g.font='800 '+size+'px system-ui,sans-serif';let tw=g.measureText(ev.text).width;if(tw>1020){size=Math.floor(27*1020/tw);g.font='800 '+size+'px system-ui,sans-serif';tw=g.measureText(ev.text).width;}
   const bw=tw+124,bx=(W-bw)/2;rr(bx,650,bw,52,10);g.fillStyle='rgba(8,12,20,.82)';g.fill();rr(bx+8,658,70,36,7);g.fillStyle='#d6341f';g.fill();g.fillStyle='#fff';g.font='800 19px system-ui,sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText('중계',bx+43,677);g.font='800 '+size+'px system-ui,sans-serif';g.textAlign='left';g.fillText(ev.text,bx+92,677);g.globalAlpha=1;}
  const big=(t,col)=>{g.font='900 190px system-ui,sans-serif';g.textAlign='center';g.textBaseline='middle';g.lineWidth=16;g.strokeStyle='rgba(0,0,0,.7)';g.strokeText(t,W/2,300);g.fillStyle=col;g.fillText(t,W/2,300);};
- if(f<0)big(String(Math.ceil(-f/HZ)),'#fff');else if(f<0.9*HZ)big('출발!','#ffd92e');
+ if(f<0&&-f/HZ<=COUNTDOWN)big(String(Math.ceil(-f/HZ)),'#fff');else if(f>=0&&f<0.9*HZ)big('출발!','#ffd92e');
  if(f>=F+0.6*HZ){g.globalAlpha=Math.min(1,(f-F-0.6*HZ)/20);g.fillStyle='rgba(5,10,18,.72)';g.fillRect(0,0,W,H);rr(270,60,740,600,22);g.fillStyle='rgba(18,28,44,.96)';g.fill();g.strokeStyle='#ffd92e';g.lineWidth=3;g.stroke();
   g.fillStyle='#ffd92e';g.font='900 40px system-ui,sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText('경기 결과',640,112);g.fillStyle='#9fb0c4';g.font='600 17px system-ui,sans-serif';g.fillText('추첨 번호 '+seed+' · '+race.seconds+'초',640,150);
-  const rows=Math.ceil(n/2);race.order.forEach((no,r)=>{const col=r<rows?0:1,x=300+col*350,y=205+(r%rows)*(420/rows);g.fillStyle=r<3?'#ffd92e':'#dfe6ee';g.font='900 30px system-ui,sans-serif';g.textAlign='right';g.textBaseline='middle';g.fillText((r+1)+'위',x+70,y);chip(x+106,y,21,no);
+  const rows=Math.ceil(n/2);race.order.forEach((no,r)=>{const col=r<rows?0:1,x=300+col*350,y=205+(r%rows)*(420/rows);if(readRank===r+1){rr(x-6,y-34,340,68,14);g.fillStyle='rgba(255,217,46,.2)';g.fill();g.strokeStyle='#ffd92e';g.lineWidth=2;g.stroke();}g.fillStyle=r<3?'#ffd92e':'#dfe6ee';g.font='900 30px system-ui,sans-serif';g.textAlign='right';g.textBaseline='middle';g.fillText((r+1)+'위',x+70,y);chip(x+106,y,21,no);
    const im=SP[race.types[no-1]].f[0],fit=Math.min(84/im.width,58/im.height),ww=im.width*fit,hh=im.height*fit;g.drawImage(im,x+136+(84-ww)/2,y-hh/2,ww,hh);g.fillStyle='#fff';g.font='700 20px system-ui,sans-serif';g.textAlign='left';g.fillText(TYPES[race.types[no-1]].name,x+230,y-(r>=race.finished?9:0));
    if(r>=race.finished){g.fillStyle='#ff8d7a';g.font='600 14px system-ui,sans-serif';g.fillText('결승선 못 옴',x+230,y+13);}});g.globalAlpha=1;}
 }
-return {race,seed,n,total,endAt:PRE+tOf[F],render,frameAt,speedAt,shots,F,firstF};
+return {race,tl,seed,n,total,endAt:tl.endAt,render,frameAt,speedAt,shots,F,firstF};
 }

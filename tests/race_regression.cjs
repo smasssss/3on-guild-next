@@ -40,9 +40,11 @@ const race=(over={})=>({id:'d1b2c3d4-0000-4000-8000-000000000001',seed:'00c51d27
  const js=fs.readFileSync('public/race-game.js','utf8');assert.match(js,/root\.gameSwitch\.add\('race','엉뚱 경주'/);assert.match(js,/ensureAdmin/);
  assert.ok(js.indexOf("api('/api/race',{method:'POST'")<js.indexOf('show.play()'),'the record is saved before the race plays');
  const player=fs.readFileSync('public/race/player.mjs','utf8');assert.match(player,/결과 바로 보기/);assert.match(player,/voice\/index\.json/);assert.match(player,/music\/race\.mp3/);
- for(const file of ['sim.mjs','view.mjs','player.mjs','voice/lines.json','music/race.mp3','music/CREDITS.md','assets/track.jpg','assets/panda.png','assets/shell.png','assets/kangaroo.png','assets/ufo.png','assets/mouse.png','assets/cbike.png','assets/cride.png','assets/cfront_0.png','assets/cback_1.png'])assert.ok(fs.existsSync('public/race/'+file),file);
+ for(const file of ['sim.mjs','view.mjs','player.mjs','timeline.mjs','commentary.mjs','voice/lines.json','music/race.mp3','music/CREDITS.md','assets/track.jpg','assets/panda.png','assets/shell.png','assets/kangaroo.png','assets/ufo.png','assets/mouse.png','assets/cbike.png','assets/cride.png','assets/cfront_0.png','assets/cback_1.png'])assert.ok(fs.existsSync('public/race/'+file),file);
  for(const k of lib.RACER_TYPES)if(k!=='panda')for(let i=0;i<4;i++)assert.ok(fs.existsSync('public/race/assets/'+k+'_'+i+'.png'),k+'_'+i);
  // 5) Voice clips, when present, are listed in voice/index.json and every listed clip exists
- if(fs.existsSync('public/race/voice/index.json')){const idx=JSON.parse(fs.readFileSync('public/race/voice/index.json','utf8'));for(const k of Object.keys(idx))assert.ok(fs.existsSync('public/race/voice/'+k+'.mp3'),'clip '+k);}
+ const idx=JSON.parse(fs.readFileSync('public/race/voice/index.json','utf8'));for(const k of Object.keys(idx))assert.ok(fs.existsSync('public/race/voice/'+k+'.mp3'),'clip '+k);
+ // The commentary starts calm (a greeting by the caster), rises with the race, and ends with a calm wrap-up reading the finishers
+ const lines=JSON.parse(fs.readFileSync('public/race/voice/lines.json','utf8'));assert.match(lines.i_hello,/안녕하십니까.*해설을 맡은/);assert.match(lines.w_intro,/결과를 정리/);assert.match(lines.p_start,/경기 시작했습니다/);for(let k=1;k<=10;k++)assert.equal(lines['r'+k],k+'위,');
  console.log('PASS: 엉뚱 경주 records validated (one racer per kind, full finishing order), own document kind, admin-only save, input checks, wired into the 추첨 게임 tab');
 })().catch(e=>{console.error(e);process.exitCode=1;});

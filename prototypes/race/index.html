@@ -15,9 +15,12 @@ canvas{width:100%;max-width:calc(100vh*16/9);aspect-ratio:16/9;display:block}
 <!-- 개발용: 저장소 맨 위에서 python3 -m http.server 8780 을 켜고 /prototypes/race/index.html#seed=e1bfedc3&n=10&play 로 엽니다. -->
 <script type="module">
 import {createShow} from '../../public/race/view.mjs';
+import {planCommentary} from '../../public/race/commentary.mjs';
 const q=new URLSearchParams(location.hash.slice(1)),show=await createShow(document.getElementById('cv'),{seed:(q.get('seed')||'00c51d27'),n:+(q.get('n')||10)});
-window.__total=show.total;window.__endAt=show.endAt;window.__race=show.race;window.__shots=show.shots;window.__seek=t=>show.render(t);show.render(0);
-if(q.get('play')!=null){let t0=null;const loop=now=>{if(t0==null)t0=now;const t=(now-t0)/1000;show.render(t);if(t<show.total)requestAnimationFrame(loop);};requestAnimationFrame(loop);}
+const lines=await (await fetch('../../public/race/voice/lines.json')).json(),idx=await (await fetch('../../public/race/voice/index.json')).json(),plan=planCommentary(show.race,show.tl,lines,Object.keys(idx).length?idx:null);
+const draw=t=>{let readRank=0;for(const it of plan.items)if(it.rank&&t>=it.t&&t<it.t+it.dur+0.12)readRank=it.rank;show.render(t,{readRank});};
+window.__total=Math.max(show.total,plan.endAt);window.__endAt=show.endAt;window.__race=show.race;window.__shots=show.shots;window.__plan=plan;window.__seek=draw;draw(0);
+if(q.get('play')!=null){let t0=null;const loop=now=>{if(t0==null)t0=now;const t=(now-t0)/1000;draw(t);if(t<window.__total)requestAnimationFrame(loop);};requestAnimationFrame(loop);}
 window.__ready=true;
 </script>
 </body>

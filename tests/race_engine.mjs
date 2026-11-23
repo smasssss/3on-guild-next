@@ -6,7 +6,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {runRace,lineup,TYPES,TRACK,HZ,MAX_RACERS,MIN_RACERS,MAX_SECONDS,RACE_VERSION} from '../public/race/sim.mjs';
-import {voiceOf,nameText} from '../public/race/player.mjs';
+import {voiceOf,planCommentary,clipText,LEVELS} from '../public/race/commentary.mjs';
+import {timeline,PRE} from '../public/race/timeline.mjs';
 assert.equal(RACE_VERSION,1);assert.equal(MAX_RACERS,10);assert.equal(MIN_RACERS,2);assert.equal(Object.keys(TYPES).length,11);
 const GOLD=[
  ['00c51d27',10,['giraffe','elephant','cheetah','turtle','biped','ostrich','panda','horse','cow','costume'],[6,1,5,8,3,2,9,7,10,4],81.3],
@@ -16,6 +17,7 @@ const GOLD=[
  ['24234430',10,['panda','giraffe','zebra','cow','ostrich','cheetah','turtle','elephant','costume','biped'],[10,2,3,8,5,1,6,4,9,7],195.4],
 ];
 const lines=JSON.parse(fs.readFileSync(new URL('../public/race/voice/lines.json',import.meta.url),'utf8')),kinds=new Set();
+const idx=JSON.parse(fs.readFileSync(new URL('../public/race/voice/index.json',import.meta.url),'utf8')),voiceIndex=Object.keys(idx).length?idx:null;
 function checkRace(g,n){
  assert.equal(g.types.length,n);assert.equal(new Set(g.types).size,n,'each kind of racer appears at most once');
  assert.deepEqual(g.order.slice().sort((a,b)=>a-b),Array.from({length:n},(_,i)=>i+1),'the order holds every number once');
@@ -23,7 +25,15 @@ function checkRace(g,n){
  const fin=g.events.filter(e=>e.kind==='finish');assert.deepEqual(fin.map(e=>e.a),g.order,'the order is the order of crossing the line');
  assert.ok(Math.abs(g.frames.length-g.seconds*HZ)<=6,'one frame per 1/60 second');for(const q of g.frames[g.frames.length-1])assert.equal(q.x,TRACK);
  // 중계: 사건마다 읽을 문장이 있고, 필요한 문장 조각이 모두 준비되어 있음
- let rank=0;for(const e of g.events){kinds.add(e.kind);assert.ok(e.text&&e.frame>=0);const v=voiceOf(e,g.types,e.kind==='finish'?++rank:0);assert.ok(v,'voice for '+e.kind);for(const k of v.keys)assert.ok(nameText(k)||lines[k],'voice line '+k);}
+ let rank=0;for(const e of g.events){kinds.add(e.kind);assert.ok(e.text&&e.frame>=0);const v=voiceOf(e,g.types,e.kind==='finish'?++rank:0);assert.ok(v,'voice for '+e.kind);for(const k of v.keys)for(const lv of LEVELS)assert.ok(clipText(k+'_'+lv,lines),'voice line '+k);}
+ // 중계 순서: 차분한 인사로 시작하고, 말이 서로 겹치지 않으며, 끝에는 순위를 1위부터 차례로 불러 줌
+ const tl=timeline(g),plan=planCommentary(g,tl,lines,voiceIndex);assert.ok(tl.endAt<=PRE+g.seconds+0.2,'fast-forward never makes the race longer');
+ assert.deepEqual(plan.items[0].keys,['i_hello_c']);assert.ok(plan.items.find(x=>x.keys[0]==='p_start_c').t===PRE,'the start call comes at the start signal');
+ for(let k=1;k<plan.items.length;k++){const a=plan.items[k-1],b=plan.items[k];assert.ok(b.t>=a.t+(a.cut!=null?a.cut:a.dur)-1e-6,'commentary lines never overlap');}
+ for(const k of plan.keys)assert.ok(clipText(k,lines),'text for '+k);
+ const wrap=plan.items.filter(x=>x.rank);assert.deepEqual(wrap.map(x=>x.rank),g.order.map((_,k)=>k+1));assert.deepEqual(wrap.map(x=>x.keys[1]),g.order.map(no=>'n'+no+'_'+g.types[no-1]+'_c'),'the wrap-up reads the finishers in order');
+ assert.ok(wrap[0].t>=tl.endAt&&plan.items[plan.items.length-1].keys[0]==='w_outro_c');assert.ok(plan.items.every(x=>x.kind==='wrap'||x.t<plan.wrapAt));
+ const live=plan.items.filter(x=>x.kind&&x.kind!=='wrap'&&x.kind!=='start');if(n===10&&live.length>6){const lv=x=>LEVELS.indexOf(x.level),third=Math.ceil(live.length/3),avg=a=>a.reduce((s,x)=>s+lv(x),0)/a.length;assert.ok(avg(live.slice(0,third))<avg(live.slice(-third))+0.8,'excitement does not start high');}
 }
 for(const [seed,n,types,order,seconds] of GOLD){const g=runRace(seed,n);assert.deepEqual(g.types,types,'seed '+seed+' racers');assert.deepEqual(g.order,order,'seed '+seed+' must replay exactly');assert.equal(g.seconds,seconds);assert.deepEqual(lineup(seed,n),types);checkRace(g,n);}
 assert.deepEqual(runRace('00c51d27',10).order,GOLD[0][3],'computing the same race twice gives the same order');
