@@ -42,6 +42,7 @@ name: Promote roster sync to Production after a fresh Staging verification (user
 # Release 40 (user-approved 2026-11-23 "런닝머신 설정도 너가 테스트 해본 다음 그나마 괜찮은걸로 선택해서 프로덕션에 배포해버려"): 런닝머신 레이스 version 3 — no 10-second restart, no concave belt; a flat belt with a bold ramp at the back, sides banked slightly toward the middle, much lower seams; every 10 seconds the belt gets a little faster and the ramp a little lower so every race ends by itself. Version 1 and 2 records replay as recorded.
 # Release 41 (user-approved 2026-11-23 "소리 줄인거 프로덕션에 올리는거 승인한다"): 핀볼 추첨 is quieter — background music 0.55 to 0.28, effect sounds (arrival ding, result sound) 0.8 to 0.3.
 # Release 42 (user-approved 2026-11-23 "엉뚱경기 음성 없이 배경음악만 깔아서 배포하자"): 엉뚱 경주 as a third game in the 추첨 게임 tab — 2-10 numbered racers of eleven kinds (one of each at most), wild events, close-ups and a back camera, everyone finishes, a show-result button, the user's own race music; no commentary voice yet (captions only). Records in their own kind 'race' (admin-only save).
+# Release 43 (user-approved 2026-11-23 "세가지 모두 승인할게"): the race game is renamed 정통 경마 (was 엉뚱 경주; the name and description no longer give the surprise away); the game switch shows two buttons per row; race rules version 2 adds the elephant trunk-propeller skill (grabs a racer, spins it while sprinting, then throws it forward with an "oops" pause or backward). Version 1 records still replay with the version 1 rules.
 on:
   push:
     branches: [claude/new-session-narazy]
