@@ -3,18 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>엉뚱 경주 시안</title>
+<title>엉뚱 경주 확인용 화면</title>
 <style>
 html,body{margin:0;height:100%;background:#0b1118}
 body{display:flex;align-items:center;justify-content:center}
 canvas{width:100%;max-width:calc(100vh*16/9);aspect-ratio:16/9;display:block}
-#skip{position:fixed;right:16px;bottom:16px;padding:10px 16px;border:0;border-radius:999px;background:#ffd92e;color:#111;font:800 15px system-ui,sans-serif;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35)}
-#skip[hidden]{display:none}
 </style>
 </head>
 <body>
 <canvas id="cv"></canvas>
-<button id="skip" type="button">결과 바로 보기</button>
-<script type="module" src="view.mjs"></script>
+<!-- 개발용: 저장소 맨 위에서 python3 -m http.server 8780 을 켜고 /prototypes/race/index.html#seed=e1bfedc3&n=10&play 로 엽니다. -->
+<script type="module">
+import {createShow} from '../../public/race/view.mjs';
+const q=new URLSearchParams(location.hash.slice(1)),show=await createShow(document.getElementById('cv'),{seed:(q.get('seed')||'00c51d27'),n:+(q.get('n')||10)});
+window.__total=show.total;window.__endAt=show.endAt;window.__race=show.race;window.__shots=show.shots;window.__seek=t=>show.render(t);show.render(0);
+if(q.get('play')!=null){let t0=null;const loop=now=>{if(t0==null)t0=now;const t=(now-t0)/1000;show.render(t);if(t<show.total)requestAnimationFrame(loop);};requestAnimationFrame(loop);}
+window.__ready=true;
+</script>
 </body>
 </html>

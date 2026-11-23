@@ -1,5 +1,5 @@
 // 보고 싶은 사건이 들어 있는 추첨 번호 찾기(개발용): node find.mjs [사건,사건,...]
-import {runRace} from './sim.mjs';
+import {runRace} from '../../public/race/sim.mjs';
 const want=(process.argv[2]||'').split(',').filter(Boolean),seen={},best=[];
 for(let s=1;s<=1500;s++){const seed=((s*2246822519+0x9e3779b9)>>>0).toString(16).padStart(8,'0'),g=runRace(seed,10),kinds=[...new Set(g.events.map(e=>e.kind))];
  for(const k of kinds)if(!seen[k])seen[k]=seed;

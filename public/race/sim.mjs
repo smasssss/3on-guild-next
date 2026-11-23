@@ -1,4 +1,6 @@
-// 엉뚱 경주 계산(시안 2). 같은 추첨 번호(seed)면 언제나 같은 경기입니다. 사칙연산만 씁니다.
+// 엉뚱 경주 계산. 같은 추첨 번호(seed)면 언제나 같은 경기입니다. 기기마다 값이 달라질 수 있는 함수는 쓰지 않고 사칙연산만 씁니다.
+// 기록은 추첨 번호로 다시 계산해 보여 주므로, 여기 규칙이나 숫자를 바꾸면 옛 기록이 달라집니다. 바꿀 때는 새 판 번호(RACE_VERSION)를 만들어 옛 판을 남겨 두세요.
+export const RACE_VERSION=1,MIN_RACERS=2;
 export const HZ=60,TRACK=1600,MAX_RACERS=10,MAX_SECONDS=320;
 export function rng(seedHex){let a=parseInt(seedHex,16)>>>0;return ()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
 const hex=v=>(v>>>0).toString(16).padStart(8,'0');
@@ -30,7 +32,7 @@ export function runRace(seedHex,n){
   if(type==='costume'){q.splitAt=TRACK*(0.2+0.3*r());q.split=false;const u=r(),w=r();q.plan=u<T.luck?(w<0.5?'bike':'ride'):'none';q.bikeIn=3+5*r();q.fuel=500+1100*r();q.rideCool=0;}
   if(type==='turtle'){const u=r(),w=r();q.stompAt=u<T.stomp?TRACK*(0.3+0.45*r()):-1;q.through=w<T.luck;q.dir=1;q.shellTo=0;}
   return q;});
- const frames=[],events=[],finish=[];let t=0,lead=-1,leadSince=0,lastLeadSay=-9,firstDone=null,lastDone=0,ufoDone=false,tornadoDone=false,celeDone=false,homeSaid=false;
+ const frames=[],events=[],finish=[];let t=0,lead=-1,leadSince=0,lastLeadSay=-9,firstDone=null,ufoDone=false,tornadoDone=false,celeDone=false,homeSaid=false;
  const say=(text,kind,a,b,extra)=>events.push({t,frame:frames.length,text,kind,a,b,...extra});
  const name=q=>q.no+'번 '+TYPES[q.type].name,jong=s=>(s.charCodeAt(s.length-1)-0xAC00)%28!==0;
  const obj=q=>{const s=name(q);return s+(jong(s)?'을':'를');},sub=q=>{const s=name(q);return s+(jong(s)?'이':'가');};
@@ -91,7 +93,7 @@ export function runRace(seedHex,n){
   }
   for(const q of live)if(q.st==='ride')q.x=R[q.host-1].x-3;
   // 선수끼리 부딪침
-  for(const q of live){const T=TYPES[q.type],near=(o,d,l)=>o!==q&&o.done==null&&!q.hit.includes(o.no)&&o.x>q.x&&o.x-q.x<d&&Math.abs(o.lane-q.lane)<=l;
+  for(const q of live){const near=(o,d,l)=>o!==q&&o.done==null&&!q.hit.includes(o.no)&&o.x>q.x&&o.x-q.x<d&&Math.abs(o.lane-q.lane)<=l;
    if(q.type==='cheetah'&&q.st==='run'&&q.mode==='sprint'&&q.cool<=0){const v=live.find(o=>near(o,9,3)&&o.type!=='cheetah'&&(hittable(o)||(o.type==='elephant'&&o.st==='run')));
     if(v&&r()<1.6*DT){q.hit.push(v.no);q.cool=4;if(v.type==='elephant'){knock(q,'fly',1.6);say(sub(q)+' '+obj(v)+' 덮치려다 튕겨 나갑니다!','bounce',q.no,v.no);}
      else{knock(q,'down',1.5);knock(v,'down',2.1);say(sub(q)+' 앞서가던 '+obj(v)+' 덮칩니다! 둘 다 주저앉았어요!','pounce',q.no,v.no);}}}
@@ -117,7 +119,7 @@ export function runRace(seedHex,n){
   if(!tornadoDone&&course.tornado>0&&leadX>=course.tornado&&leadX<TRACK-120){tornadoDone=true;const hitList=rank.slice(0,3).filter(hittable);
    if(hitList.length){for(const o of hitList){knock(o,'blown',1.4);}say('회오리바람입니다! 선두권이 통째로 휩쓸려 날아갑니다!','tornado',hitList[0].no,undefined,{list:hitList.map(o=>o.no),x:leadX});}}
   if(!celeDone&&course.cele&&rank.length>1&&finish.length===0){const f=rank[0];if(f.x>TRACK-95&&f.x<TRACK-60){celeDone=true;if(f.st==='run'&&f.mode!=='crawl'&&f.mode!=='split'&&f.x-rank[1].x>30){f.st='cele';f.tm=2.1;say(sub(f)+' 벌써 우승 세리머니를 합니다! 아직 결승선 전인데요?!','cele',f.no);}}}
-  for(const q of live){if(q.x>=TRACK){q.done=t;q.x=TRACK;finish.push(q.no);if(firstDone==null)firstDone=t;lastDone=t;say(name(q)+', 결승선 통과! '+finish.length+'위!','finish',q.no);}}
+  for(const q of live){if(q.x>=TRACK){q.done=t;q.x=TRACK;finish.push(q.no);if(firstDone==null)firstDone=t;say(name(q)+', 결승선 통과! '+finish.length+'위!','finish',q.no);}}
   // 선두가 바뀌면 알림(2초 이상 지킨 뒤에만), 결승선이 가까워지면 알림
   const front=R.filter(q=>q.done==null).sort((a,b)=>b.x-a.x)[0];
   if(front&&finish.length===0){if(front.no!==lead){if(t-leadSince>2&&t>3&&t-lastLeadSay>3){say('선두가 바뀝니다! '+name(front)+'!','lead',front.no);lastLeadSay=t;}lead=front.no;leadSince=t;}

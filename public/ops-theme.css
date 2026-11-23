@@ -346,3 +346,15 @@ html.tr-open,html.tr-open body{overflow:hidden}
 .tr-overlay{position:fixed;inset:0;z-index:1000;background:#15171b}.tr-overlay[hidden]{display:none}
 .tr-overlay iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 .tr-overlay button{position:absolute;top:calc(8px + env(safe-area-inset-top));right:10px;z-index:1;min-height:40px;padding:6px 14px;border-radius:999px;border:1px solid #ffffff55;background:#000a;color:#fff;font:inherit;font-size:14px;cursor:pointer}
+
+/* 엉뚱 경주(추첨 게임 탭): 경기 화면 덮개와 기록의 번호표 */
+.rg-overlay{position:fixed;inset:0;z-index:1000;background:#0b1118;display:flex;align-items:center;justify-content:center}.rg-overlay[hidden]{display:none}
+#rgBox{width:100%;max-width:calc((100vh - 56px)*16/9)}
+.rg-stage{position:relative}.rg-canvas{display:block;width:100%;aspect-ratio:16/9;background:#16324a}
+.rg-wait,.rg-loading{margin:0;color:#fff;font-size:18px;text-align:center}.rg-wait{position:absolute;inset:0;display:grid;place-items:center}.rg-loading{padding:40px 16px}
+.rg-bar{display:flex;gap:12px;align-items:center;justify-content:space-between;min-height:48px;padding:6px 12px}
+.rg-skip{min-height:38px;padding:6px 16px;border:0;border-radius:999px;background:#ffd92e;color:#111;font:inherit;font-weight:700;font-size:15px;cursor:pointer}.rg-skip[hidden]{display:none}
+.rg-hint{color:#9fb0c4;font-size:13px}@media (orientation:landscape){.rg-hint{display:none}}
+#rgClose{position:absolute;top:calc(8px + env(safe-area-inset-top));right:10px;z-index:1;min-height:40px;padding:6px 14px;border-radius:999px;border:1px solid #ffffff55;background:#000a;color:#fff;font:inherit;font-size:14px;cursor:pointer}
+.rg-chip{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;border:1px solid #0006;font-weight:800;font-size:13px;flex:none}
+.rg-top{display:inline-flex;align-items:center;gap:4px;margin-right:6px}

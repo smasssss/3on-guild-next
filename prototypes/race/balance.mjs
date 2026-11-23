@@ -1,6 +1,6 @@
 // 열한 종류가 비슷하게 우승하도록 값을 조금씩 고쳐 가며 맞춥니다(개발용).
 // 대부분은 속도를, 거북이와 인형탈 말은 '기적이 일어날 확률(luck)'을 고칩니다.
-import {runRace,TYPES} from './sim.mjs';
+import {runRace,TYPES} from '../../public/race/sim.mjs';
 const base=JSON.parse(JSON.stringify(TYPES)),keys=Object.keys(TYPES),LUCK=['turtle','costume'],k=Object.fromEntries(keys.map(x=>[x,1])),speedKeys=['v','burstV','sprintV','rollMax','rollUp','panicV'];
 const apply=()=>{for(const t of keys){if(LUCK.includes(t))TYPES[t].luck=Math.max(0.02,Math.min(0.95,base[t].luck*k[t]));else for(const f of speedKeys)if(base[t][f]!=null)TYPES[t][f]=base[t][f]*k[t];}};
 const N=+(process.argv[3]||700),IT=+(process.argv[2]||40);let wins,present;

@@ -1,21 +1,21 @@
 // 엉뚱 경주 화면(시안 2). sim.mjs 가 미리 계산한 경기를 그대로 다시 보여 줍니다.
-// 주소 뒤에 #seed=추첨번호&n=선수수 를 붙이면 그 경기를 봅니다. window.__seek(초) 로 원하는 순간을 그릴 수 있습니다.
+// createShow(캔버스,{seed,n}) 가 경기 한 판을 준비해, 원하는 순간을 그리는 render(초) 를 돌려줍니다. 재생과 소리는 player.mjs 가 맡습니다.
 import {runRace,TYPES,TRACK,HZ} from './sim.mjs';
-const W=1280,H=720,PPU=11,HOR=392,PRE=3,POST=5.5;
-const q=new URLSearchParams(location.hash.slice(1)),seed=(q.get('seed')||'00c51d27').padStart(8,'0').slice(-8),n=Math.max(2,Math.min(10,+(q.get('n')||10)||10));
-const cv=document.getElementById('cv');cv.width=W;cv.height=H;const main=cv.getContext('2d'),off=document.createElement('canvas');off.width=W;off.height=H;const offg=off.getContext('2d');
-// 화면에 그릴 키(가까운 줄 기준, 픽셀)와 한 보폭의 길이(트랙 단위)
+export const W=1280,H=720,PRE=3,POST=5.5;
+const PPU=11,HOR=392,ASSET_VERSION='1';
 const LOOK={horse:{h:135,stride:16},biped:{h:158,stride:11},cheetah:{h:90,stride:20},panda:{h:112,stride:0},ostrich:{h:165,stride:10},costume:{h:150,stride:9},giraffe:{h:185,stride:18},elephant:{h:178,stride:13},cow:{h:132,stride:15},zebra:{h:138,stride:16},turtle:{h:66,stride:4}};
 const EXTRA={shell:60,kangaroo:200,cfront_0:150,cfront_1:150,cback_0:150,cback_1:150,cbike:170,cride:165,mouse:36,ufo:100};
 const NUMC=['#e53935','#fafafa','#1e5fd0','#f6c915','#2e9e4f','#1b1b1b','#f57c00','#ec6fa7','#27b5c4','#7d4cc2'],NUMT=['#fff','#111','#fff','#111','#fff','#fff','#fff','#111','#111','#fff'];
-const load=src=>new Promise(res=>{const im=new Image();im.onload=()=>res(im);im.onerror=()=>res(null);im.src=src;});
+const loaded=new Map(),load=name=>{if(!loaded.has(name))loaded.set(name,new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=()=>{loaded.delete(name);rej(Error('그림을 불러오지 못했습니다: '+name));};im.src=new URL('assets/'+name+'?v='+ASSET_VERSION,import.meta.url).href;}));return loaded.get(name);};
 function crop(im){const c=document.createElement('canvas');c.width=im.width;c.height=im.height;const x=c.getContext('2d');x.drawImage(im,0,0);const d=x.getImageData(0,0,c.width,c.height).data;
  let x0=c.width,y0=c.height,x1=0,y1=0;for(let y=0;y<c.height;y++)for(let i=0;i<c.width;i++)if(d[(y*c.width+i)*4+3]>40){if(i<x0)x0=i;if(i>x1)x1=i;if(y<y0)y0=y;if(y>y1)y1=y;}
  const o=document.createElement('canvas');o.width=x1-x0+1;o.height=y1-y0+1;o.getContext('2d').drawImage(c,-x0,-y0);return o;}
 function tileOf(img,sy,sh,flip){const c=document.createElement('canvas');c.width=img.width*2;c.height=sh;const x=c.getContext('2d');if(flip){x.translate(0,sh);x.scale(1,-1);}x.drawImage(img,0,sy,img.width,sh,0,0,img.width,sh);x.translate(c.width,0);x.scale(-1,1);x.drawImage(img,0,sy,img.width,sh,0,0,img.width,sh);return c;}
+export async function createShow(cv,{seed,n}){
+const main=cv.getContext('2d'),off=document.createElement('canvas');cv.width=W;cv.height=H;off.width=W;off.height=H;const offg=off.getContext('2d');
 const race=runRace(seed,n),F=race.frames.length,names=[...new Set(race.types)],SP={},EX={};
-{const jobs=[load('assets/track.jpg')];for(const k of names)if(k==='panda')jobs.push(load('assets/panda.png'));else for(let i=0;i<4;i++)jobs.push(load('assets/'+k+'_'+i+'.png'));
- const ex=Object.keys(EXTRA);for(const k of ex)jobs.push(load('assets/'+k+'.png'));const got=await Promise.all(jobs);let p=1;var track=got[0];
+{const jobs=[load('track.jpg')];for(const k of names)if(k==='panda')jobs.push(load('panda.png'));else for(let i=0;i<4;i++)jobs.push(load(k+'_'+i+'.png'));
+ const ex=Object.keys(EXTRA);for(const k of ex)jobs.push(load(k+'.png'));const got=await Promise.all(jobs);let p=1;var track=got[0];
  for(const k of names){const f=k==='panda'?[crop(got[p++])]:[got[p++],got[p++],got[p++],got[p++]],hs=f.map(i=>i.height).sort((a,b)=>a-b),ws=f.map(i=>i.width).sort((a,b)=>a-b);SP[k]={f,k:LOOK[k].h/hs[hs.length>>1],w:ws[ws.length>>1],h0:hs[hs.length>>1],...LOOK[k]};}
  for(const k of ex){const im=got[p++];EX[k]={im,k:EXTRA[k]/im.height};}}
 const FAR=tileOf(track,230,330),FENCE=tileOf(track,560,215),GRASS=tileOf(track,790,234),GRASS2=tileOf(track,790,234,true);
@@ -99,7 +99,7 @@ function world(f,ts,C){const {L,z,hy}=C,X=x=>(x-L)*PPU*z,Yof=lf=>hy+laneY(lf)*z,
    for(let r=0;r<Math.ceil((H-hy)/14);r++)for(let k=0;k<2;k++){g.fillStyle=(r+k)&1?'#111':'#fff';g.fillRect(x-14+k*14,hy+r*14,14,14);}}}
  const pandaI=race.types.indexOf('panda');if(pandaI>=0)race.course.bamboo.forEach((bx,k)=>{const x=X(bx+3),y=Yof(laneF(pandaI));if(x<-80||x>W+80)return;const e=race.events.find(e=>e.kind==='eat'&&e.a===pandaI+1&&e.k===k),eaten=e&&f>e.frame+2*HZ,hh=(eaten?22:120)*z;
   for(let s=0;s<4;s++){const sx=x+(s*13-10)*z;g.strokeStyle=s&1?'#5d9a3a':'#77b548';g.lineWidth=6*z;g.beginPath();g.moveTo(sx,y);g.lineTo(sx+(s-1.5)*4*z,y-hh*(0.8+0.07*s));g.stroke();if(!eaten)for(let l=0;l<3;l++){g.beginPath();g.ellipse(sx+(s-1.5)*4*z+(l-1)*13*z,y-hh*(0.55+0.14*l),14*z,4*z,(l-1)*0.6,0,7);g.fillStyle='#4f9a33';g.fill();}}});
- const fx=[],late=[];
+ const fx=[];
  const drawOne=i=>{const type=race.types[i],S=SP[type],s=stateOf(i,f),x=dispX(i,f),v=f<0?0:fr(i,f).v,seg=f>=0&&(doneF[i]==null||f<=doneF[i])?segAt(i,f):{s,f0:0,f1:1e9},tau=(f-seg.f0)/HZ,rem=(seg.f1-f)/HZ,p=clamp((f-seg.f0)/Math.max(1,seg.f1-seg.f0),0,1);
   let lf=laneF(i);const rideHost=(s==='ride'||s==='leap')?fr(i,f).h-1:-1;if(s==='leap')lf=laneF(rideHost)+(lf-laneF(rideHost))*p;if(s==='ride')return;
   const per=z*(0.8+0.2*lf),sc=per*S.k,Xn=X(x),Y=Yof(lf),bw=S.w*sc,bh=S.h0*sc,cx=Xn-bw/2;if(Xn<-260*z||cx-bw>W+260*z)return;
@@ -140,7 +140,7 @@ function world(f,ts,C){const {L,z,hy}=C,X=x=>(x-L)*PPU*z,Yof=lf=>hy+laneY(lf)*z,
   else if(type==='panda'){ang=x*PPU/(S.h*0.5);dy=-Math.abs(Math.sin(x*0.35))*8*per;if(v>36)lines();dust(9,0.8);}
   else if(type==='turtle'){dy=-Math.abs(sw)*1.5*per;}
   else{gallop(s==='panic'||s==='sprint'||s==='burst'?1.5:1);dust(S.stride/2,type==='elephant'?1.6:1);if(s==='sprint'||s==='burst'||s==='panic'||v>52)lines();}
-  if(!drawn){const w=img.width*sc,h=img.height*sc;g.beginPath();g.ellipse(cx,Y+2*z,bw*0.42,7*z,0,0,7);g.fillStyle='rgba(0,0,0,'+shadow+')';g.fill();put(img,cx,Y-h/2+dy,sc,ang,fxp,sy);topY=Math.min(Y-h/2+dy-h/2,Y-bh);}
+  if(!drawn){const h=img.height*sc;g.beginPath();g.ellipse(cx,Y+2*z,bw*0.42,7*z,0,0,7);g.fillStyle='rgba(0,0,0,'+shadow+')';g.fill();put(img,cx,Y-h/2+dy,sc,ang,fxp,sy);topY=Math.min(Y-h/2+dy-h/2,Y-bh);}
   const by=topY-17*per;chip(cx,by,15.5*per,i+1);
   if(mark==='?')word('?',cx+bw*0.42,by-6*per,40*per);
   if(mark==='*')for(let k=0;k<3;k++){const a=ts*6+k*2.094;star(cx+Math.cos(a)*26*per,by-26*per+Math.sin(a)*8*per,9*per,a,'#ffd92e');}
@@ -201,9 +201,5 @@ function hud(f,ts,pip){const ord=orderAt(Math.max(0,f));
    const im=SP[race.types[no-1]].f[0],fit=Math.min(84/im.width,58/im.height),ww=im.width*fit,hh=im.height*fit;g.drawImage(im,x+136+(84-ww)/2,y-hh/2,ww,hh);g.fillStyle='#fff';g.font='700 20px system-ui,sans-serif';g.textAlign='left';g.fillText(TYPES[race.types[no-1]].name,x+230,y-(r>=race.finished?9:0));
    if(r>=race.finished){g.fillStyle='#ff8d7a';g.font='600 14px system-ui,sans-serif';g.fillText('결승선 못 옴',x+230,y+13);}});g.globalAlpha=1;}
 }
-window.__total=total;window.__endAt=PRE+tOf[F];window.__race=race;window.__shots=shots;window.__seek=t=>render(t);
-let t0=null,running=false;const skip=document.getElementById('skip'),endAt=PRE+tOf[F]+0.7;function loop(now){if(t0==null)t0=now;const t=(now-t0)/1000;render(t);if(skip)skip.hidden=t>=endAt-0.1;running=t<total;if(running)requestAnimationFrame(loop);}
-if(skip)skip.addEventListener('click',e=>{e.stopPropagation();t0=performance.now()-endAt*1000;if(!running)requestAnimationFrame(loop);});
-if(q.get('still')!=null)render(+q.get('still'));else requestAnimationFrame(loop);
-cv.addEventListener('click',()=>{t0=null;requestAnimationFrame(loop);});
-window.__ready=true;
+return {race,seed,n,total,endAt:PRE+tOf[F],render,frameAt,speedAt,shots,F,firstF};
+}
