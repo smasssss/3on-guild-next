@@ -15,12 +15,12 @@ const decode=(ctx,p)=>fetch(url(p)).then(r=>r.ok?r.arrayBuffer():Promise.reject(
 export async function open(box,{seed,n,ctx=null,voice=true,music=true,onEnd=null}){
  box.innerHTML='<div class="rg-stage"><canvas class="rg-canvas" aria-label="엉뚱 경주 화면"></canvas><p class="rg-wait" role="status">경기를 준비하는 중입니다…</p></div><div class="rg-bar"><button type="button" class="rg-skip" hidden>결과 바로 보기</button><span class="rg-hint">휴대폰을 옆으로 돌려서 보세요.</span></div>';
  const cv=box.querySelector('canvas'),wait=box.querySelector('.rg-wait'),skipBtn=box.querySelector('.rg-skip');
- const show=await createShow(cv,{seed,n}),race=show.race,text=await lines(),index=ctx&&voice?await clipIndex():null,plan=planCommentary(race,show.tl,text,index),buffers=new Map();
+ const show=await createShow(cv,{seed,n,greeting:voice}),race=show.race,text=await lines(),index=ctx&&voice?await clipIndex():null,plan=planCommentary(race,show.tl,text,index),buffers=new Map();
  // 이번 경기에 필요한 목소리 조각만 미리 받아 둠(오래 걸리면 받은 것까지만 쓰고 시작)
  if(index){const jobs=plan.keys.filter(k=>index[k]).map(k=>decode(ctx,'voice/'+k+'.mp3?v='+VOICE_VERSION).then(b=>buffers.set(k,b)).catch(()=>{}));await Promise.race([Promise.all(jobs),new Promise(r=>setTimeout(r,8000))]);}
  let musicBuf=null;if(ctx&&music)decode(ctx,'music/race.mp3?v='+VOICE_VERSION).then(b=>{musicBuf=b;}).catch(()=>{});
  wait.remove();show.render(0);
- const tts=voice&&!index&&typeof speechSynthesis!=='undefined'&&typeof SpeechSynthesisUtterance!=='undefined',stopAt=Math.max(show.total,plan.endAt);
+ const tts=voice&&!index&&typeof speechSynthesis!=='undefined'&&typeof SpeechSynthesisUtterance!=='undefined',stopAt=voice?Math.max(show.total,plan.endAt):show.total; // 목소리를 끄면 순위 읽기 정리 없이 결과판에서 끝남
  let raf=0,t0=null,at=0,sources=[],bgm=null,ended=false,closed=false,duckUntil=-1,ducked=false;
  const musicLevel=v=>{if(bgm&&ctx)try{bgm.g.gain.setTargetAtTime(v,ctx.currentTime,0.08);}catch{/* 음악 없음 */}};
  const hush=()=>{for(const s of sources)try{s.stop();}catch{/* 이미 끝남 */}sources=[];if(tts)try{speechSynthesis.cancel();}catch{/* 지원하지 않음 */}duckUntil=-1;};
@@ -39,7 +39,7 @@ export async function open(box,{seed,n,ctx=null,voice=true,music=true,onEnd=null
  function stopMusic(fade){const m=bgm;bgm=null;if(!m||!ctx)return;try{if(!fade)m.src.stop();else{const t=ctx.currentTime;m.g.gain.cancelScheduledValues(t);m.g.gain.setValueAtTime(m.g.gain.value,t);m.g.gain.linearRampToValueAtTime(0,t+2.5);m.src.stop(t+2.6);}}catch{/* 이미 멈춤 */}}
  function finish(){if(ended)return;ended=true;skipBtn.hidden=true;stopMusic(true);if(onEnd)onEnd(race);}
  function tick(nowMs){if(closed)return;if(t0==null)t0=nowMs;const t=(nowMs-t0)/1000;
-  let readRank=0;for(const it of plan.items)if(it.rank&&t>=it.t&&t<it.t+it.dur+0.12)readRank=it.rank;
+  let readRank=0;if(voice)for(const it of plan.items)if(it.rank&&t>=it.t&&t<it.t+it.dur+0.12)readRank=it.rank;
   show.render(t,{readRank});
   if(t>=PRE-COUNTDOWN)startMusic();
   while(at<plan.items.length&&plan.items[at].t<=t){const it=plan.items[at++];if(t-it.t<0.6)say(it,t);}
@@ -50,7 +50,7 @@ export async function open(box,{seed,n,ctx=null,voice=true,music=true,onEnd=null
  const api={race,show,plan,
   play(){if(closed||raf||t0!=null)return;skipBtn.hidden=false;if(ctx&&ctx.state!=='running')ctx.resume().catch(()=>{});raf=requestAnimationFrame(tick);},
   // 결과 바로 보기: 결과판으로 건너뛰고, 순위를 불러 주는 정리 중계부터 이어 감
-  skip(){if(closed||ended)return;hush();const jump=plan.wrapAt-0.3;t0=performance.now()-jump*1000;at=plan.items.findIndex(it=>it.t>=jump);if(at<0)at=plan.items.length;finish();if(!raf)raf=requestAnimationFrame(tick);},
+  skip(){if(closed||ended)return;hush();const jump=voice?plan.wrapAt-0.3:show.endAt+0.7;t0=performance.now()-jump*1000;at=plan.items.findIndex(it=>it.t>=jump);if(at<0)at=plan.items.length;finish();if(!raf)raf=requestAnimationFrame(tick);},
   close(){closed=true;cancelAnimationFrame(raf);hush();stopMusic(false);box.innerHTML='';},
  };
  skipBtn.onclick=()=>api.skip();

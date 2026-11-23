@@ -4,6 +4,8 @@
    - 경기 계산과 화면은 /race/ 의 파일(sim.mjs, view.mjs, player.mjs)이 맡고, 이 파일은 설정·기록 저장·기록 목록을 맡습니다. 같은 추첨 번호면 언제나 같은 경기입니다. */
 (function(root){'use strict';
  const MIN_RACERS=2,MAX_RACERS=10,PLAYER='/race/player.mjs?v=1',VERSION=1;
+ // 2026-11-23 사용자 결정: 중계 목소리는 마음에 드는 목소리를 찾을 때까지 끄고, 배경음악만 틉니다(자막 중계는 그대로).
+ const VOICE=false;
  const NAMES={horse:'경주마',biped:'두 발 말',cheetah:'치타',panda:'판다',ostrich:'타조',costume:'인형탈 말',giraffe:'기린',elephant:'코끼리',cow:'소',zebra:'얼룩말',turtle:'거북이'};
  const NUMC=['#e53935','#fafafa','#1e5fd0','#f6c915','#2e9e4f','#1b1b1b','#f57c00','#ec6fa7','#27b5c4','#7d4cc2'],NUMT=['#fff','#111','#fff','#111','#fff','#fff','#fff','#111','#111','#fff'];
  const $=id=>document.getElementById(id);
@@ -42,7 +44,7 @@
   const sound=soundOn(),audioCtx=audio(),mine=current={...job,show:null};
   $('rgOverlay').hidden=false;document.documentElement.classList.add('tr-open');$('rgBox').innerHTML='<p class="rg-loading" role="status">경기를 준비하는 중입니다…</p>';
   try{
-   const player=await import(PLAYER),show=await player.open($('rgBox'),{seed:job.seed,n:job.n,ctx:audioCtx,voice:sound,music:sound});
+   const player=await import(PLAYER),show=await player.open($('rgBox'),{seed:job.seed,n:job.n,ctx:audioCtx,voice:VOICE&&sound,music:sound});
    if(current!==mine){show.close();return;}
    mine.show=show;
    if(job.mode==='new'){
@@ -76,7 +78,7 @@
   const el=document.createElement('div');el.id='rgPage';
   el.innerHTML='<div class="card"><h2>엉뚱 경주</h2><p class="sub">번호를 단 선수들이 경주합니다. 경주마, 치타, 판다, 기린, 코끼리, 거북이 같은 열한 종류 가운데 누가 몇 번을 다는지는 경기마다 무작위입니다. 넘어지고, 덮치고, 날아가는 온갖 일이 벌어지지만 어느 선수든 1등을 할 수 있습니다. 경기는 관리자만 돌릴 수 있고, 들어온 순서대로 기록에 남아 누구나 볼 수 있습니다.</p>'
    +'<div class="formgrid"><div class="field"><label for="rgCount">선수 수</label><input id="rgCount" type="number" min="'+MIN_RACERS+'" max="'+MAX_RACERS+'" value="'+MAX_RACERS+'" inputmode="numeric"></div>'
-   +'<div class="field pb-check"><label><input id="rgSound" type="checkbox" checked> 소리 켜기 (중계 목소리·경기 음악)</label></div></div>'
+   +'<div class="field pb-check"><label><input id="rgSound" type="checkbox" checked> 소리 켜기 (경기 음악)</label></div></div>'
    +'<p class="sub" id="rgSummary" role="status"></p><div class="actions"><button type="button" class="btn primary" id="rgStart">경기 시작</button></div></div>'
    +'<div class="card"><h2>경기 기록</h2><div id="rgRecords"><p class="sub">기록을 불러오는 중입니다.</p></div></div>';
   root.gameSwitch.add('race','엉뚱 경주',el,()=>{summary();});

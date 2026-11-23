@@ -13,7 +13,7 @@ function crop(im){const c=document.createElement('canvas');c.width=im.width;c.he
  let x0=c.width,y0=c.height,x1=0,y1=0;for(let y=0;y<c.height;y++)for(let i=0;i<c.width;i++)if(d[(y*c.width+i)*4+3]>40){if(i<x0)x0=i;if(i>x1)x1=i;if(y<y0)y0=y;if(y>y1)y1=y;}
  const o=document.createElement('canvas');o.width=x1-x0+1;o.height=y1-y0+1;o.getContext('2d').drawImage(c,-x0,-y0);return o;}
 function tileOf(img,sy,sh,flip){const c=document.createElement('canvas');c.width=img.width*2;c.height=sh;const x=c.getContext('2d');if(flip){x.translate(0,sh);x.scale(1,-1);}x.drawImage(img,0,sy,img.width,sh,0,0,img.width,sh);x.translate(c.width,0);x.scale(-1,1);x.drawImage(img,0,sy,img.width,sh,0,0,img.width,sh);return c;}
-export async function createShow(cv,{seed,n}){
+export async function createShow(cv,{seed,n,greeting=false}){
 const main=cv.getContext('2d'),off=document.createElement('canvas');cv.width=W;cv.height=H;off.width=W;off.height=H;const offg=off.getContext('2d');
 const race=runRace(seed,n),F=race.frames.length,names=[...new Set(race.types)],SP={},EX={};
 {const jobs=[load('track.jpg')];for(const k of names)if(k==='panda')jobs.push(load('panda.png'));else for(let i=0;i<4;i++)jobs.push(load(k+'_'+i+'.png'));
@@ -187,10 +187,14 @@ function hud(f,ts,pip,readRank){const ord=orderAt(Math.max(0,f));
  // 중계 자막(웃긴 사건이 순위 알림에 바로 덮이지 않게 함)
  let ev=null,hi=null;for(const e of race.events){if(e.frame>f)break;if(f-e.frame<3*HZ){ev=e;if(!LOWKEY.includes(e.kind))hi=e;}}
  if(ev&&hi&&LOWKEY.includes(ev.kind)&&f-hi.frame<1.7*HZ)ev=hi;
- if(f<0)ev={text:-f/HZ>COUNTDOWN?HELLO:READY+' 곧 출발합니다!',frame:-f/HZ>COUNTDOWN?F0-30:-COUNTDOWN*HZ-1};
+ if(f<0)ev={text:-f/HZ>COUNTDOWN?(greeting?HELLO:'오늘의 선수들입니다. 누가 몇 번인지 확인하세요!'):READY+' 곧 출발합니다!',frame:-f/HZ>COUNTDOWN?F0-30:-COUNTDOWN*HZ-1};
  if(ev&&f<F+0.6*HZ){g.globalAlpha=Math.min(1,(f-ev.frame)/8+0.2);let size=27;g.font='800 '+size+'px system-ui,sans-serif';let tw=g.measureText(ev.text).width;if(tw>1020){size=Math.floor(27*1020/tw);g.font='800 '+size+'px system-ui,sans-serif';tw=g.measureText(ev.text).width;}
   const bw=tw+124,bx=(W-bw)/2;rr(bx,650,bw,52,10);g.fillStyle='rgba(8,12,20,.82)';g.fill();rr(bx+8,658,70,36,7);g.fillStyle='#d6341f';g.fill();g.fillStyle='#fff';g.font='800 19px system-ui,sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText('중계',bx+43,677);g.font='800 '+size+'px system-ui,sans-serif';g.textAlign='left';g.fillText(ev.text,bx+92,677);g.globalAlpha=1;}
  const big=(t,col)=>{g.font='900 190px system-ui,sans-serif';g.textAlign='center';g.textBaseline='middle';g.lineWidth=16;g.strokeStyle='rgba(0,0,0,.7)';g.strokeText(t,W/2,300);g.fillStyle=col;g.fillText(t,W/2,300);};
+ // 출발 전 선수 소개: 누가 몇 번을 달았는지 보여 줌
+ if(f<0&&-f/HZ>COUNTDOWN-0.4){g.globalAlpha=clamp((-f/HZ-(COUNTDOWN-0.4))/0.4,0,1)*clamp((f-F0)/12,0,1);const rows=Math.ceil(n/2),ph=96+rows*64;rr(240,84,800,ph,22);g.fillStyle='rgba(18,28,44,.92)';g.fill();g.strokeStyle='#ffd92e';g.lineWidth=3;g.stroke();
+  g.fillStyle='#ffd92e';g.font='900 34px system-ui,sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText('오늘의 선수',640,126);
+  race.types.forEach((type,i)=>{const col=i<rows?0:1,x=280+col*390,y=186+(i%rows)*64;chip(x+24,y,21,i+1);const im=SP[type].f[0],fit=Math.min(92/im.width,54/im.height),ww=im.width*fit,hh=im.height*fit;g.drawImage(im,x+60+(92-ww)/2,y-hh/2,ww,hh);g.fillStyle='#fff';g.font='700 22px system-ui,sans-serif';g.textAlign='left';g.fillText((i+1)+'번 '+TYPES[type].name,x+166,y+1);});g.globalAlpha=1;}
  if(f<0&&-f/HZ<=COUNTDOWN)big(String(Math.ceil(-f/HZ)),'#fff');else if(f>=0&&f<0.9*HZ)big('출발!','#ffd92e');
  if(f>=F+0.6*HZ){g.globalAlpha=Math.min(1,(f-F-0.6*HZ)/20);g.fillStyle='rgba(5,10,18,.72)';g.fillRect(0,0,W,H);rr(270,60,740,600,22);g.fillStyle='rgba(18,28,44,.96)';g.fill();g.strokeStyle='#ffd92e';g.lineWidth=3;g.stroke();
   g.fillStyle='#ffd92e';g.font='900 40px system-ui,sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText('경기 결과',640,112);g.fillStyle='#9fb0c4';g.font='600 17px system-ui,sans-serif';g.fillText('추첨 번호 '+seed+' · '+race.seconds+'초',640,150);
