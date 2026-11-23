@@ -1,6 +1,6 @@
 // 정통 경마 화면(시안 2). sim.mjs 가 미리 계산한 경기를 그대로 다시 보여 줍니다.
 // createShow(캔버스,{seed,n}) 가 경기 한 판을 준비해, 원하는 순간을 그리는 render(초) 를 돌려줍니다. 재생과 소리는 player.mjs 가 맡습니다.
-import {runRace,TYPES,TRACK,HZ} from './sim.mjs';
+import {runRace,TYPES,TRACK,HZ,RACE_VERSION} from './sim.mjs';
 import {timeline,PRE,COUNTDOWN,POST} from './timeline.mjs';
 import {HELLO,READY} from './commentary.mjs';
 export const W=1280,H=720;
@@ -13,9 +13,9 @@ function crop(im){const c=document.createElement('canvas');c.width=im.width;c.he
  let x0=c.width,y0=c.height,x1=0,y1=0;for(let y=0;y<c.height;y++)for(let i=0;i<c.width;i++)if(d[(y*c.width+i)*4+3]>40){if(i<x0)x0=i;if(i>x1)x1=i;if(y<y0)y0=y;if(y>y1)y1=y;}
  const o=document.createElement('canvas');o.width=x1-x0+1;o.height=y1-y0+1;o.getContext('2d').drawImage(c,-x0,-y0);return o;}
 function tileOf(img,sy,sh,flip){const c=document.createElement('canvas');c.width=img.width*2;c.height=sh;const x=c.getContext('2d');if(flip){x.translate(0,sh);x.scale(1,-1);}x.drawImage(img,0,sy,img.width,sh,0,0,img.width,sh);x.translate(c.width,0);x.scale(-1,1);x.drawImage(img,0,sy,img.width,sh,0,0,img.width,sh);return c;}
-export async function createShow(cv,{seed,n,greeting=false}){
+export async function createShow(cv,{seed,n,version=RACE_VERSION,greeting=false}){
 const main=cv.getContext('2d'),off=document.createElement('canvas');cv.width=W;cv.height=H;off.width=W;off.height=H;const offg=off.getContext('2d');
-const race=runRace(seed,n),F=race.frames.length,names=[...new Set(race.types)],SP={},EX={};
+const race=runRace(seed,n,version),F=race.frames.length,names=[...new Set(race.types)],SP={},EX={};
 {const jobs=[load('track.jpg')];for(const k of names)if(k==='panda')jobs.push(load('panda.png'));else for(let i=0;i<4;i++)jobs.push(load(k+'_'+i+'.png'));
  const ex=Object.keys(EXTRA);for(const k of ex)jobs.push(load(k+'.png'));const got=await Promise.all(jobs);let p=1;var track=got[0];
  for(const k of names){const f=k==='panda'?[crop(got[p++])]:[got[p++],got[p++],got[p++],got[p++]],hs=f.map(i=>i.height).sort((a,b)=>a-b),ws=f.map(i=>i.width).sort((a,b)=>a-b);SP[k]={f,k:LOOK[k].h/hs[hs.length>>1],w:ws[ws.length>>1],h0:hs[hs.length>>1],...LOOK[k]};}
@@ -27,7 +27,7 @@ const F0=-PRE*HZ,F1=F+Math.round(POST*HZ),clampF=f=>Math.max(0,Math.min(F-1,f));
 const tl=timeline(race),{doneF,firstF,speedAt,frameAt,total}=tl;
 const fr=(i,f)=>race.frames[clampF(f)][i];
 const dispX=(i,f)=>{if(f<0)return 0;const d=doneF[i];if(d!=null&&f>d)return TRACK+Math.max(12,fr(i,d).v)*0.8*(f-d)/HZ;return fr(i,f).x;};
-const MOVING=['run','sprint','burst','panic','crawl','split','roll','bike','shell'];
+const MOVING=['run','sprint','burst','panic','prop','crawl','split','roll','bike','shell'];
 const stateOf=(i,f)=>{if(f<0)return 'ready';const d=doneF[i];if(d!=null&&f>d){const s=fr(i,d).s;return s==='leap'?'split':MOVING.includes(s)?s:fr(i,d).sp?'split':race.types[i]==='panda'?'roll':'run';}return fr(i,f).s;};
 const segs=Array.from({length:n},()=>[]);for(let i=0;i<n;i++){let cur=null;for(let f=0;f<F;f++){const s=race.frames[f][i].s;if(!cur||cur.s!==s){if(cur)cur.f1=f;cur={s,f0:f,f1:F};segs[i].push(cur);}}}
 const segAt=(i,f)=>{const a=segs[i];for(let k=a.length-1;k>=0;k--)if(f>=a[k].f0)return a[k];return a[0];};
@@ -43,7 +43,7 @@ const SHOT={pounce:{o:'b',pre:.5,post:1.7,z:1.45,p:3},bowl:{o:'b',pre:.4,post:1.
  bonk:{o:'a',pre:.4,post:1.5,z:1.35,p:2},back:{o:'a',pre:.1,post:1.7,z:1.35,p:2},nap:{o:'a',pre:.2,post:1.9,z:1.5,p:2},dig:{o:'a',pre:.2,post:1.3,z:1.5,p:1},eat:{o:'a',pre:.2,post:1.7,z:1.5,p:1},wait:{o:'a',pre:.3,post:1.9,z:1.4,p:2},
  split:{o:'a',pre:.6,post:2.3,z:1.4,p:4},bike:{o:'a',pre:.2,post:2.5,z:1.25,p:5},ride:{o:'a',pre:.4,post:2.3,z:1.3,p:5},rideoff:{o:'a',pre:.2,post:1.5,z:1.4,p:3},leap:{o:'a',pre:.3,post:1.6,z:1,p:6,flat:1},
  stomp:{o:'a',pre:1.5,post:2.2,z:1.2,p:5},ricochet:{o:'a',pre:.3,post:1.7,z:1.2,p:4},unshell:{o:'a',pre:.2,post:1.4,z:1.45,p:2},ufo:{o:'a',pre:1,post:3.4,z:1.05,p:5},ufofail:{o:'a',pre:1,post:2.3,z:1.1,p:4},
- panic:{o:'a',pre:.3,post:2,z:1.25,p:3},cele:{o:'a',pre:.2,post:2.3,z:1.4,p:5},tornado:{o:'a',pre:.4,post:2.3,z:1,p:5},slip:{o:'a',pre:.3,post:1.3,z:1.4,p:1}};
+ panic:{o:'a',pre:.3,post:2,z:1.25,p:3},cele:{o:'a',pre:.2,post:2.3,z:1.4,p:5},tornado:{o:'a',pre:.4,post:2.3,z:1,p:5},grab:{o:'a',pre:.4,post:3,z:1.2,p:5},throwfwd:{o:'a',pre:.1,post:2.1,z:1,p:5},throwback:{o:'b',pre:.1,post:1.9,z:1.1,p:4},slip:{o:'a',pre:.3,post:1.3,z:1.4,p:1}};
 const shots=[];{let lastCutEnd=-1e9;
  for(const e of race.events){const S=SHOT[e.kind];if(!S)continue;const who=(S.o==='b'&&e.b?e.b:e.a)-1,f0=Math.max(0,Math.round(e.frame-S.pre*HZ)),f1=Math.min(F-1,Math.round(e.frame+S.post*HZ));if(f1-f0<40)continue;
   const cut=!inLead(dispX(who,e.frame),e.frame),last=shots[shots.length-1];
@@ -98,7 +98,7 @@ function world(f,ts,C){const {L,z,hy}=C,X=x=>(x-L)*PPU*z,Yof=lf=>hy+laneY(lf)*z,
   for(let s=0;s<4;s++){const sx=x+(s*13-10)*z;g.strokeStyle=s&1?'#5d9a3a':'#77b548';g.lineWidth=6*z;g.beginPath();g.moveTo(sx,y);g.lineTo(sx+(s-1.5)*4*z,y-hh*(0.8+0.07*s));g.stroke();if(!eaten)for(let l=0;l<3;l++){g.beginPath();g.ellipse(sx+(s-1.5)*4*z+(l-1)*13*z,y-hh*(0.55+0.14*l),14*z,4*z,(l-1)*0.6,0,7);g.fillStyle='#4f9a33';g.fill();}}});
  const fx=[];
  const drawOne=i=>{const type=race.types[i],S=SP[type],s=stateOf(i,f),x=dispX(i,f),v=f<0?0:fr(i,f).v,seg=f>=0&&(doneF[i]==null||f<=doneF[i])?segAt(i,f):{s,f0:0,f1:1e9},tau=(f-seg.f0)/HZ,rem=(seg.f1-f)/HZ,p=clamp((f-seg.f0)/Math.max(1,seg.f1-seg.f0),0,1);
-  let lf=laneF(i);const rideHost=(s==='ride'||s==='leap')?fr(i,f).h-1:-1;if(s==='leap')lf=laneF(rideHost)+(lf-laneF(rideHost))*p;if(s==='ride')return;
+  let lf=laneF(i);const rideHost=(s==='ride'||s==='leap')?fr(i,f).h-1:-1;if(s==='leap')lf=laneF(rideHost)+(lf-laneF(rideHost))*p;if(s==='ride'||s==='spun')return;
   const per=z*(0.8+0.2*lf),sc=per*S.k,Xn=X(x),Y=Yof(lf),bw=S.w*sc,bh=S.h0*sc,cx=Xn-bw/2;if(Xn<-260*z||cx-bw>W+260*z)return;
   const ph=S.stride?x/S.stride:0,idx=Math.floor(fract(ph)*4)%4,sw=Math.sin(ph*2*Math.PI);
   let img=S.f[Math.min(idx,S.f.length-1)],ang=0,dy=0,fxp=1,sy=1,mark=null,shadow=0.26,drawn=false,topY=Y-bh;
@@ -119,6 +119,8 @@ function world(f,ts,C){const {L,z,hy}=C,X=x=>(x-L)*PPU*z,Yof=lf=>hy+laneY(lf)*z,
   else if(s==='ready'){dy=Math.sin(ts*5+i)*1.5;img=S.f[type==='panda'?0:1];}
   else if(s==='down'){tumble();if(tau<0.5)for(let k=0;k<5;k++)puff(Xn-bw*(0.1+k*0.2),Y-4-tau*30*(k%2+1),(8+tau*40)*per,0.5*(1-tau/0.5));}
   else if(s==='fly'){dy=-Math.sin(p*Math.PI)*150*per;ang=p*Math.PI*4;shadow=0.12;}
+  else if(s==='thrown'){dy=-Math.sin(p*Math.PI)*190*per;ang=p*Math.PI*5*(v<0?-1:1);shadow=0.1;}
+  else if(s==='oops'){img=S.f[3];fx.push({say:'아차!',x:cx+bw*0.1,y:Y-bh-52*per,per});mark='!';}
   else if(s==='blown'){dy=-Math.sin(p*Math.PI)*210*per-20*per;ang=tau*13;shadow=0.1;}
   else if(s==='lift'){dy=-smooth(p)*Math.min(290*z,Y-120);ang=Math.sin(tau*5)*0.25;shadow=0.1;}
   else if(s==='gone'){return;}
@@ -136,19 +138,23 @@ function world(f,ts,C){const {L,z,hy}=C,X=x=>(x-L)*PPU*z,Yof=lf=>hy+laneY(lf)*z,
   else if(s==='leap'){const E=EX.cride,h=E.im.height*E.k*per,hh=SP[race.types[rideHost]].h0*SP[race.types[rideHost]].k*per;drawn=true;const yy=Y-h/2-(1-p)*hh*0.7-Math.sin(p*Math.PI)*170*per;g.beginPath();g.ellipse(Xn-60*per,Y+2*z,50*per,6*z,0,0,7);g.fillStyle='rgba(0,0,0,.14)';g.fill();put(E.im,Xn-70*per,yy,E.k*per,-0.5+p*1.1);topY=yy-h/2;lines();}
   else if(type==='panda'){ang=x*PPU/(S.h*0.5);dy=-Math.abs(Math.sin(x*0.35))*8*per;if(v>36)lines();dust(9,0.8);}
   else if(type==='turtle'){dy=-Math.abs(sw)*1.5*per;}
-  else{gallop(s==='panic'||s==='sprint'||s==='burst'?1.5:1);dust(S.stride/2,type==='elephant'?1.6:1);if(s==='sprint'||s==='burst'||s==='panic'||v>52)lines();}
+  else{gallop(s==='panic'||s==='sprint'||s==='burst'||s==='prop'?1.5:1);dust(S.stride/2,type==='elephant'?1.6:1);if(s==='sprint'||s==='burst'||s==='panic'||s==='prop'||v>52)lines();}
   if(!drawn){const h=img.height*sc;g.beginPath();g.ellipse(cx,Y+2*z,bw*0.42,7*z,0,0,7);g.fillStyle='rgba(0,0,0,'+shadow+')';g.fill();put(img,cx,Y-h/2+dy,sc,ang,fxp,sy);topY=Math.min(Y-h/2+dy-h/2,Y-bh);}
   const by=topY-17*per;chip(cx,by,15.5*per,i+1);
   if(mark==='?')word('?',cx+bw*0.42,by-6*per,40*per);
   if(mark==='*')for(let k=0;k<3;k++){const a=ts*6+k*2.094;star(cx+Math.cos(a)*26*per,by-26*per+Math.sin(a)*8*per,9*per,a,'#ffd92e');}
-  if(s==='panic')word('!',cx+bw*0.4,by-8*per,44*per,'#ff5a4a');
+  if(s==='panic'||mark==='!')word('!',cx+bw*0.4,by-8*per,44*per,'#ff5a4a');
+  // 코끼리 코에 잡혀 프로펠러처럼 도는 선수
+  for(let j=0;j<n;j++)if(f>=0&&fr(j,f).s==='spun'&&fr(j,f).h===i+1&&(doneF[j]==null||f<=doneF[j])){const V=SP[race.types[j]],vim=V.f[0],vs=V.k*per*0.82,vr=Math.max(vim.width,vim.height)*vs*0.5,px=Xn+vr*0.75,py=Y-bh*0.5+dy;
+   g.beginPath();g.arc(px,py,vr*1.05,0,7);g.fillStyle='rgba(255,255,255,.2)';g.fill();g.lineWidth=3*per;g.strokeStyle='rgba(255,255,255,.55)';for(let k=0;k<3;k++){const a0=ts*30+k*2.094;g.beginPath();g.arc(px,py,vr*(0.7+0.12*k),a0,a0+1.1);g.stroke();}
+   put(vim,px,py,vs,ts*30);chip(px,py-vr-16*per,15.5*per,j+1);}
   // 등에 올라탄 두 사람
   for(let j=0;j<n;j++)if(f>=0&&fr(j,f).s==='ride'&&fr(j,f).h===i+1&&(doneF[j]==null||f<=doneF[j])){const E=EX.cride,h=E.im.height*E.k*per;put(E.im,cx-bw*0.05,Y-bh*0.78-h*0.32+dy,E.k*per,sw*0.05);chip(cx-bw*0.05,Y-bh*0.78-h*0.82+dy-17*per,15.5*per,j+1);}
  };
  for(let i=0;i<n;i++)drawOne(i);
  // 사건 연출: 부딪침 표시, 생쥐, 캥거루, UFO, 회오리바람
  for(const e of race.events){const d=(f-e.frame)/HZ;if(d<-1.6||d>4.5)continue;const who=i=>{const lf=laneF(i),per=z*(0.8+0.2*lf),S=SP[race.types[i]];return {x:X(dispX(i,f))-S.w*S.k*per/2,y:Yof(lf),per,h:S.h0*S.k*per};};
-  if(d>=0&&d<0.55&&['pounce','bowl','trample','shellhit','bounce','ricochet'].includes(e.kind)){const w=who((e.kind==='bounce'||e.kind==='ricochet'?e.a:e.b)-1);fx.push({x:w.x,y:w.y-w.h*0.6,r:(46+d*56)*w.per,text:e.kind==='pounce'?'퍽!':e.kind==='ricochet'||e.kind==='bounce'?'팅!':'쾅!'});}
+  if(d>=0&&d<0.55&&['pounce','bowl','trample','shellhit','bounce','ricochet','grab','throwfwd','throwback'].includes(e.kind)){const w=who((e.kind==='bounce'||e.kind==='ricochet'||e.kind==='grab'?e.a:e.b)-1);fx.push({x:w.x+(e.kind==='grab'?w.h*0.9:0),y:w.y-w.h*0.6,r:(46+d*56)*w.per,text:e.kind==='pounce'?'퍽!':e.kind==='ricochet'||e.kind==='bounce'?'팅!':e.kind==='grab'?'휙!':e.kind.startsWith('throw')?'슝!':'쾅!'});}
   if(e.kind==='panic'&&d>=0&&d<3.2){const lf=laneF(e.a-1),per=z*(0.8+0.2*lf),E=EX.mouse;put(E.im,X(e.x),Yof(lf)-E.im.height*E.k*per/2-Math.abs(Math.sin(d*10))*5*per,E.k*per);}
   if(e.kind==='stomp'&&d>-1.5&&d<1.6){const i=e.a-1,lf=laneF(i),per=z*(0.8+0.2*lf),E=EX.kangaroo,h=E.im.height*E.k*per,tx=dispX(i,e.frame),kx=d<0?tx+d*70:tx+d*55,ky=d<0?Math.abs(Math.sin((d+1.5)*Math.PI/0.5))*150*per*(d>-0.5?1:0.7):Math.abs(Math.sin(d*Math.PI/0.55))*170*per+d*40*per;
    put(E.im,X(kx)-10*per,Yof(lf)-h/2-ky-(d>=0?20*per:0),E.k*per,d<0&&d>-0.5?0.25:-0.1);if(d>=0&&d<0.5)fx.push({x:X(tx)-30*per,y:Yof(lf)-40*per,r:(50+d*60)*per,text:'콱!'});}
@@ -164,7 +170,7 @@ function world(f,ts,C){const {L,z,hy}=C,X=x=>(x-L)*PPU*z,Yof=lf=>hy+laneY(lf)*z,
 function orderAt(f){const fin=race.events.filter(e=>e.kind==='finish'&&e.frame<=f).map(e=>e.a),rest=[];for(let i=0;i<n;i++)if(!fin.includes(i+1))rest.push(i+1);rest.sort((a,b)=>dispX(b-1,f)-dispX(a-1,f));return [...fin,...rest];}
 const LOWKEY=['lead','finish','home','unshell'];
 function render(ts,opts={}){ts=clamp(ts,0,total-1e-6);const f=clamp(frameAt(ts),F0,F1-1),k=f-F0,shot=shotAt[k];g=main;
- let shake=0;for(const e of race.events)if(['pounce','bowl','trample','shellhit','stomp','bounce','ricochet'].includes(e.kind)&&f>=e.frame&&f-e.frame<16)shake=Math.max(shake,1-(f-e.frame)/16);
+ let shake=0;for(const e of race.events)if(['pounce','bowl','trample','shellhit','stomp','bounce','ricochet','grab','throwfwd','throwback'].includes(e.kind)&&f>=e.frame&&f-e.frame<16)shake=Math.max(shake,1-(f-e.frame)/16);
  g.save();if(shake)g.translate(Math.sin(f*2.1)*8*shake,Math.cos(f*2.7)*6*shake);
  world(f,ts,{L:camX[k]-W/(2*PPU*camZ[k]),z:camZ[k],hy:camH[k]});g.restore();
  // 뒤쪽 카메라일 때는 선두 화면을 작게 함께 보여 줌

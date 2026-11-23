@@ -12,10 +12,10 @@ const lines=()=>linesP||(linesP=fetch(url('voice/lines.json?v='+VOICE_VERSION)).
 const clipIndex=()=>indexP||(indexP=fetch(url('voice/index.json?v='+VOICE_VERSION)).then(r=>r.ok?r.json():null).then(j=>j&&Object.keys(j).length?j:null).catch(()=>null));
 const decode=(ctx,p)=>fetch(url(p)).then(r=>r.ok?r.arrayBuffer():Promise.reject(Error(p))).then(b=>new Promise((ok,no)=>ctx.decodeAudioData(b,ok,no)));
 /** 경기 한 판을 준비합니다. ctx 는 누르는 순간 만들어 둔 소리 장치(없으면 소리 없이 진행). */
-export async function open(box,{seed,n,ctx=null,voice=true,music=true,onEnd=null}){
+export async function open(box,{seed,n,version,ctx=null,voice=true,music=true,onEnd=null}){
  box.innerHTML='<div class="rg-stage"><canvas class="rg-canvas" aria-label="정통 경마 화면"></canvas><p class="rg-wait" role="status">경기를 준비하는 중입니다…</p></div><div class="rg-bar"><button type="button" class="rg-skip" hidden>결과 바로 보기</button><span class="rg-hint">휴대폰을 옆으로 돌려서 보세요.</span></div>';
  const cv=box.querySelector('canvas'),wait=box.querySelector('.rg-wait'),skipBtn=box.querySelector('.rg-skip');
- const show=await createShow(cv,{seed,n,greeting:voice}),race=show.race,text=await lines(),index=ctx&&voice?await clipIndex():null,plan=planCommentary(race,show.tl,text,index),buffers=new Map();
+ const show=await createShow(cv,{seed,n,version,greeting:voice}),race=show.race,text=await lines(),index=ctx&&voice?await clipIndex():null,plan=planCommentary(race,show.tl,text,index),buffers=new Map();
  // 이번 경기에 필요한 목소리 조각만 미리 받아 둠(오래 걸리면 받은 것까지만 쓰고 시작)
  if(index){const jobs=plan.keys.filter(k=>index[k]).map(k=>decode(ctx,'voice/'+k+'.mp3?v='+VOICE_VERSION).then(b=>buffers.set(k,b)).catch(()=>{}));await Promise.race([Promise.all(jobs),new Promise(r=>setTimeout(r,8000))]);}
  let musicBuf=null;if(ctx&&music)decode(ctx,'music/race.mp3?v='+VOICE_VERSION).then(b=>{musicBuf=b;}).catch(()=>{});

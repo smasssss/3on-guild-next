@@ -4,7 +4,7 @@
    - 들어온 순서대로 기록으로 남습니다. 경기는 관리자만 돌릴 수 있고, 기록은 누구나 보고 다시 볼 수 있습니다.
    - 경기 계산과 화면은 /race/ 의 파일(sim.mjs, view.mjs, player.mjs)이 맡고, 이 파일은 설정·기록 저장·기록 목록을 맡습니다. 같은 추첨 번호면 언제나 같은 경기입니다. */
 (function(root){'use strict';
- const MIN_RACERS=2,MAX_RACERS=10,PLAYER='/race/player.mjs?v=1',VERSION=1;
+ const MIN_RACERS=2,MAX_RACERS=10,PLAYER='/race/player.mjs?v=2',VERSION=2; // VERSION: 새 경기에 쓰는 규칙 판(기록마다 판 번호가 남아, 다시 보기는 그 판의 규칙으로 계산)
  // 2026-11-23 사용자 결정: 중계 목소리는 마음에 드는 목소리를 찾을 때까지 끄고, 배경음악만 틉니다(자막 중계는 그대로).
  const VOICE=false;
  const NAMES={horse:'경주마',biped:'두 발 말',cheetah:'치타',panda:'판다',ostrich:'타조',costume:'인형탈 말',giraffe:'기린',elephant:'코끼리',cow:'소',zebra:'얼룩말',turtle:'거북이'};
@@ -45,12 +45,12 @@
   const sound=soundOn(),audioCtx=audio(),mine=current={...job,show:null};
   $('rgOverlay').hidden=false;document.documentElement.classList.add('tr-open');$('rgBox').innerHTML='<p class="rg-loading" role="status">경기를 준비하는 중입니다…</p>';
   try{
-   const player=await import(PLAYER),show=await player.open($('rgBox'),{seed:job.seed,n:job.n,ctx:audioCtx,voice:VOICE&&sound,music:sound});
+   const player=await import(PLAYER),show=await player.open($('rgBox'),{seed:job.seed,n:job.n,version:job.version,ctx:audioCtx,voice:VOICE&&sound,music:sound});
    if(current!==mine){show.close();return;}
    mine.show=show;
    if(job.mode==='new'){
     // 기록을 먼저 남기고, 저장된 뒤에만 경기를 보여 줍니다
-    const race={id:crypto.randomUUID(),seed:job.seed,version:VERSION,n:job.n,types:show.race.types,order:show.race.order};
+    const race={id:crypto.randomUUID(),seed:job.seed,version:job.version,n:job.n,types:show.race.types,order:show.race.order};
     try{records=await api('/api/race',{method:'POST',body:JSON.stringify({revision:records.revision,mutation:crypto.randomUUID(),race})});renderRecords();}
     catch(err){if(current===mine)close();notice('경기 기록을 저장하지 못해 경기를 시작하지 않았습니다. '+err.message);loadRecords();return;}
    }else if(!sameOrder(show.race.order,job.expect)){if(current===mine)close();notice('이 기록은 지금 계산한 순위와 달라 다시 볼 수 없습니다. 기록된 순위는 목록에서 확인해 주세요.');return;}
@@ -61,9 +61,9 @@
   if(typeof ensureAdmin==='function'&&!ensureAdmin())return;
   const n=count();if(check(n))return;
   const seed=Array.from(crypto.getRandomValues(new Uint8Array(4)),x=>x.toString(16).padStart(2,'0')).join('');
-  run({mode:'new',seed,n});
+  run({mode:'new',seed,n,version:VERSION});
  }
- const replay=d=>run({mode:'replay',seed:d.seed,n:d.n,expect:d.order});
+ const replay=d=>run({mode:'replay',seed:d.seed,n:d.n,version:d.version,expect:d.order});
  async function loadRecords(){try{records=await api('/api/race');}catch(e){records={revision:0,races:[],error:e.message};}renderRecords();}
  function renderRecords(){
   const el=$('rgRecords');if(!el)return;

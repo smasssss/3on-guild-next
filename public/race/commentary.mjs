@@ -20,6 +20,9 @@ export function voiceOf(e,types,rank){
   case 'bounce':return {keys:['p_bounce_'+(ta==='panda'?'panda':'cheetah')],p:3};
   case 'pounce':case 'bowl':case 'trample':return {keys:['p_'+e.kind,nm(e.b)],p:3};
   case 'ride':return {keys:['p_ride',nm(e.b)],p:5};
+  case 'grab':return {keys:['p_grab',nm(e.b)],p:5};
+  case 'throwfwd':return {keys:['p_throwfwd'],p:5};
+  case 'throwback':return {keys:['p_throwback'],p:4};
   case 'ufo':return {keys:['p_ufo',nm(e.a)],p:5};
   case 'shellhit':return {keys:[nm(e.b),'p_shellhit'],p:2};
   case 'ufodrop':return {keys:['p_ufodrop'+(/뒤쪽/.test(e.text)?'_back':/선두 앞/.test(e.text)?'_front':'')],p:4};

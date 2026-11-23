@@ -15,7 +15,8 @@ const race=(over={})=>({id:'d1b2c3d4-0000-4000-8000-000000000001',seed:'00c51d27
  assert.equal(lib.validateRace(race({n:2,types:['cow','elephant'],order:[1,2]})).n,2,'two racers are enough');
  const bad=[[{order:[6,1,5,8,3,2,9,7,10]},/순위/],[{order:[6,1,5,8,3,2,9,7,10,10]},/순위/],[{order:[6,1,5,8,3,2,9,7,10,11]},/순위/],[{order:[0,1,5,8,3,2,9,7,10,4]},/순위/],[{order:[6,1,5,8,3,2,9,7,10,4.5]},/순위/],
   [{types:TYPES10.slice(0,9)},/선수 종류/],[{types:[...TYPES10.slice(0,9),'giraffe']},/선수 종류/],[{types:[...TYPES10.slice(0,9),'dragon']},/선수 종류/],
-  [{n:1,types:['cow'],order:[1]},/선수 수/],[{n:11},/선수 수/],[{n:2.5},/선수 수/],[{seed:'zz'},/추첨 번호/],[{version:2},/규칙 판/],[{id:'x'},/기록 번호/]];
+  [{n:1,types:['cow'],order:[1]},/선수 수/],[{n:11},/선수 수/],[{n:2.5},/선수 수/],[{seed:'zz'},/추첨 번호/],[{version:3},/규칙 판/],[{version:0},/규칙 판/],[{id:'x'},/기록 번호/]];
+ assert.equal(lib.validateRace(race({version:2})).version,2,'rules version 2 (elephant trunk propeller, 2026-11-23) is accepted and kept');assert.equal(ok.version,1,'a version 1 record stays version 1');
  for(const [over,why] of bad)assert.throws(()=>lib.validateRace(race(over)),why,JSON.stringify(over));
  assert.equal(lib.addRace(lib.addRace(lib.emptyRaces(),{...ok,at:'t'}),{...ok,at:'t'}).races.length,1,'the same race is not stored twice');
  // 2) Storage: own document kind, admin only, anyone reads, other documents untouched
@@ -34,7 +35,8 @@ const race=(over={})=>({id:'d1b2c3d4-0000-4000-8000-000000000001',seed:'00c51d27
  assert.deepEqual(ui.ranking(ok).slice(0,2),[{rank:1,no:6,name:'타조'},{rank:2,no:1,name:'기린'}]);
  assert.ok(ui.sameOrder([1,2,3],[1,2,3]));assert.ok(!ui.sameOrder([1,2,3],[1,3,2]));assert.ok(!ui.sameOrder([1,2],undefined));
  const sim=fs.readFileSync('public/race/sim.mjs','utf8');for(const [k,name] of Object.entries(ui.NAMES))assert.ok(sim.includes(k+":{name:'"+name+"'"),'name of '+k);
- assert.match(sim,/export const RACE_VERSION=1,MIN_RACERS=2;/);assert.equal(ui.VERSION,1);
+ assert.match(sim,/export const RACE_VERSION=2,MIN_RACERS=2;/);assert.equal(ui.VERSION,2,'new races are saved with the current rules version');assert.deepEqual([...lib.RACE_VERSIONS],[1,2]);
+ assert.match(fs.readFileSync('public/race-game.js','utf8'),/version:d\.version,expect:d\.order/,'a replay uses the rules version stored in the record');
  // 4) Wiring: the game is added to the 추첨 게임 tab's game switch; the record is saved before the race is shown; a skip button exists
  const html=fs.readFileSync('public/legacy.html','utf8');assert.match(html,/<script src="\/lotto-draw\.js\?v=\d+" defer><\/script><script src="\/race-game\.js\?v=\d+" defer><\/script>/);
  const js=fs.readFileSync('public/race-game.js','utf8');assert.match(js,/root\.gameSwitch\.add\('race','정통 경마'/);assert.match(js,/ensureAdmin/);

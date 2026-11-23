@@ -1,6 +1,7 @@
 // 정통 경마 계산. 같은 추첨 번호(seed)면 언제나 같은 경기입니다. 기기마다 값이 달라질 수 있는 함수는 쓰지 않고 사칙연산만 씁니다.
 // 기록은 추첨 번호로 다시 계산해 보여 주므로, 여기 규칙이나 숫자를 바꾸면 옛 기록이 달라집니다. 바꿀 때는 새 판 번호(RACE_VERSION)를 만들어 옛 판을 남겨 두세요.
-export const RACE_VERSION=1,MIN_RACERS=2;
+export const RACE_VERSION=2,MIN_RACERS=2;
+// 2판(2026-11-23 사용자 요청): 코끼리가 코로 선수 하나를 낚아채 프로펠러처럼 돌리며 질주한 뒤, 앞이나 뒤로 던집니다. 1판 기록은 1판 규칙으로 다시 계산합니다.
 export const HZ=60,TRACK=1600,MAX_RACERS=10,MAX_SECONDS=320;
 export function rng(seedHex){let a=parseInt(seedHex,16)>>>0;return ()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
 const hex=v=>(v>>>0).toString(16).padStart(8,'0');
@@ -18,17 +19,24 @@ export const TYPES={
  zebra:{name:'얼룩말',v:44.02,trip:0.008,down:1.4},
  turtle:{name:'거북이',v:8,shellV:120,stomp:0.65,luck:0.259},
 };
+// 2판에서 쓰는 값: 코끼리의 낚아채기(grab: 기회가 있을 때 1초에 일어날 확률, propV: 돌리며 달리는 속도)와, 그에 맞춰 다시 고른 속도
+export const TYPES_V2=JSON.parse(JSON.stringify(TYPES));
+{const set={horse:{v:40.41},biped:{v:30.81,burstV:49.84},cheetah:{v:23.52,sprintV:62.36},panda:{v:28.24,rollMax:55.29,rollUp:1.41},ostrich:{v:41.67},costume:{luck:0.225},giraffe:{v:41.55},
+  elephant:{v:31.69,panicV:63.38,grab:1.5,propV:66.96},cow:{v:41.85},zebra:{v:44.08},turtle:{luck:0.255}};for(const k of Object.keys(set))Object.assign(TYPES_V2[k],set[k]);}
+export const typesFor=version=>version>=2?TYPES_V2:TYPES;
 const ORDER=Object.keys(TYPES);
 // 번호 1~n 에 어떤 선수가 들어갈지는 추첨 번호로 정함(열한 종류를 섞어 앞에서부터 n 명)
 export function lineup(seedHex,n){const r=rng(seedHex),d=ORDER.slice();for(let i=d.length-1;i>0;i--){const j=Math.floor(r()*(i+1));[d[i],d[j]]=[d[j],d[i]];}return d.slice(0,n);}
 const HITTABLE=['run','dig','nap','eat','wait','cele','back'];
-export function runRace(seedHex,n){
+// stopAfter: 이만큼 들어오면 계산을 멈춤(균형 맞추는 도구가 우승자만 빨리 볼 때 씀. 평소에는 끝까지 계산)
+export function runRace(seedHex,n,version=RACE_VERSION,stopAfter=n){
+ const TT=typesFor(version),V2=version>=2;
  const types=lineup(seedHex,n),sn=parseInt(seedHex,16)>>>0,r=rng(hex(sn^0x5bd1e995)),c=rng(hex(sn^0x2545f491)),DT=1/HZ;
  // 경기장 꾸밈(횡단보도, 대나무, 진흙탕)과 돌발 사건 예정
  const cv=Array.from({length:12},()=>c());
  const course={cross:[TRACK*(0.24+0.14*cv[0]),TRACK*(0.58+0.2*cv[1])],bamboo:[TRACK*(0.3+0.12*cv[2]),TRACK*(0.62+0.16*cv[3])],puddle:{x:TRACK*(0.2+0.6*cv[4]),lane:Math.floor(cv[5]*Math.max(1,n-2))},
   ufo:cv[6]<0.6?TRACK*(0.3+0.45*cv[7]):-1,tornado:cv[8]<0.45?TRACK*(0.5+0.33*cv[9]):-1,cele:cv[10]<0.5};
- const R=types.map((type,i)=>{const T=TYPES[type],q={no:i+1,lane:i,type,form:0.93+0.14*r(),x:0,px:0,v:0,mood:1,st:'run',mode:'run',tm:0,cool:0,hit:[],done:null,phase:r()*T.rest||0,roll:0,burst:false,panic:0,seen:[false,false],ate:[false,false],sign:0,wet:false,host:0};
+ const R=types.map((type,i)=>{const T=TT[type],q={no:i+1,lane:i,type,form:0.93+0.14*r(),x:0,px:0,v:0,mood:1,st:'run',mode:'run',tm:0,cool:0,hit:[],done:null,phase:r()*T.rest||0,roll:0,burst:false,panic:0,prop:0,holding:0,holder:0,grabs:0,grabbed:[],carry:0,seen:[false,false],ate:[false,false],sign:0,wet:false,host:0};
   if(type==='costume'){q.splitAt=TRACK*(0.2+0.3*r());q.split=false;const u=r(),w=r();q.plan=u<T.luck?(w<0.5?'bike':'ride'):'none';q.bikeIn=3+5*r();q.fuel=500+1100*r();q.rideCool=0;}
   if(type==='turtle'){const u=r(),w=r();q.stompAt=u<T.stomp?TRACK*(0.3+0.45*r()):-1;q.through=w<T.luck;q.dir=1;q.shellTo=0;}
   return q;});
@@ -39,11 +47,11 @@ export function runRace(seedHex,n){
  const hittable=o=>o.done==null&&o.type!=='elephant'&&HITTABLE.includes(o.st)&&!(o.type==='turtle'&&o.st!=='run');
  const knock=(o,st,tm)=>{o.st=st;o.tm=tm;o.roll=0;o.panic=0;};
  say('출발했습니다!','start');
- while(finish.length<n&&t<MAX_SECONDS){
+ while(finish.length<Math.min(n,stopAfter)&&t<MAX_SECONDS){
   const live=R.filter(q=>q.done==null);
   // 모든 선수가 결승선에 들어올 때까지 기다림(거북이가 끝까지 걸어오면 3분을 넘기도 함. 화면에 '결과 바로 보기'가 있음)
   const leadX=Math.max(...R.map(q=>q.done!=null?TRACK:q.x));
-  for(const q of live){const T=TYPES[q.type];q.px=q.x;
+  for(const q of live){const T=TT[q.type];q.px=q.x;
    q.mood+=(r()-0.5)*0.9*DT;q.mood=Math.max(0.86,Math.min(1.14,q.mood+(1-q.mood)*0.4*DT));if(q.cool>0)q.cool-=DT;if(q.rideCool>0)q.rideCool-=DT;
    if(q.st==='run'){let target=T.v,mode='run',tripRate=T.trip||0;
     if(q.type==='horse'&&t>4&&q.x<TRACK*0.9&&r()<T.back*DT){q.st='back';q.tm=1.5;say(sub(q)+' 갑자기 거꾸로 달립니다! 어디 가세요?!','back',q.no);}
@@ -54,7 +62,11 @@ export function runRace(seedHex,n){
      for(let k=0;k<2;k++)if(!q.ate[k]&&q.x>=course.bamboo[k]){q.ate[k]=true;if(r()<0.7){q.st='eat';q.tm=2.2;q.roll=0;say(name(q)+', 대나무를 발견했습니다! 식사 시간입니다.','eat',q.no,undefined,{k});}}}
     if(q.type==='ostrich'&&t>2&&r()<T.dig*DT){q.st='dig';q.tm=1.2;say(sub(q)+' 갑자기 머리를 땅에 박습니다! 무서운 걸 봤나요?','dig',q.no);}
     if(q.type==='giraffe'){const s=Math.floor(q.x/200);if(s>q.sign&&s<TRACK/200){q.sign=s;if(r()<T.bonk){q.st='down';q.tm=T.down;say(sub(q)+' 거리 표지판에 머리를 부딪혔습니다! 키가 너무 커요!','bonk',q.no);}}}
-    if(q.type==='elephant'){if(q.panic>0){q.panic-=DT;target=T.panicV;mode='panic';}else if(t>3&&r()<T.panic*DT){q.panic=3;say(sub(q)+' 생쥐를 보고 깜짝! 폭주합니다!','panic',q.no,undefined,{x:q.x+16});}}
+    if(q.type==='elephant'){
+     if(q.prop>0){q.prop-=DT;target=T.propV;mode='prop';
+      if(q.prop<=0){const o=R[q.holding-1];q.holding=0;if(o.st==='spun'){const fwd=r()<0.5;o.st='thrown';o.tm=1.2;o.carry=fwd?105:-95;o.holder=0;
+        if(fwd){q.st='oops';q.tm=1.1;say(sub(q)+' '+obj(o)+' 앞으로 던져 버렸습니다! 아차!','throwfwd',q.no,o.no);}else say(sub(q)+' '+obj(o)+' 뒤로 내던집니다!','throwback',q.no,o.no);}}}
+     else if(q.panic>0){q.panic-=DT;target=T.panicV;mode='panic';}else if(t>3&&r()<T.panic*DT){q.panic=3;say(sub(q)+' 생쥐를 보고 깜짝! 폭주합니다!','panic',q.no,undefined,{x:q.x+16});}}
     if(q.type==='cow'&&t>3&&r()<T.graze*DT){q.st='eat';q.tm=1.4;say(sub(q)+' 풀을 뜯습니다. 맛있어 보였나 봅니다.','eat',q.no);}
     if(q.type==='zebra')for(let k=0;k<2;k++)if(!q.seen[k]&&q.x>=course.cross[k]-6){q.seen[k]=true;if(r()<0.85){q.st='wait';q.tm=1.6+1.2*r();say(sub(q)+' 횡단보도 앞에 멈춰 섭니다. 빨간불이거든요!','wait',q.no,undefined,{k});}}
     if(q.type==='turtle'){mode='crawl';if(q.stompAt>0&&leadX>=q.stompAt&&q.x<leadX){q.stompAt=-1;q.st='shell';q.dir=1;q.shellTo=q.through?TRACK+40:Math.max(q.x+120,leadX-90+220*r());
@@ -71,7 +83,9 @@ export function runRace(seedHex,n){
    else{const host=q.host?R[q.host-1]:null;
     switch(q.st){
      case 'down':case 'fly':q.v*=0.90;break;
-     case 'dig':case 'nap':case 'eat':case 'wait':case 'cele':q.v*=0.86;break;
+     case 'dig':case 'nap':case 'eat':case 'wait':case 'cele':case 'oops':q.v*=0.86;break;
+     case 'spun':q.v=R[q.holder-1].v;break;
+     case 'thrown':q.v=q.carry;break;
      case 'back':q.v+=(-22-q.v)*3*DT;break;
      case 'lift':case 'drop':q.v=0;break;
      case 'gone':q.v=q.carry;break;
@@ -87,11 +101,14 @@ export function runRace(seedHex,n){
      else if(q.st==='gone'){const front=Math.max(...R.filter(o=>o!==q).map(o=>o.done!=null?TRACK:o.x));q.st='drop';q.tm=0.7;say('UFO가 '+obj(q)+(q.dropBack?' 한참 뒤쪽에 내려놓았습니다! 이런!':q.x>front?' 선두 앞에 내려놓았습니다! 이게 무슨 일입니까!':' 앞쪽에 내려놓았습니다!'),'ufodrop',q.no);}
      else if(q.st==='drop'){q.st='down';q.tm=0.7;}
      else if(q.st==='blown'){q.st='down';q.tm=0.9;}
+     else if(q.st==='thrown'){q.st='down';q.tm=0.8;}
      else q.st='run';}}
    }
-   if(q.st!=='ride')q.x+=q.v*DT;if(q.x<0)q.x=0;
+   if(q.st!=='ride'&&q.st!=='spun')q.x+=q.v*DT;if(q.x<0)q.x=0;
   }
   for(const q of live)if(q.st==='ride')q.x=R[q.host-1].x-3;
+  // 코끼리 코에 잡힌 선수는 코끼리와 함께 감(코끼리가 멈추면 놓여남)
+  for(const q of live)if(q.st==='spun'){const h=R[q.holder-1];if(h.st!=='run'||h.holding!==q.no){q.st='down';q.tm=0.8;q.holder=0;if(h.holding===q.no){h.holding=0;h.prop=0;}}else q.x=h.x+6;}
   // 선수끼리 부딪침
   for(const q of live){const near=(o,d,l)=>o!==q&&o.done==null&&!q.hit.includes(o.no)&&o.x>q.x&&o.x-q.x<d&&Math.abs(o.lane-q.lane)<=l;
    if(q.type==='cheetah'&&q.st==='run'&&q.mode==='sprint'&&q.cool<=0){const v=live.find(o=>near(o,9,3)&&o.type!=='cheetah'&&(hittable(o)||(o.type==='elephant'&&o.st==='run')));
@@ -102,6 +119,8 @@ export function runRace(seedHex,n){
      else{knock(v,'fly',1.2);say(sub(q)+' 굴러가며 '+obj(v)+' 치고 지나갑니다!','bowl',q.no,v.no);}}}
    if(q.type==='elephant'&&q.st==='run'&&q.mode==='panic'){const v=live.find(o=>near(o,10,1)&&hittable(o));
     if(v){q.hit.push(v.no);knock(v,'fly',1.5);say('폭주하는 '+sub(q)+' '+obj(v)+' 들이받습니다!','trample',q.no,v.no);}}
+   if(V2&&q.type==='elephant'&&q.st==='run'&&q.prop<=0&&q.panic<=0&&q.grabs<2&&t>4&&q.x<TRACK-280){const T=TT.elephant,v=live.find(o=>o!==q&&hittable(o)&&!(o.type==='costume'&&o.split)&&!q.grabbed.includes(o.no)&&o.x-q.x>-6&&o.x-q.x<16&&Math.abs(o.lane-q.lane)<=2);
+    if(v&&r()<T.grab*DT){q.grabs++;q.grabbed.push(v.no);q.prop=3;q.holding=v.no;v.st='spun';v.tm=0;v.holder=q.no;v.roll=0;say(sub(q)+' '+obj(v)+' 코로 낚아챘습니다! 프로펠러처럼 돌리며 질주합니다!','grab',q.no,v.no);}}
    if(q.type==='turtle'&&q.st==='shell')for(const o of live){if(o===q||Math.abs(o.lane-q.lane)>2||q.hit.includes(o.no))continue;const lo=Math.min(q.px,q.x),hi=Math.max(q.px,q.x);if(o.x<lo||o.x>hi)continue;
     if(o.type==='elephant'&&q.dir>0){q.hit.push(o.no);q.dir=-1;q.shellTo=Math.max(0,q.x-120-200*r());say('등껍질이 '+name(o)+'에 맞고 되돌아갑니다! 거북이 어디 가나요!','ricochet',q.no,o.no);break;}
     if(hittable(o)&&r()<0.8){q.hit.push(o.no);knock(o,'fly',1.5);say(sub(o)+' 거북이 등껍질에 맞고 날아갑니다!','shellhit',q.no,o.no);}}
@@ -124,10 +143,10 @@ export function runRace(seedHex,n){
   const front=R.filter(q=>q.done==null).sort((a,b)=>b.x-a.x)[0];
   if(front&&finish.length===0){if(front.no!==lead){if(t-leadSince>2&&t>3&&t-lastLeadSay>3){say('선두가 바뀝니다! '+name(front)+'!','lead',front.no);lastLeadSay=t;}lead=front.no;leadSince=t;}
    if(!homeSaid&&front.x>TRACK-220){homeSaid=true;say('결승선이 눈앞입니다! 선두는 '+name(front)+'!','home',front.no);}}
-  t+=DT;frames.push(R.map(q=>({x:q.x,v:q.v,s:q.st==='run'?q.mode:q.st,h:q.st==='ride'||q.st==='leap'?q.host:0,sp:q.type==='costume'&&q.split?1:0})));
+  t+=DT;frames.push(R.map(q=>({x:q.x,v:q.v,s:q.st==='run'?q.mode:q.st,h:q.st==='ride'||q.st==='leap'?q.host:q.st==='spun'?q.holder:0,sp:q.type==='costume'&&q.split?1:0})));
  }
  const rest=R.filter(q=>q.done==null).sort((a,b)=>b.x-a.x);
  if(rest.length)say(rest.map(name).join(', ')+', 아직도 오는 중입니다… 여기서 경기를 마칩니다!','timeup',rest[0].no);else say('모든 선수가 결승선에 들어왔습니다! 경기 끝!','end');
  const order=[...finish,...rest.map(q=>q.no)];
- return {types,course,frames,events,order,finished:finish.length,seconds:Math.round(t*10)/10};
+ return {version,types,course,frames,events,order,finished:finish.length,seconds:Math.round(t*10)/10};
 }
