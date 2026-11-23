@@ -1,5 +1,5 @@
 // 엉뚱 경주 계산(시안 2). 같은 추첨 번호(seed)면 언제나 같은 경기입니다. 사칙연산만 씁니다.
-export const HZ=60,TRACK=1600,MAX_RACERS=10,MAX_SECONDS=130,AFTER_FIRST=14;
+export const HZ=60,TRACK=1600,MAX_RACERS=10,MAX_SECONDS=320;
 export function rng(seedHex){let a=parseInt(seedHex,16)>>>0;return ()=>{a=(a+0x6D2B79F5)>>>0;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
 const hex=v=>(v>>>0).toString(16).padStart(8,'0');
 // 선수 종류와 버릇. v: 기본 속도, trip: 1초에 넘어질 확률, down: 넘어져 있는 시간(초), luck: 기적이 일어날 확률
@@ -37,10 +37,9 @@ export function runRace(seedHex,n){
  const hittable=o=>o.done==null&&o.type!=='elephant'&&HITTABLE.includes(o.st)&&!(o.type==='turtle'&&o.st!=='run');
  const knock=(o,st,tm)=>{o.st=st;o.tm=tm;o.roll=0;o.panic=0;};
  say('출발했습니다!','start');
- while(finish.length<n&&t<MAX_SECONDS&&(firstDone==null||t<firstDone+AFTER_FIRST)){
+ while(finish.length<n&&t<MAX_SECONDS){
   const live=R.filter(q=>q.done==null);
-  // 남은 선수가 시간 안에 못 들어올 게 뻔하면(기어가는 거북이, 갈라진 인형탈) 오래 기다리지 않음
-  if(firstDone!=null&&t>lastDone+2.5&&live.every(q=>{const top=q.type==='turtle'&&q.st==='run'&&q.stompAt<0?10:q.type==='costume'&&q.split&&q.plan==='none'&&(q.st==='run'||q.st==='down')?24:0;return top>0&&(TRACK-q.x)/top>firstDone+AFTER_FIRST-t;}))break;
+  // 모든 선수가 결승선에 들어올 때까지 기다림(거북이가 끝까지 걸어오면 3분을 넘기도 함. 화면에 '결과 바로 보기'가 있음)
   const leadX=Math.max(...R.map(q=>q.done!=null?TRACK:q.x));
   for(const q of live){const T=TYPES[q.type];q.px=q.x;
    q.mood+=(r()-0.5)*0.9*DT;q.mood=Math.max(0.86,Math.min(1.14,q.mood+(1-q.mood)*0.4*DT));if(q.cool>0)q.cool-=DT;if(q.rideCool>0)q.rideCool-=DT;
@@ -126,7 +125,7 @@ export function runRace(seedHex,n){
   t+=DT;frames.push(R.map(q=>({x:q.x,v:q.v,s:q.st==='run'?q.mode:q.st,h:q.st==='ride'||q.st==='leap'?q.host:0,sp:q.type==='costume'&&q.split?1:0})));
  }
  const rest=R.filter(q=>q.done==null).sort((a,b)=>b.x-a.x);
- if(rest.length)say(rest.map(name).join(', ')+', 아직도 오는 중입니다… 여기서 경기를 마칩니다!','timeup',rest[0].no);
+ if(rest.length)say(rest.map(name).join(', ')+', 아직도 오는 중입니다… 여기서 경기를 마칩니다!','timeup',rest[0].no);else say('모든 선수가 결승선에 들어왔습니다! 경기 끝!','end');
  const order=[...finish,...rest.map(q=>q.no)];
  return {types,course,frames,events,order,finished:finish.length,seconds:Math.round(t*10)/10};
 }

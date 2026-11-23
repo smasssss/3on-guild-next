@@ -8,10 +8,13 @@
 html,body{margin:0;height:100%;background:#0b1118}
 body{display:flex;align-items:center;justify-content:center}
 canvas{width:100%;max-width:calc(100vh*16/9);aspect-ratio:16/9;display:block}
+#skip{position:fixed;right:16px;bottom:16px;padding:10px 16px;border:0;border-radius:999px;background:#ffd92e;color:#111;font:800 15px system-ui,sans-serif;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35)}
+#skip[hidden]{display:none}
 </style>
 </head>
 <body>
 <canvas id="cv"></canvas>
+<button id="skip" type="button">결과 바로 보기</button>
 <script type="module" src="view.mjs"></script>
 </body>
 </html>

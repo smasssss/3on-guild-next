@@ -64,7 +64,11 @@ const camX=new Float32Array(NF),camZ=new Float32Array(NF),camH=new Float32Array(
   if(s){const lf=laneF(s.who);tz=s.z;tc=dispX(s.who,f)-7+(s.kind==='stomp'||s.kind==='bike'?10:0);th=s.flat?HOR+40:clamp(505-laneY(lf)*tz,HOR-230,HOR+70);rate=4.5;}
   const snap=(s!==prev)&&((s&&s.cut)||(prev&&prev.cut));if(snap){c=tc;z=tz;h=th;snaps.push(f);}else{c+=(tc-c)*rate/HZ;z+=(tz-z)*rate/HZ;h+=(th-h)*rate/HZ;}
   camX[f-F0]=c;camZ[f-F0]=z;camH[f-F0]=h;prev=s;}}
-const total=PRE+F/HZ+POST;
+// 빨리 감기: 선두가 들어온 뒤, 느린 선수(기어가는 거북이·갈라진 인형탈)만 남고 별일이 없는 구간은 6배로 돌림
+const speedAt=new Float32Array(F).fill(1),tOf=new Float64Array(F+1);{const busy=new Uint8Array(F);for(const e of race.events){if(e.kind==='fall'||e.kind==='end')continue;for(let f=Math.max(0,e.frame-Math.round(2.5*HZ));f<Math.min(F,e.frame+HZ);f++)busy[f]=1;}
+ for(let f=firstF+1;f<F;f++){if(busy[f])continue;let slow=true;for(let i=0;i<n&&slow;i++){if(doneF[i]!=null&&f>doneF[i])continue;const d=race.frames[f][i];slow=(race.types[i]==='turtle'&&d.s==='crawl')||(d.sp&&(d.s==='split'||d.s==='down'));}if(slow)speedAt[f]=6;}
+ for(let f=0;f<F;f++)tOf[f+1]=tOf[f]+1/(HZ*speedAt[f]);}
+const total=PRE+tOf[F]+POST,frameAt=ts=>{const u=ts-PRE;if(u<0)return Math.floor(u*HZ);if(u>=tOf[F])return F+Math.floor((u-tOf[F])*HZ);let a=0,b=F;while(b-a>1){const m=(a+b)>>1;if(tOf[m]<=u)a=m;else b=m;}return a;};
 // ---- 그리기 도구 ----
 let g=main;
 function strip(tile,dy,dh,scroll){const s=dh/tile.height,tw=tile.width*s;let x=-(((scroll%tw)+tw)%tw);for(;x<W;x+=tw-1)g.drawImage(tile,x,dy,tw,dh);}
@@ -162,7 +166,7 @@ function world(f,ts,C){const {L,z,hy}=C,X=x=>(x-L)*PPU*z,Yof=lf=>hy+laneY(lf)*z,
 }
 function orderAt(f){const fin=race.events.filter(e=>e.kind==='finish'&&e.frame<=f).map(e=>e.a),rest=[];for(let i=0;i<n;i++)if(!fin.includes(i+1))rest.push(i+1);rest.sort((a,b)=>dispX(b-1,f)-dispX(a-1,f));return [...fin,...rest];}
 const LOWKEY=['lead','finish','home','unshell'];
-function render(ts){ts=clamp(ts,0,total-1e-6);const f=clamp(Math.floor((ts-PRE)*HZ),F0,F1-1),k=f-F0,shot=shotAt[k];g=main;
+function render(ts){ts=clamp(ts,0,total-1e-6);const f=clamp(frameAt(ts),F0,F1-1),k=f-F0,shot=shotAt[k];g=main;
  let shake=0;for(const e of race.events)if(['pounce','bowl','trample','shellhit','stomp','bounce','ricochet'].includes(e.kind)&&f>=e.frame&&f-e.frame<16)shake=Math.max(shake,1-(f-e.frame)/16);
  g.save();if(shake)g.translate(Math.sin(f*2.1)*8*shake,Math.cos(f*2.7)*6*shake);
  world(f,ts,{L:camX[k]-W/(2*PPU*camZ[k]),z:camZ[k],hy:camH[k]});g.restore();
@@ -172,6 +176,7 @@ function render(ts){ts=clamp(ts,0,total-1e-6);const f=clamp(Math.floor((ts-PRE)*
   g.font='800 21px system-ui,sans-serif';const lw=g.measureText(shot.label).width+54;rr(180,66,lw,36,18);g.fillStyle='rgba(10,20,30,.78)';g.fill();g.beginPath();g.arc(200,84,7,0,7);g.fillStyle=Math.floor(ts*2)%2?'#ff3b2f':'#a01912';g.fill();g.fillStyle='#fff';g.textAlign='left';g.fillText(shot.label,214,85);}
  for(const sf of snaps){const d=f-sf;if(d>=0&&d<6){g.fillStyle='rgba(255,255,255,'+(0.55*(1-d/6))+')';g.fillRect(0,0,W,H);}}
  hud(f,ts,!!(shot&&shot.cut));
+ if(f>=0&&f<F&&speedAt[f]>1){rr(W/2-96,112,192,40,20);g.fillStyle='rgba(10,20,30,.78)';g.fill();g.fillStyle='#ffd92e';g.font='800 21px system-ui,sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText('▶▶ 빨리 감기',W/2,133);}
 }
 function hud(f,ts,pip){const ord=orderAt(Math.max(0,f));
  rr(176,14,1088,42,21);g.fillStyle='rgba(10,20,30,.62)';g.fill();const bx0=206,bx1=1214;g.strokeStyle='rgba(255,255,255,.55)';g.lineWidth=4;g.beginPath();g.moveTo(bx0,35);g.lineTo(bx1,35);g.stroke();
@@ -196,8 +201,9 @@ function hud(f,ts,pip){const ord=orderAt(Math.max(0,f));
    const im=SP[race.types[no-1]].f[0],fit=Math.min(84/im.width,58/im.height),ww=im.width*fit,hh=im.height*fit;g.drawImage(im,x+136+(84-ww)/2,y-hh/2,ww,hh);g.fillStyle='#fff';g.font='700 20px system-ui,sans-serif';g.textAlign='left';g.fillText(TYPES[race.types[no-1]].name,x+230,y-(r>=race.finished?9:0));
    if(r>=race.finished){g.fillStyle='#ff8d7a';g.font='600 14px system-ui,sans-serif';g.fillText('결승선 못 옴',x+230,y+13);}});g.globalAlpha=1;}
 }
-window.__total=total;window.__race=race;window.__shots=shots;window.__seek=t=>render(t);
-let t0=null;function loop(now){if(t0==null)t0=now;const t=(now-t0)/1000;render(t);if(t<total)requestAnimationFrame(loop);}
+window.__total=total;window.__endAt=PRE+tOf[F];window.__race=race;window.__shots=shots;window.__seek=t=>render(t);
+let t0=null,running=false;const skip=document.getElementById('skip'),endAt=PRE+tOf[F]+0.7;function loop(now){if(t0==null)t0=now;const t=(now-t0)/1000;render(t);if(skip)skip.hidden=t>=endAt-0.1;running=t<total;if(running)requestAnimationFrame(loop);}
+if(skip)skip.addEventListener('click',e=>{e.stopPropagation();t0=performance.now()-endAt*1000;if(!running)requestAnimationFrame(loop);});
 if(q.get('still')!=null)render(+q.get('still'));else requestAnimationFrame(loop);
 cv.addEventListener('click',()=>{t0=null;requestAnimationFrame(loop);});
 window.__ready=true;
