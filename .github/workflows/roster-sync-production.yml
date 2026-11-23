@@ -40,6 +40,7 @@ name: Promote roster sync to Production after a fresh Staging verification (user
 # Release 38 (user-approved 2026-11-23 "바람으로 섞는 통, 로또 추첨기, 출발 신호등 함께 프로덕션에 올려서 배포해"): 로또 추첨기 in the 추첨 게임 tab (number balls blown in a glass drum and drawn one by one; range of 2-60 balls and the count typed each time; drawn order recorded in its own kind 'lotto'); 런닝머신 레이스 version 2 mixes the slot-owner balls with air before they drop (version 1 records replay as version 1); start lights (3 seconds of red lamps, then go) before the treadmill starts.
 # Release 39 (user-approved 2026-11-23 "음악 프로덕션에 올리고 배포해"): 런닝머신 레이스 plays the user's own race music (made by the user) from the go signal and fades it when the race ends; a sound switch turns it off.
 # Release 40 (user-approved 2026-11-23 "런닝머신 설정도 너가 테스트 해본 다음 그나마 괜찮은걸로 선택해서 프로덕션에 배포해버려"): 런닝머신 레이스 version 3 — no 10-second restart, no concave belt; a flat belt with a bold ramp at the back, sides banked slightly toward the middle, much lower seams; every 10 seconds the belt gets a little faster and the ramp a little lower so every race ends by itself. Version 1 and 2 records replay as recorded.
+# Release 41 (user-approved 2026-11-23 "소리 줄인거 프로덕션에 올리는거 승인한다"): 핀볼 추첨 is quieter — background music 0.55 to 0.28, effect sounds (arrival ding, result sound) 0.8 to 0.3.
 on:
   push:
     branches: [claude/new-session-narazy]
